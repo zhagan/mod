@@ -993,78 +993,163 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
     case 'MP3Deck':
       return output ? (
         <MP3Deck output={output}>
-          {(controls) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <FileUpload
-                onFileSelect={(file) => controls.loadFile(file)}
-                accept="audio/*"
-                label="Load Audio"
-              />
-              <Slider
-                label="Gain"
-                value={controls.gain}
-                onChange={controls.setGain}
-                min={0}
-                max={2}
-                step={0.01}
-                formatValue={(v) => v.toFixed(2)}
-              />
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <IconButton
-                  icon={controls.isPlaying ? <Pause size={16} /> : <Play size={16} />}
-                  active={controls.isPlaying}
-                  onClick={controls.isPlaying ? controls.pause : controls.play}
-                  variant="success"
-                  title={controls.isPlaying ? 'Pause' : 'Play'}
+          {(controls) => {
+            const formatTime = (seconds: number) => {
+              if (!isFinite(seconds)) return '0:00';
+              const mins = Math.floor(seconds / 60);
+              const secs = Math.floor(seconds % 60);
+              return `${mins}:${secs.toString().padStart(2, '0')}`;
+            };
+
+            const hasAudio = controls.duration > 0;
+
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <FileUpload
+                  onFileSelect={(file) => controls.loadFile(file)}
+                  accept="audio/*"
+                  label="Load Audio"
                 />
-                <IconButton
-                  icon={<Square size={16} />}
-                  onClick={controls.stop}
-                  title="Stop"
+                <Slider
+                  label="Gain"
+                  value={controls.gain}
+                  onChange={controls.setGain}
+                  min={0}
+                  max={2}
+                  step={0.01}
+                  formatValue={(v) => v.toFixed(2)}
                 />
-                <IconButton
-                  icon={<Repeat size={16} />}
-                  active={controls.loop}
-                  onClick={() => controls.setLoop(!controls.loop)}
-                  title="Loop"
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                  <IconButton
+                    icon={controls.isPlaying ? <Pause size={16} /> : <Play size={16} />}
+                    active={controls.isPlaying}
+                    onClick={controls.isPlaying ? controls.pause : controls.play}
+                    variant="success"
+                    title={controls.isPlaying ? 'Pause' : 'Play'}
+                    disabled={!hasAudio}
+                  />
+                  <IconButton
+                    icon={<Square size={16} />}
+                    onClick={controls.stop}
+                    title="Stop"
+                    disabled={!hasAudio}
+                  />
+                  <IconButton
+                    icon={<Repeat size={16} />}
+                    active={controls.loop}
+                    onClick={() => controls.setLoop(!controls.loop)}
+                    title="Loop"
+                    disabled={!hasAudio}
+                  />
+                </div>
+                <div style={{
+                  fontSize: '12px',
+                  color: hasAudio ? '#999' : '#555',
+                  fontFamily: 'monospace',
+                  textAlign: 'center'
+                }}>
+                  {hasAudio ? `${formatTime(controls.currentTime)} / ${formatTime(controls.duration)}` : '0:00 / 0:00'}
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={controls.duration || 100}
+                  step={0.1}
+                  value={controls.currentTime}
+                  onChange={(e) => controls.seek(parseFloat(e.target.value))}
+                  disabled={!hasAudio}
+                  style={{
+                    width: '100%',
+                    cursor: hasAudio ? 'pointer' : 'not-allowed',
+                    accentColor: '#00ff88',
+                    opacity: hasAudio ? 1 : 0.5
+                  }}
                 />
               </div>
-            </div>
-          )}
+            );
+          }}
         </MP3Deck>
       ) : null;
 
     case 'StreamingAudioDeck':
       return output ? (
         <StreamingAudioDeck output={output}>
-          {(controls) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <TextInput
-                value={controls.url}
-                onChange={controls.setUrl}
-                placeholder="Stream URL"
-                label="URL"
-              />
-              <Slider
-                label="Gain"
-                value={controls.gain}
-                onChange={controls.setGain}
-                min={0}
-                max={2}
-                step={0.01}
-                formatValue={(v) => v.toFixed(2)}
-              />
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <IconButton
-                  icon={controls.isPlaying ? <Pause size={16} /> : <Play size={16} />}
-                  active={controls.isPlaying}
-                  onClick={controls.isPlaying ? controls.pause : controls.play}
-                  variant="success"
-                  title={controls.isPlaying ? 'Pause' : 'Play'}
+          {(controls) => {
+            const formatTime = (seconds: number) => {
+              if (!isFinite(seconds)) return '0:00';
+              const mins = Math.floor(seconds / 60);
+              const secs = Math.floor(seconds % 60);
+              return `${mins}:${secs.toString().padStart(2, '0')}`;
+            };
+
+            const hasAudio = controls.duration > 0;
+
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <TextInput
+                  value={controls.url}
+                  onChange={controls.setUrl}
+                  placeholder="Stream URL"
+                  label="URL"
+                />
+                <Slider
+                  label="Gain"
+                  value={controls.gain}
+                  onChange={controls.setGain}
+                  min={0}
+                  max={2}
+                  step={0.01}
+                  formatValue={(v) => v.toFixed(2)}
+                />
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                  <IconButton
+                    icon={controls.isPlaying ? <Pause size={16} /> : <Play size={16} />}
+                    active={controls.isPlaying}
+                    onClick={controls.isPlaying ? controls.pause : controls.play}
+                    variant="success"
+                    title={controls.isPlaying ? 'Pause' : 'Play'}
+                    disabled={!hasAudio}
+                  />
+                  <IconButton
+                    icon={<Square size={16} />}
+                    onClick={controls.stop}
+                    title="Stop"
+                    disabled={!hasAudio}
+                  />
+                  <IconButton
+                    icon={<Repeat size={16} />}
+                    active={controls.loop}
+                    onClick={() => controls.setLoop(!controls.loop)}
+                    title="Loop"
+                    disabled={!hasAudio}
+                  />
+                </div>
+                <div style={{
+                  fontSize: '12px',
+                  color: hasAudio ? '#999' : '#555',
+                  fontFamily: 'monospace',
+                  textAlign: 'center'
+                }}>
+                  {hasAudio ? `${formatTime(controls.currentTime)} / ${formatTime(controls.duration)}` : '0:00 / 0:00'}
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={controls.duration || 100}
+                  step={0.1}
+                  value={controls.currentTime}
+                  onChange={(e) => controls.seek(parseFloat(e.target.value))}
+                  disabled={!hasAudio}
+                  style={{
+                    width: '100%',
+                    cursor: hasAudio ? 'pointer' : 'not-allowed',
+                    accentColor: '#00ff88',
+                    opacity: hasAudio ? 1 : 0.5
+                  }}
                 />
               </div>
-            </div>
-          )}
+            );
+          }}
         </StreamingAudioDeck>
       ) : null;
 

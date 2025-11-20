@@ -15,7 +15,7 @@ export { MP3Deck } from './components/sources/MP3Deck';
 export type { MP3DeckProps, MP3DeckRenderProps, MP3DeckHandle } from './components/sources/MP3Deck';
 
 export { StreamingAudioDeck } from './components/sources/StreamingAudioDeck';
-export type { StreamingAudioDeckProps, StreamingAudioDeckRenderProps } from './components/sources/StreamingAudioDeck';
+export type { StreamingAudioDeckProps, StreamingAudioDeckRenderProps, StreamingAudioDeckHandle } from './components/sources/StreamingAudioDeck';
 
 export { ToneGenerator } from './components/sources/ToneGenerator';
 export type { ToneGeneratorProps, ToneGeneratorRenderProps, OscillatorType } from './components/sources/ToneGenerator';

@@ -6,10 +6,15 @@ import { useControlledState } from '../../hooks/useControlledState';
 export interface StreamingAudioDeckHandle {
   play: () => void;
   pause: () => void;
+  stop: () => void;
+  seek: (time: number) => void;
   getState: () => {
     url: string;
     gain: number;
+    loop: boolean;
     isPlaying: boolean;
+    currentTime: number;
+    duration: number;
     error: string | null;
   };
 }
@@ -19,9 +24,15 @@ export interface StreamingAudioDeckRenderProps {
   setUrl: (url: string) => void;
   gain: number;
   setGain: (value: number) => void;
+  loop: boolean;
+  setLoop: (value: boolean) => void;
   isPlaying: boolean;
   play: () => void;
   pause: () => void;
+  stop: () => void;
+  currentTime: number;
+  duration: number;
+  seek: (time: number) => void;
   isActive: boolean;
   error: string | null;
 }
@@ -34,8 +45,11 @@ export interface StreamingAudioDeckProps {
   onUrlChange?: (url: string) => void;
   gain?: number;
   onGainChange?: (gain: number) => void;
+  loop?: boolean;
+  onLoopChange?: (loop: boolean) => void;
   // Event callbacks
   onPlayingChange?: (isPlaying: boolean) => void;
+  onTimeUpdate?: (currentTime: number, duration: number) => void;
   onError?: (error: string | null) => void;
   // Render props
   children?: (props: StreamingAudioDeckRenderProps) => ReactNode;
@@ -48,14 +62,20 @@ export const StreamingAudioDeck = React.forwardRef<StreamingAudioDeckHandle, Str
   onUrlChange,
   gain: controlledGain,
   onGainChange,
+  loop: controlledLoop,
+  onLoopChange,
   onPlayingChange,
+  onTimeUpdate,
   onError,
   children,
 }, ref) => {
   const audioContext = useAudioContext();
   const [url, setUrl] = useControlledState(controlledUrl, '', onUrlChange);
   const [gain, setGain] = useControlledState(controlledGain, 1.0, onGainChange);
+  const [loop, setLoop] = useControlledState(controlledLoop, false, onLoopChange);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
@@ -130,6 +150,7 @@ export const StreamingAudioDeck = React.forwardRef<StreamingAudioDeckHandle, Str
         audioElement = new Audio();
         audioElement.crossOrigin = 'anonymous';
         audioElement.src = url;
+        audioElement.loop = loop;
         audioElementRef.current = audioElement;
 
         // Create source from the new audio element
@@ -148,6 +169,12 @@ export const StreamingAudioDeck = React.forwardRef<StreamingAudioDeckHandle, Str
         const handlePlay = () => setIsPlaying(true);
         const handlePause = () => setIsPlaying(false);
         const handleEnded = () => setIsPlaying(false);
+        const handleLoadedMetadata = () => {
+          setDuration(audioElement!.duration);
+        };
+        const handleTimeUpdate = () => {
+          setCurrentTime(audioElement!.currentTime);
+        };
         const handleError = (e: Event) => {
           setError('Failed to load stream');
           console.error('Stream error:', e);
@@ -156,6 +183,8 @@ export const StreamingAudioDeck = React.forwardRef<StreamingAudioDeckHandle, Str
         audioElement.addEventListener('play', handlePlay);
         audioElement.addEventListener('pause', handlePause);
         audioElement.addEventListener('ended', handleEnded);
+        audioElement.addEventListener('loadedmetadata', handleLoadedMetadata);
+        audioElement.addEventListener('timeupdate', handleTimeUpdate);
         audioElement.addEventListener('error', handleError);
 
         // If we were playing before, start playing the new URL
@@ -210,6 +239,13 @@ export const StreamingAudioDeck = React.forwardRef<StreamingAudioDeckHandle, Str
     }
   }, [gain]);
 
+  // Update loop when it changes
+  useEffect(() => {
+    if (audioElementRef.current) {
+      audioElementRef.current.loop = loop;
+    }
+  }, [loop]);
+
   // Playback controls
   const play = async () => {
     if (audioElementRef.current && audioContext) {
@@ -230,17 +266,36 @@ export const StreamingAudioDeck = React.forwardRef<StreamingAudioDeckHandle, Str
     }
   };
 
+  const stop = () => {
+    if (audioElementRef.current) {
+      audioElementRef.current.pause();
+      audioElementRef.current.currentTime = 0;
+    }
+  };
+
+  const seek = (time: number) => {
+    if (audioElementRef.current) {
+      audioElementRef.current.currentTime = time;
+    }
+  };
+
   // Expose imperative handle
   useImperativeHandle(ref, () => ({
     play,
     pause,
-    getState: () => ({ url, gain, isPlaying, error }),
-  }), [url, gain, isPlaying, error]);
+    stop,
+    seek,
+    getState: () => ({ url, gain, loop, isPlaying, currentTime, duration, error }),
+  }), [url, gain, loop, isPlaying, currentTime, duration, error]);
 
   // Event callback effects
   useEffect(() => {
     onPlayingChange?.(isPlaying);
   }, [isPlaying, onPlayingChange]);
+
+  useEffect(() => {
+    onTimeUpdate?.(currentTime, duration);
+  }, [currentTime, duration, onTimeUpdate]);
 
   useEffect(() => {
     onError?.(error);
@@ -257,9 +312,15 @@ export const StreamingAudioDeck = React.forwardRef<StreamingAudioDeckHandle, Str
       setUrl,
       gain,
       setGain,
+      loop,
+      setLoop,
       isPlaying,
       play,
       pause,
+      stop,
+      currentTime,
+      duration,
+      seek,
       isActive: !!output.current,
       error,
     })}</>;

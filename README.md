@@ -28,8 +28,8 @@
 
 - 🎛️ **Modular Design** - Composable audio components that can be connected in any configuration
 - ⚡ **Type-Safe** - Full TypeScript support with comprehensive type definitions
-- 🎨 **Flexible API** - Three usage patterns: render props, controlled props, or imperative refs
-- 🔌 **Extensive Module Library** - Sources, processors, CV generators, mixers, and more
+- 🎨 **Flexible API** - Three usage patterns: render props, controlled props, and imperative refs
+- 🔌 **Extensive Module Library** - Sources, processors, CV generators, mixers, visualizations, and more
 - 📊 **Real-time Control** - React-driven parameter control with smooth automation
 - 🎵 **Professional Audio** - Built on the Web Audio API for high-quality sound
 
