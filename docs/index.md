@@ -6,7 +6,7 @@ hero:
   text: Modular Web Audio
   tagline: Build synthesizers, effects processors, and generative music apps with composable React components
   image:
-    src: /logo.png
+    src: /mod/logo.png
     alt: MOD logo
   actions:
     - theme: brand
