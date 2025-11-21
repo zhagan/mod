@@ -1,6 +1,16 @@
-import { useEffect, useState, useRef, ReactNode } from 'react';
+import React, { useEffect, useRef, ReactNode, useImperativeHandle } from 'react';
 import { useAudioContext } from '../../context/AudioContext';
 import { ModStreamRef } from '../../types/ModStream';
+import { useControlledState } from '../../hooks/useControlledState';
+
+export interface ChorusHandle {
+  getState: () => {
+    rate: number;
+    depth: number;
+    delay: number;
+    wet: number;
+  };
+}
 
 export interface ChorusRenderProps {
   rate: number;
@@ -18,20 +28,36 @@ export interface ChorusProps {
   input: ModStreamRef;
   output: ModStreamRef;
   label?: string;
+  rate?: number;
+  onRateChange?: (value: number) => void;
+  depth?: number;
+  onDepthChange?: (value: number) => void;
+  delay?: number;
+  onDelayChange?: (value: number) => void;
+  wet?: number;
+  onWetChange?: (value: number) => void;
   children?: (props: ChorusRenderProps) => ReactNode;
 }
 
-export const Chorus: React.FC<ChorusProps> = ({
+export const Chorus = React.forwardRef<ChorusHandle, ChorusProps>(({
   input,
   output,
   label = 'chorus',
+  rate: controlledRate,
+  onRateChange,
+  depth: controlledDepth,
+  onDepthChange,
+  delay: controlledDelay,
+  onDelayChange,
+  wet: controlledWet,
+  onWetChange,
   children,
-}) => {
+}, ref) => {
   const audioContext = useAudioContext();
-  const [rate, setRate] = useState(1.5); // LFO rate in Hz
-  const [depth, setDepth] = useState(0.002); // Modulation depth in seconds
-  const [delay, setDelay] = useState(0.02); // Base delay in seconds
-  const [wet, setWet] = useState(0.5); // Wet/dry mix
+  const [rate, setRate] = useControlledState(controlledRate, 1.5, onRateChange);
+  const [depth, setDepth] = useControlledState(controlledDepth, 0.002, onDepthChange);
+  const [delay, setDelay] = useControlledState(controlledDelay, 0.02, onDelayChange);
+  const [wet, setWet] = useControlledState(controlledWet, 0.5, onWetChange);
 
   const dryGainRef = useRef<GainNode | null>(null);
   const wetGainRef = useRef<GainNode | null>(null);
@@ -172,6 +198,11 @@ export const Chorus: React.FC<ChorusProps> = ({
     }
   }, [wet]);
 
+  // Expose imperative handle
+  useImperativeHandle(ref, () => ({
+    getState: () => ({ rate, depth, delay, wet }),
+  }), [rate, depth, delay, wet]);
+
   // Render children with state
   if (children) {
     return <>{children({
@@ -188,4 +219,6 @@ export const Chorus: React.FC<ChorusProps> = ({
   }
 
   return null;
-};
+});
+
+Chorus.displayName = 'Chorus';

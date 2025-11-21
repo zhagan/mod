@@ -1,6 +1,14 @@
-import { useEffect, useState, useRef, ReactNode } from 'react';
+import React, { useEffect, useRef, ReactNode, useImperativeHandle } from 'react';
 import { useAudioContext } from '../../context/AudioContext';
 import { ModStreamRef } from '../../types/ModStream';
+import { useControlledState } from '../../hooks/useControlledState';
+
+export interface LimiterHandle {
+  getState: () => {
+    threshold: number;
+    release: number;
+  };
+}
 
 export interface LimiterRenderProps {
   threshold: number;
@@ -14,18 +22,26 @@ export interface LimiterProps {
   input: ModStreamRef;
   output: ModStreamRef;
   label?: string;
+  threshold?: number;
+  onThresholdChange?: (value: number) => void;
+  release?: number;
+  onReleaseChange?: (value: number) => void;
   children?: (props: LimiterRenderProps) => ReactNode;
 }
 
-export const Limiter: React.FC<LimiterProps> = ({
+export const Limiter = React.forwardRef<LimiterHandle, LimiterProps>(({
   input,
   output,
   label = 'limiter',
+  threshold: controlledThreshold,
+  onThresholdChange,
+  release: controlledRelease,
+  onReleaseChange,
   children,
-}) => {
+}, ref) => {
   const audioContext = useAudioContext();
-  const [threshold, setThreshold] = useState(-1); // Threshold in dB
-  const [release, setRelease] = useState(0.05); // Release time in seconds
+  const [threshold, setThreshold] = useControlledState(controlledThreshold, -1, onThresholdChange);
+  const [release, setRelease] = useControlledState(controlledRelease, 0.05, onReleaseChange);
 
   const compressorRef = useRef<DynamicsCompressorNode | null>(null);
   const outputGainRef = useRef<GainNode | null>(null);
@@ -106,6 +122,11 @@ export const Limiter: React.FC<LimiterProps> = ({
     }
   }, [release]);
 
+  // Expose imperative handle
+  useImperativeHandle(ref, () => ({
+    getState: () => ({ threshold, release }),
+  }), [threshold, release]);
+
   // Render children with state
   if (children) {
     return <>{children({
@@ -118,4 +139,6 @@ export const Limiter: React.FC<LimiterProps> = ({
   }
 
   return null;
-};
+});
+
+Limiter.displayName = 'Limiter';

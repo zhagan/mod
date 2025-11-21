@@ -9,7 +9,19 @@ The `Reverb` component adds spatial depth and ambience to audio signals using co
 | `input` | `ModStreamRef` | Required | Audio signal to process |
 | `output` | `ModStreamRef` | Required | Reverb output |
 | `label` | `string` | `'reverb'` | Label for the component in metadata |
+| `wet` | `number` | `0.3` | Wet/dry mix 0-1 (controlled or initial value) |
+| `onWetChange` | `(wet: number) => void` | `-` | Callback when wet/dry mix changes |
+| `duration` | `number` | `2.0` | Reverb duration in seconds (controlled or initial value) |
+| `onDurationChange` | `(duration: number) => void` | `-` | Callback when duration changes |
+| `decay` | `number` | `2.0` | Decay rate (controlled or initial value) |
+| `onDecayChange` | `(decay: number) => void` | `-` | Callback when decay changes |
 | `children` | `function` | - | Render prop function receiving control props |
+| `wet` | `number` | `0.3` | Wet/dry mix 0-1 (controlled or initial value) |
+| `onWetChange` | `(wet: number) => void` | - | Callback when wet/dry mix changes |
+| `duration` | `number` | `2.0` | Reverb duration in seconds (controlled or initial value) |
+| `onDurationChange` | `(duration: number) => void` | - | Callback when duration changes |
+| `decay` | `number` | `2.0` | Decay rate (controlled or initial value) |
+| `onDecayChange` | `(decay: number) => void` | - | Callback when decay changes |
 
 ## Render Props
 
@@ -251,58 +263,42 @@ function App() {
 
 ### Imperative Refs
 
-For programmatic control, you can use refs to access methods directly:
+For programmatic access to state, you can use refs:
 
 ```tsx
-import { ToneGenerator, Reverb, ReverbHandle, Monitor } from '@mode-7/mod';
+import { Reverb, ReverbHandle, Monitor } from '@mode-7/mod';
 import { useRef, useEffect } from 'react';
 
 function App() {
   const reverbRef = useRef<ReverbHandle>(null);
-  const toneOut = useRef(null);
-  const reverbOut = useRef(null);
+  const inputRef = useRef(null);
+  const outputRef = useRef(null);
 
   useEffect(() => {
-    // Direct programmatic control
+    // Access current state
     if (reverbRef.current) {
-      reverbRef.current.setWet(0.3);
-      reverbRef.current.setDuration(1.5);
-      reverbRef.current.setDecay(2.5);
-
-      // Get current state
       const state = reverbRef.current.getState();
-      console.log(state.wet, state.duration, state.decay);
+      console.log('wet:', state.wet);
+      console.log('duration:', state.duration);
+      console.log('decay:', state.decay);
     }
   }, []);
 
-  const loadPreset = (preset: 'room' | 'hall' | 'cathedral') => {
-    if (!reverbRef.current) return;
-
-    const presets = {
-      room: { duration: 0.5, decay: 2, wet: 0.2 },
-      hall: { duration: 2.0, decay: 3, wet: 0.4 },
-      cathedral: { duration: 4.0, decay: 4, wet: 0.5 },
-    };
-
-    const settings = presets[preset];
-    reverbRef.current.setDuration(settings.duration);
-    reverbRef.current.setDecay(settings.decay);
-    reverbRef.current.setWet(settings.wet);
-  };
-
   return (
     <>
-      <ToneGenerator output={toneOut} />
-      <Reverb ref={reverbRef} input={toneOut} output={reverbOut} />
-      <button onClick={() => loadPreset('room')}>Room</button>
-      <button onClick={() => loadPreset('hall')}>Hall</button>
-      <button onClick={() => loadPreset('cathedral')}>Cathedral</button>
-      <Monitor input={reverbOut} />
+      <SomeSource output={inputRef} />
+      <Reverb
+        ref={reverbRef}
+        input={inputRef}
+        output={outputRef}
+      />
+      <Monitor input={outputRef} />
     </>
   );
 }
 ```
 
+**Note:** The imperative handle provides read-only access via `getState()`. To control the component programmatically, use the controlled props pattern shown above.
 ## Important Notes
 
 ### Duration

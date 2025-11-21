@@ -1,6 +1,16 @@
-import { useEffect, useState, useRef, ReactNode } from 'react';
+import React, { useEffect, useRef, ReactNode, useImperativeHandle } from 'react';
 import { useAudioContext } from '../../context/AudioContext';
 import { ModStreamRef } from '../../types/ModStream';
+import { useControlledState } from '../../hooks/useControlledState';
+
+export interface PhaserHandle {
+  getState: () => {
+    rate: number;
+    depth: number;
+    feedback: number;
+    baseFreq: number;
+  };
+}
 
 export interface PhaserRenderProps {
   rate: number;
@@ -18,20 +28,36 @@ export interface PhaserProps {
   input: ModStreamRef;
   output: ModStreamRef;
   label?: string;
+  rate?: number;
+  onRateChange?: (value: number) => void;
+  depth?: number;
+  onDepthChange?: (value: number) => void;
+  feedback?: number;
+  onFeedbackChange?: (value: number) => void;
+  baseFreq?: number;
+  onBaseFreqChange?: (value: number) => void;
   children?: (props: PhaserRenderProps) => ReactNode;
 }
 
-export const Phaser: React.FC<PhaserProps> = ({
+export const Phaser = React.forwardRef<PhaserHandle, PhaserProps>(({
   input,
   output,
   label = 'phaser',
+  rate: controlledRate,
+  onRateChange,
+  depth: controlledDepth,
+  onDepthChange,
+  feedback: controlledFeedback,
+  onFeedbackChange,
+  baseFreq: controlledBaseFreq,
+  onBaseFreqChange,
   children,
-}) => {
+}, ref) => {
   const audioContext = useAudioContext();
-  const [rate, setRate] = useState(0.5); // LFO rate in Hz
-  const [depth, setDepth] = useState(500); // Modulation depth in Hz
-  const [feedback, setFeedback] = useState(0.5); // Feedback amount
-  const [baseFreq, setBaseFreq] = useState(800); // Base frequency
+  const [rate, setRate] = useControlledState(controlledRate, 0.5, onRateChange);
+  const [depth, setDepth] = useControlledState(controlledDepth, 500, onDepthChange);
+  const [feedback, setFeedback] = useControlledState(controlledFeedback, 0.5, onFeedbackChange);
+  const [baseFreq, setBaseFreq] = useControlledState(controlledBaseFreq, 800, onBaseFreqChange);
 
   const filtersRef = useRef<BiquadFilterNode[]>([]);
   const feedbackGainRef = useRef<GainNode | null>(null);
@@ -172,6 +198,11 @@ export const Phaser: React.FC<PhaserProps> = ({
     }
   }, [baseFreq]);
 
+  // Expose imperative handle
+  useImperativeHandle(ref, () => ({
+    getState: () => ({ rate, depth, feedback, baseFreq }),
+  }), [rate, depth, feedback, baseFreq]);
+
   // Render children with state
   if (children) {
     return <>{children({
@@ -188,4 +219,6 @@ export const Phaser: React.FC<PhaserProps> = ({
   }
 
   return null;
-};
+});
+
+Phaser.displayName = 'Phaser';

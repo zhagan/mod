@@ -9,6 +9,14 @@ The `ADSR` component generates envelope signals that shape sound over time. It p
 | `output` | `ModStreamRef` | Required | Reference to output the envelope signal |
 | `gate` | `ModStreamRef` | - | Optional gate input to trigger the envelope |
 | `label` | `string` | `'adsr'` | Label for the component in metadata |
+| `attack` | `number` | `0.01` | Attack time in seconds (controlled or initial value) |
+| `onAttackChange` | `(attack: number) => void` | - | Callback when attack changes |
+| `decay` | `number` | `0.1` | Decay time in seconds (controlled or initial value) |
+| `onDecayChange` | `(decay: number) => void` | - | Callback when decay changes |
+| `sustain` | `number` | `0.7` | Sustain level 0-1 (controlled or initial value) |
+| `onSustainChange` | `(sustain: number) => void` | - | Callback when sustain changes |
+| `release` | `number` | `0.3` | Release time in seconds (controlled or initial value) |
+| `onReleaseChange` | `(release: number) => void` | - | Callback when release changes |
 | `children` | `function` | - | Render prop function receiving control props |
 
 ## Render Props
@@ -299,22 +307,20 @@ function App() {
   const toneOut = useRef(null);
 
   useEffect(() => {
-    // Direct programmatic control
+    // Access current state
     if (adsrRef.current) {
-      adsrRef.current.setAttack(0.01);
-      adsrRef.current.setDecay(0.1);
-      adsrRef.current.setSustain(0.7);
-      adsrRef.current.setRelease(0.3);
-
-      // Get current state
       const state = adsrRef.current.getState();
-      console.log(state.attack, state.decay, state.sustain, state.release);
+      console.log('Attack:', state.attack);
+      console.log('Decay:', state.decay);
+      console.log('Sustain:', state.sustain);
+      console.log('Release:', state.release);
     }
   }, []);
 
   const playNote = (durationMs: number) => {
     if (!adsrRef.current) return;
 
+    // Use imperative methods for triggering
     adsrRef.current.trigger();
     setTimeout(() => {
       adsrRef.current?.releaseGate();
@@ -340,12 +346,15 @@ function App() {
     <>
       <ADSR ref={adsrRef} output={adsrOut} />
       <ToneGenerator output={toneOut} frequency={440} cv={adsrOut} cvAmount={1.0} />
+      <button onClick={() => playNote(500)}>Play Note</button>
       <button onClick={playMelody}>Play Melody</button>
       <Monitor input={toneOut} />
     </>
   );
 }
 ```
+
+**Note:** The imperative handle provides `trigger()` and `releaseGate()` for envelope triggering, plus `getState()` for read-only parameter access. To control envelope parameters programmatically, use the controlled props pattern shown above.
 
 ## Important Notes
 

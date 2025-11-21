@@ -9,6 +9,16 @@ The `EQ` (Equalizer) component provides three-band frequency control for shaping
 | `input` | `ModStreamRef` | Required | Audio signal to equalize |
 | `output` | `ModStreamRef` | Required | Equalized audio output |
 | `label` | `string` | `'eq'` | Label for the component in metadata |
+| `lowGain` | `number` | `0` | Low shelf gain in dB (controlled or initial value) |
+| `onLowGainChange` | `(value: number) => void` | `-` | Callback when low gain changes |
+| `midGain` | `number` | `0` | Mid peak gain in dB (controlled or initial value) |
+| `onMidGainChange` | `(value: number) => void` | `-` | Callback when mid gain changes |
+| `highGain` | `number` | `0` | High shelf gain in dB (controlled or initial value) |
+| `onHighGainChange` | `(value: number) => void` | `-` | Callback when high gain changes |
+| `lowFreq` | `number` | `250` | Low shelf frequency in Hz (controlled or initial value) |
+| `onLowFreqChange` | `(value: number) => void` | `-` | Callback when low frequency changes |
+| `highFreq` | `number` | `4000` | High shelf frequency in Hz (controlled or initial value) |
+| `onHighFreqChange` | `(value: number) => void` | `-` | Callback when high frequency changes |
 | `children` | `function` | - | Render prop function receiving control props |
 
 ## Render Props
@@ -308,42 +318,44 @@ function App() {
 
 ### Imperative Refs
 
-Control EQ programmatically using refs:
+For programmatic access to state, you can use refs:
 
 ```tsx
-import { EQ, EQHandle } from '@mode-7/mod';
+import { EQ, EQHandle, Monitor } from '@mode-7/mod';
 import { useRef, useEffect } from 'react';
 
 function App() {
-  const inputRef = useRef(null);
-  const eqOut = useRef(null);
   const eqRef = useRef<EQHandle>(null);
+  const inputRef = useRef(null);
+  const outputRef = useRef(null);
 
   useEffect(() => {
+    // Access current state
     if (eqRef.current) {
-      // Apply vocal presence boost
-      eqRef.current.setLowFreq(200);
-      eqRef.current.setLowGain(-2);
-      eqRef.current.setMidGain(3);
-      eqRef.current.setHighFreq(8000);
-      eqRef.current.setHighGain(4);
-
-      // Get current state
       const state = eqRef.current.getState();
-      console.log('EQ settings:', state);
+      console.log('lowGain:', state.lowGain);
+      console.log('midGain:', state.midGain);
+      console.log('highGain:', state.highGain);
+      console.log('lowFreq:', state.lowFreq);
+      console.log('highFreq:', state.highFreq);
     }
   }, []);
 
   return (
-    <EQ
-      ref={eqRef}
-      input={inputRef}
-      output={eqOut}
-    />
+    <>
+      <SomeSource output={inputRef} />
+      <EQ
+        ref={eqRef}
+        input={inputRef}
+        output={outputRef}
+      />
+      <Monitor input={outputRef} />
+    </>
   );
 }
 ```
 
+**Note:** The imperative handle provides read-only access via `getState()`. To control the component programmatically, use the controlled props pattern shown above.
 ## Important Notes
 
 ### Frequency Bands

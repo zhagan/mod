@@ -1,6 +1,17 @@
-import { useEffect, useState, useRef, ReactNode } from 'react';
+import React, { useEffect, useRef, ReactNode, useImperativeHandle } from 'react';
 import { useAudioContext } from '../../context/AudioContext';
 import { ModStreamRef } from '../../types/ModStream';
+import { useControlledState } from '../../hooks/useControlledState';
+
+export interface CompressorHandle {
+  getState: () => {
+    threshold: number;
+    knee: number;
+    ratio: number;
+    attack: number;
+    release: number;
+  };
+}
 
 export interface CompressorRenderProps {
   threshold: number;
@@ -20,21 +31,41 @@ export interface CompressorProps {
   input: ModStreamRef;
   output: ModStreamRef;
   label?: string;
+  threshold?: number;
+  onThresholdChange?: (threshold: number) => void;
+  knee?: number;
+  onKneeChange?: (knee: number) => void;
+  ratio?: number;
+  onRatioChange?: (ratio: number) => void;
+  attack?: number;
+  onAttackChange?: (attack: number) => void;
+  release?: number;
+  onReleaseChange?: (release: number) => void;
   children?: (props: CompressorRenderProps) => ReactNode;
 }
 
-export const Compressor: React.FC<CompressorProps> = ({
+export const Compressor = React.forwardRef<CompressorHandle, CompressorProps>(({
   input,
   output,
   label = 'compressor',
+  threshold: controlledThreshold,
+  onThresholdChange,
+  knee: controlledKnee,
+  onKneeChange,
+  ratio: controlledRatio,
+  onRatioChange,
+  attack: controlledAttack,
+  onAttackChange,
+  release: controlledRelease,
+  onReleaseChange,
   children,
-}) => {
+}, ref) => {
   const audioContext = useAudioContext();
-  const [threshold, setThreshold] = useState(-24);
-  const [knee, setKnee] = useState(30);
-  const [ratio, setRatio] = useState(12);
-  const [attack, setAttack] = useState(0.003);
-  const [release, setRelease] = useState(0.25);
+  const [threshold, setThreshold] = useControlledState(controlledThreshold, -24, onThresholdChange);
+  const [knee, setKnee] = useControlledState(controlledKnee, 30, onKneeChange);
+  const [ratio, setRatio] = useControlledState(controlledRatio, 12, onRatioChange);
+  const [attack, setAttack] = useControlledState(controlledAttack, 0.003, onAttackChange);
+  const [release, setRelease] = useControlledState(controlledRelease, 0.25, onReleaseChange);
 
   const compressorNodeRef = useRef<DynamicsCompressorNode | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
@@ -137,6 +168,11 @@ export const Compressor: React.FC<CompressorProps> = ({
     }
   }, [release]);
 
+  // Expose imperative handle
+  useImperativeHandle(ref, () => ({
+    getState: () => ({ threshold, knee, ratio, attack, release }),
+  }), [threshold, knee, ratio, attack, release]);
+
   // Render children with state
   if (children) {
     return <>{children({
@@ -155,4 +191,6 @@ export const Compressor: React.FC<CompressorProps> = ({
   }
 
   return null;
-};
+});
+
+Compressor.displayName = 'Compressor';

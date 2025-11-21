@@ -1,6 +1,15 @@
-import { useEffect, useState, useRef, ReactNode } from 'react';
+import React, { useEffect, useRef, ReactNode, useImperativeHandle } from 'react';
 import { useAudioContext } from '../../context/AudioContext';
 import { ModStreamRef } from '../../types/ModStream';
+import { useControlledState } from '../../hooks/useControlledState';
+
+export interface ReverbHandle {
+  getState: () => {
+    wet: number;
+    duration: number;
+    decay: number;
+  };
+}
 
 export interface ReverbRenderProps {
   wet: number;
@@ -16,19 +25,31 @@ export interface ReverbProps {
   input: ModStreamRef;
   output: ModStreamRef;
   label?: string;
+  wet?: number;
+  onWetChange?: (wet: number) => void;
+  duration?: number;
+  onDurationChange?: (duration: number) => void;
+  decay?: number;
+  onDecayChange?: (decay: number) => void;
   children?: (props: ReverbRenderProps) => ReactNode;
 }
 
-export const Reverb: React.FC<ReverbProps> = ({
+export const Reverb = React.forwardRef<ReverbHandle, ReverbProps>(({
   input,
   output,
   label = 'reverb',
+  wet: controlledWet,
+  onWetChange,
+  duration: controlledDuration,
+  onDurationChange,
+  decay: controlledDecay,
+  onDecayChange,
   children,
-}) => {
+}, ref) => {
   const audioContext = useAudioContext();
-  const [wet, setWet] = useState(0.3);
-  const [duration, setDuration] = useState(2.0);
-  const [decay, setDecay] = useState(2.0);
+  const [wet, setWet] = useControlledState(controlledWet, 0.3, onWetChange);
+  const [duration, setDuration] = useControlledState(controlledDuration, 2.0, onDurationChange);
+  const [decay, setDecay] = useControlledState(controlledDecay, 2.0, onDecayChange);
 
   // Track input changes
   const inputKey = input.current?.audioNode ? String(input.current.audioNode) : 'null';
@@ -160,6 +181,11 @@ export const Reverb: React.FC<ReverbProps> = ({
     }
   }, [duration, decay, output, audioContext]);
 
+  // Expose imperative handle
+  useImperativeHandle(ref, () => ({
+    getState: () => ({ wet, duration, decay }),
+  }), [wet, duration, decay]);
+
   // Render children with state
   if (children) {
     return <>{children({
@@ -174,4 +200,6 @@ export const Reverb: React.FC<ReverbProps> = ({
   }
 
   return null;
-};
+});
+
+Reverb.displayName = 'Reverb';

@@ -9,6 +9,8 @@ The `Distortion` component adds harmonic distortion and overdrive to audio signa
 | `input` | `ModStreamRef` | Required | Audio signal to distort |
 | `output` | `ModStreamRef` | Required | Distorted audio output |
 | `label` | `string` | `'distortion'` | Label for the component in metadata |
+| `amount` | `number` | `50` | Distortion amount (controlled or initial value) |
+| `onAmountChange` | `(amount: number) => void` | `-` | Callback when amount changes |
 | `children` | `function` | - | Render prop function receiving control props |
 
 ## Render Props
@@ -287,44 +289,40 @@ function App() {
 
 ### Imperative Refs
 
-Control distortion programmatically using refs:
+For programmatic access to state, you can use refs:
 
 ```tsx
-import { Distortion, DistortionHandle } from '@mode-7/mod';
+import { Distortion, DistortionHandle, Monitor } from '@mode-7/mod';
 import { useRef, useEffect } from 'react';
 
 function App() {
+  const distortionRef = useRef<DistortionHandle>(null);
   const inputRef = useRef(null);
-  const distOut = useRef(null);
-  const distRef = useRef<DistortionHandle>(null);
+  const outputRef = useRef(null);
 
   useEffect(() => {
-    if (distRef.current) {
-      // Gradually increase distortion
-      let amt = 0;
-      const interval = setInterval(() => {
-        amt += 5;
-        if (amt > 150) {
-          clearInterval(interval);
-        } else {
-          distRef.current?.setAmount(amt);
-        }
-      }, 100);
-
-      return () => clearInterval(interval);
+    // Access current state
+    if (distortionRef.current) {
+      const state = distortionRef.current.getState();
+      console.log('amount:', state.amount);
     }
   }, []);
 
   return (
-    <Distortion
-      ref={distRef}
-      input={inputRef}
-      output={distOut}
-    />
+    <>
+      <SomeSource output={inputRef} />
+      <Distortion
+        ref={distortionRef}
+        input={inputRef}
+        output={outputRef}
+      />
+      <Monitor input={outputRef} />
+    </>
   );
 }
 ```
 
+**Note:** The imperative handle provides read-only access via `getState()`. To control the component programmatically, use the controlled props pattern shown above.
 ## Important Notes
 
 ### Distortion Amount

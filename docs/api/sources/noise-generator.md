@@ -8,8 +8,10 @@ The `NoiseGenerator` component creates white or pink noise. It can be used as a 
 |------|------|---------|-------------|
 | `output` | `ModStreamRef` | Required | Reference to output the generated audio signal |
 | `label` | `string` | `'noise-generator'` | Label for the component in metadata |
-| `gain` | `number` | `0.3` | Initial gain level (0-1) |
-| `type` | `NoiseType` | `'white'` | Noise type: `'white'` or `'pink'` |
+| `gain` | `number` | `0.3` | Gain level 0-1 (controlled or initial value) |
+| `onGainChange` | `(gain: number) => void` | - | Callback when gain changes |
+| `type` | `NoiseType` | `'white'` | Noise type (controlled or initial value): `'white'` or `'pink'` |
+| `onTypeChange` | `(type: NoiseType) => void` | - | Callback when noise type changes |
 | `cv` | `ModStreamRef` | - | Optional CV input for amplitude modulation |
 | `cvAmount` | `number` | `0.3` | Amount of CV modulation to apply to amplitude |
 | `children` | `function` | - | Render prop function receiving control props |
@@ -167,7 +169,7 @@ function App() {
 
 ### Imperative Refs
 
-For programmatic control, you can use refs to access methods directly:
+For programmatic access to state, you can use refs:
 
 ```tsx
 import { NoiseGenerator, NoiseGeneratorHandle, Monitor } from '@mode-7/mod';
@@ -178,43 +180,24 @@ function App() {
   const noiseOut = useRef(null);
 
   useEffect(() => {
-    // Direct programmatic control
+    // Access current state
     if (noiseRef.current) {
-      noiseRef.current.setGain(0.3);
-      noiseRef.current.setType('pink');
-
-      // Get current state
       const state = noiseRef.current.getState();
-      console.log(state.gain, state.type);
+      console.log('Current gain:', state.gain);
+      console.log('Current type:', state.type);
     }
   }, []);
-
-  const createWindEffect = () => {
-    if (!noiseRef.current) return;
-
-    noiseRef.current.setType('pink');
-
-    // Fade in wind effect
-    let gain = 0;
-    const interval = setInterval(() => {
-      if (gain < 0.6 && noiseRef.current) {
-        gain += 0.02;
-        noiseRef.current.setGain(gain);
-      } else {
-        clearInterval(interval);
-      }
-    }, 50);
-  };
 
   return (
     <>
       <NoiseGenerator ref={noiseRef} output={noiseOut} />
-      <button onClick={createWindEffect}>Create Wind Effect</button>
       <Monitor input={noiseOut} />
     </>
   );
 }
 ```
+
+**Note:** The imperative handle provides read-only access via `getState()`. To control the component programmatically, use the controlled props pattern shown above.
 
 ## Important Notes
 

@@ -1,6 +1,16 @@
-import { useEffect, useState, useRef, ReactNode } from 'react';
+import React, { useEffect, useRef, ReactNode, useImperativeHandle } from 'react';
 import { useAudioContext } from '../../context/AudioContext';
 import { ModStreamRef } from '../../types/ModStream';
+import { useControlledState } from '../../hooks/useControlledState';
+
+export interface FlangerHandle {
+  getState: () => {
+    rate: number;
+    depth: number;
+    feedback: number;
+    delay: number;
+  };
+}
 
 export interface FlangerRenderProps {
   rate: number;
@@ -18,20 +28,36 @@ export interface FlangerProps {
   input: ModStreamRef;
   output: ModStreamRef;
   label?: string;
+  rate?: number;
+  onRateChange?: (value: number) => void;
+  depth?: number;
+  onDepthChange?: (value: number) => void;
+  feedback?: number;
+  onFeedbackChange?: (value: number) => void;
+  delay?: number;
+  onDelayChange?: (value: number) => void;
   children?: (props: FlangerRenderProps) => ReactNode;
 }
 
-export const Flanger: React.FC<FlangerProps> = ({
+export const Flanger = React.forwardRef<FlangerHandle, FlangerProps>(({
   input,
   output,
   label = 'flanger',
+  rate: controlledRate,
+  onRateChange,
+  depth: controlledDepth,
+  onDepthChange,
+  feedback: controlledFeedback,
+  onFeedbackChange,
+  delay: controlledDelay,
+  onDelayChange,
   children,
-}) => {
+}, ref) => {
   const audioContext = useAudioContext();
-  const [rate, setRate] = useState(0.25); // LFO rate in Hz
-  const [depth, setDepth] = useState(0.003); // Modulation depth in seconds
-  const [feedback, setFeedback] = useState(0.5); // Feedback amount
-  const [delay, setDelay] = useState(0.005); // Base delay in seconds
+  const [rate, setRate] = useControlledState(controlledRate, 0.25, onRateChange);
+  const [depth, setDepth] = useControlledState(controlledDepth, 0.003, onDepthChange);
+  const [feedback, setFeedback] = useControlledState(controlledFeedback, 0.5, onFeedbackChange);
+  const [delay, setDelay] = useControlledState(controlledDelay, 0.005, onDelayChange);
 
   const dryGainRef = useRef<GainNode | null>(null);
   const wetGainRef = useRef<GainNode | null>(null);
@@ -175,6 +201,11 @@ export const Flanger: React.FC<FlangerProps> = ({
     }
   }, [delay]);
 
+  // Expose imperative handle
+  useImperativeHandle(ref, () => ({
+    getState: () => ({ rate, depth, feedback, delay }),
+  }), [rate, depth, feedback, delay]);
+
   // Render children with state
   if (children) {
     return <>{children({
@@ -191,4 +222,6 @@ export const Flanger: React.FC<FlangerProps> = ({
   }
 
   return null;
-};
+});
+
+Flanger.displayName = 'Flanger';

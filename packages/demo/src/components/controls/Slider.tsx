@@ -26,6 +26,16 @@ export const Slider: React.FC<SliderProps> = ({
 }) => {
   const displayValue = formatValue ? formatValue(value) : `${value}${unit}`;
 
+  const handleDecrement = () => {
+    const newValue = Math.max(min, value - step);
+    onChange(newValue);
+  };
+
+  const handleIncrement = () => {
+    const newValue = Math.min(max, value + step);
+    onChange(newValue);
+  };
+
   return (
     <div className="slider-container">
       {label && (
@@ -34,15 +44,33 @@ export const Slider: React.FC<SliderProps> = ({
           <span className="slider-value">{displayValue}</span>
         </div>
       )}
-      <input
-        type="range"
-        className="slider"
-        value={value}
-        onChange={(e) => onChange(parseFloat(e.target.value))}
-        min={min}
-        max={max}
-        step={step}
-      />
+      <div className="slider-control">
+        <button
+          className="slider-button slider-button-minus"
+          onClick={handleDecrement}
+          disabled={value <= min}
+          title="Decrease"
+        >
+          −
+        </button>
+        <input
+          type="range"
+          className="slider"
+          value={value}
+          onChange={(e) => onChange(parseFloat(e.target.value))}
+          min={min}
+          max={max}
+          step={step}
+        />
+        <button
+          className="slider-button slider-button-plus"
+          onClick={handleIncrement}
+          disabled={value >= max}
+          title="Increase"
+        >
+          +
+        </button>
+      </div>
     </div>
   );
 };

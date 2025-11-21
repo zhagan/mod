@@ -1,6 +1,14 @@
-import { useEffect, useState, useRef, ReactNode } from 'react';
+import React, { useEffect, useRef, ReactNode, useImperativeHandle } from 'react';
 import { useAudioContext } from '../../context/AudioContext';
 import { ModStreamRef } from '../../types/ModStream';
+import { useControlledState } from '../../hooks/useControlledState';
+
+export interface BitCrusherHandle {
+  getState: () => {
+    bitDepth: number;
+    sampleReduction: number;
+  };
+}
 
 export interface BitCrusherRenderProps {
   bitDepth: number;
@@ -14,18 +22,26 @@ export interface BitCrusherProps {
   input: ModStreamRef;
   output: ModStreamRef;
   label?: string;
+  bitDepth?: number;
+  onBitDepthChange?: (value: number) => void;
+  sampleReduction?: number;
+  onSampleReductionChange?: (value: number) => void;
   children?: (props: BitCrusherRenderProps) => ReactNode;
 }
 
-export const BitCrusher: React.FC<BitCrusherProps> = ({
+export const BitCrusher = React.forwardRef<BitCrusherHandle, BitCrusherProps>(({
   input,
   output,
   label = 'bitcrusher',
+  bitDepth: controlledBitDepth,
+  onBitDepthChange,
+  sampleReduction: controlledSampleReduction,
+  onSampleReductionChange,
   children,
-}) => {
+}, ref) => {
   const audioContext = useAudioContext();
-  const [bitDepth, setBitDepth] = useState(8); // Bit depth (1-16)
-  const [sampleReduction, setSampleReduction] = useState(1); // Sample rate reduction factor
+  const [bitDepth, setBitDepth] = useControlledState(controlledBitDepth, 8, onBitDepthChange);
+  const [sampleReduction, setSampleReduction] = useControlledState(controlledSampleReduction, 1, onSampleReductionChange);
 
   const scriptNodeRef = useRef<ScriptProcessorNode | null>(null);
   const outputGainRef = useRef<GainNode | null>(null);
@@ -123,6 +139,11 @@ export const BitCrusher: React.FC<BitCrusherProps> = ({
     };
   }, [input.current?.audioNode ? String(input.current.audioNode) : 'null']);
 
+  // Expose imperative handle
+  useImperativeHandle(ref, () => ({
+    getState: () => ({ bitDepth, sampleReduction }),
+  }), [bitDepth, sampleReduction]);
+
   // Render children with state
   if (children) {
     return <>{children({
@@ -135,4 +156,6 @@ export const BitCrusher: React.FC<BitCrusherProps> = ({
   }
 
   return null;
-};
+});
+
+BitCrusher.displayName = 'BitCrusher';

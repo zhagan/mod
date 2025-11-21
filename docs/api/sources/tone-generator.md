@@ -8,9 +8,12 @@ The `ToneGenerator` component creates an oscillator that generates tones at a sp
 |------|------|---------|-------------|
 | `output` | `ModStreamRef` | Required | Reference to output the generated audio signal |
 | `label` | `string` | `'tone-generator'` | Label for the component in metadata |
-| `frequency` | `number` | `440` | Initial frequency in Hz |
-| `gain` | `number` | `0.3` | Initial gain level (0-1) |
-| `waveform` | `OscillatorType` | `'square'` | Waveform type: `'sine'`, `'square'`, `'sawtooth'`, or `'triangle'` |
+| `frequency` | `number` | `440` | Frequency in Hz (controlled or initial value) |
+| `onFrequencyChange` | `(frequency: number) => void` | - | Callback when frequency changes |
+| `gain` | `number` | `0.3` | Gain level 0-1 (controlled or initial value) |
+| `onGainChange` | `(gain: number) => void` | - | Callback when gain changes |
+| `waveform` | `OscillatorType` | `'square'` | Waveform type (controlled or initial value): `'sine'`, `'square'`, `'sawtooth'`, or `'triangle'` |
+| `onWaveformChange` | `(waveform: OscillatorType) => void` | - | Callback when waveform changes |
 | `cv` | `ModStreamRef` | - | Optional CV input for frequency modulation |
 | `cvAmount` | `number` | `100` | Amount of CV modulation to apply to frequency |
 | `children` | `function` | - | Render prop function receiving control props |
@@ -180,7 +183,7 @@ function App() {
 
 ### Imperative Refs
 
-For programmatic control, you can use refs to access methods directly:
+For programmatic control, you can use refs to access the component's state:
 
 ```tsx
 import { ToneGenerator, ToneGeneratorHandle, Monitor } from '@mode-7/mod';
@@ -191,43 +194,25 @@ function App() {
   const toneOut = useRef(null);
 
   useEffect(() => {
-    // Direct programmatic control
+    // Access current state
     if (toneRef.current) {
-      toneRef.current.setFrequency(440);
-      toneRef.current.setGain(0.5);
-      toneRef.current.setWaveform('sine');
-
-      // Get current state
       const state = toneRef.current.getState();
-      console.log(state.frequency, state.gain, state.waveform);
+      console.log('Current frequency:', state.frequency);
+      console.log('Current gain:', state.gain);
+      console.log('Current waveform:', state.waveform);
     }
   }, []);
-
-  const playMelody = () => {
-    if (!toneRef.current) return;
-
-    const notes = [440, 494, 523, 587, 659, 698, 784, 880];
-    let index = 0;
-
-    const interval = setInterval(() => {
-      if (index < notes.length && toneRef.current) {
-        toneRef.current.setFrequency(notes[index]);
-        index++;
-      } else {
-        clearInterval(interval);
-      }
-    }, 300);
-  };
 
   return (
     <>
       <ToneGenerator ref={toneRef} output={toneOut} />
-      <button onClick={playMelody}>Play Melody</button>
       <Monitor input={toneOut} />
     </>
   );
 }
 ```
+
+**Note:** The imperative handle provides read-only access via `getState()`. To control the component programmatically, use the controlled props pattern shown above.
 
 ## Important Notes
 

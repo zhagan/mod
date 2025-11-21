@@ -1,6 +1,17 @@
-import { useEffect, useState, useRef, ReactNode } from 'react';
+import React, { useEffect, useRef, ReactNode, useImperativeHandle } from 'react';
 import { useAudioContext } from '../../context/AudioContext';
 import { ModStreamRef } from '../../types/ModStream';
+import { useControlledState } from '../../hooks/useControlledState';
+
+export interface EQHandle {
+  getState: () => {
+    lowGain: number;
+    midGain: number;
+    highGain: number;
+    lowFreq: number;
+    highFreq: number;
+  };
+}
 
 export interface EQRenderProps {
   lowGain: number;
@@ -20,21 +31,41 @@ export interface EQProps {
   input: ModStreamRef;
   output: ModStreamRef;
   label?: string;
+  lowGain?: number;
+  onLowGainChange?: (value: number) => void;
+  midGain?: number;
+  onMidGainChange?: (value: number) => void;
+  highGain?: number;
+  onHighGainChange?: (value: number) => void;
+  lowFreq?: number;
+  onLowFreqChange?: (value: number) => void;
+  highFreq?: number;
+  onHighFreqChange?: (value: number) => void;
   children?: (props: EQRenderProps) => ReactNode;
 }
 
-export const EQ: React.FC<EQProps> = ({
+export const EQ = React.forwardRef<EQHandle, EQProps>(({
   input,
   output,
   label = 'eq',
+  lowGain: controlledLowGain,
+  onLowGainChange,
+  midGain: controlledMidGain,
+  onMidGainChange,
+  highGain: controlledHighGain,
+  onHighGainChange,
+  lowFreq: controlledLowFreq,
+  onLowFreqChange,
+  highFreq: controlledHighFreq,
+  onHighFreqChange,
   children,
-}) => {
+}, ref) => {
   const audioContext = useAudioContext();
-  const [lowGain, setLowGain] = useState(0);
-  const [midGain, setMidGain] = useState(0);
-  const [highGain, setHighGain] = useState(0);
-  const [lowFreq, setLowFreq] = useState(250);
-  const [highFreq, setHighFreq] = useState(4000);
+  const [lowGain, setLowGain] = useControlledState(controlledLowGain, 0, onLowGainChange);
+  const [midGain, setMidGain] = useControlledState(controlledMidGain, 0, onMidGainChange);
+  const [highGain, setHighGain] = useControlledState(controlledHighGain, 0, onHighGainChange);
+  const [lowFreq, setLowFreq] = useControlledState(controlledLowFreq, 250, onLowFreqChange);
+  const [highFreq, setHighFreq] = useControlledState(controlledHighFreq, 4000, onHighFreqChange);
 
   const lowShelfRef = useRef<BiquadFilterNode | null>(null);
   const midPeakRef = useRef<BiquadFilterNode | null>(null);
@@ -143,6 +174,11 @@ export const EQ: React.FC<EQProps> = ({
     }
   }, [highFreq, highGain]);
 
+  // Expose imperative handle
+  useImperativeHandle(ref, () => ({
+    getState: () => ({ lowGain, midGain, highGain, lowFreq, highFreq }),
+  }), [lowGain, midGain, highGain, lowFreq, highFreq]);
+
   // Render children with state
   if (children) {
     return <>{children({
@@ -161,4 +197,6 @@ export const EQ: React.FC<EQProps> = ({
   }
 
   return null;
-};
+});
+
+EQ.displayName = 'EQ';

@@ -1,6 +1,13 @@
-import { useEffect, useState, useRef, ReactNode } from 'react';
+import React, { useEffect, useRef, ReactNode, useImperativeHandle } from 'react';
 import { useAudioContext } from '../../context/AudioContext';
 import { ModStreamRef } from '../../types/ModStream';
+import { useControlledState } from '../../hooks/useControlledState';
+
+export interface PannerHandle {
+  getState: () => {
+    pan: number;
+  };
+}
 
 export interface PannerRenderProps {
   pan: number;
@@ -12,25 +19,26 @@ export interface PannerProps {
   input: ModStreamRef;
   output: ModStreamRef;
   label?: string;
-  // Initial values (can be overridden by children)
   pan?: number;
+  onPanChange?: (pan: number) => void;
   // CV inputs
   cv?: ModStreamRef;
   cvAmount?: number;
   children?: (props: PannerRenderProps) => ReactNode;
 }
 
-export const Panner: React.FC<PannerProps> = ({
+export const Panner = React.forwardRef<PannerHandle, PannerProps>(({
   input,
   output,
   label = 'panner',
-  pan: initialPan = 0,
+  pan: controlledPan,
+  onPanChange,
   cv,
   cvAmount = 0.5,
   children,
-}) => {
+}, ref) => {
   const audioContext = useAudioContext();
-  const [pan, setPan] = useState(initialPan);
+  const [pan, setPan] = useControlledState(controlledPan, 0, onPanChange);
 
   const pannerNodeRef = useRef<StereoPannerNode | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
@@ -138,6 +146,11 @@ export const Panner: React.FC<PannerProps> = ({
     }
   }, [cvAmount]);
 
+  // Expose imperative handle
+  useImperativeHandle(ref, () => ({
+    getState: () => ({ pan }),
+  }), [pan]);
+
   // Render children with state
   if (children) {
     return <>{children({
@@ -148,4 +161,6 @@ export const Panner: React.FC<PannerProps> = ({
   }
 
   return null;
-};
+});
+
+Panner.displayName = 'Panner';

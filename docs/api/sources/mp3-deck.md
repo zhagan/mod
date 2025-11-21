@@ -8,6 +8,15 @@ The `MP3Deck` component loads and plays local audio files (MP3, WAV, etc.). It p
 |------|------|---------|-------------|
 | `output` | `ModStreamRef` | Required | Reference to output the audio signal |
 | `label` | `string` | `'mp3-deck'` | Label for the component in metadata |
+| `src` | `string` | `''` | Audio source URL (controlled or initial value) |
+| `onSrcChange` | `(src: string) => void` | - | Callback when source URL changes |
+| `gain` | `number` | `1.0` | Gain level 0-1+ (controlled or initial value) |
+| `onGainChange` | `(gain: number) => void` | - | Callback when gain changes |
+| `loop` | `boolean` | `false` | Whether audio loops (controlled or initial value) |
+| `onLoopChange` | `(loop: boolean) => void` | - | Callback when loop state changes |
+| `onPlayingChange` | `(isPlaying: boolean) => void` | - | Callback when playback state changes |
+| `onTimeUpdate` | `(currentTime: number, duration: number) => void` | - | Callback when playback position updates |
+| `onError` | `(error: string \| null) => void` | - | Callback when error state changes |
 | `children` | `function` | - | Render prop function receiving control props |
 
 ## Render Props
@@ -215,7 +224,6 @@ function App() {
         onGainChange={setGain}
         loop={loop}
         onLoopChange={setLoop}
-        isPlaying={isPlaying}
         onPlayingChange={setPlaying}
       >
         {({ loadFile, currentTime, duration, seek }) => (
@@ -265,7 +273,7 @@ function App() {
 
 ### Imperative Refs
 
-For programmatic control, you can use refs to access methods directly:
+For programmatic control of playback and file loading, you can use refs:
 
 ```tsx
 import { MP3Deck, MP3DeckHandle, Monitor } from '@mode-7/mod';
@@ -276,35 +284,25 @@ function App() {
   const deckOut = useRef(null);
 
   useEffect(() => {
-    // Direct programmatic control
+    // Access current state
     if (deckRef.current) {
-      deckRef.current.setSrc('/path/to/audio.mp3');
-      deckRef.current.setGain(0.8);
-      deckRef.current.setLoop(false);
-
-      // Get current state
       const state = deckRef.current.getState();
-      console.log(state.src, state.isPlaying, state.currentTime, state.duration);
+      console.log('Source:', state.src);
+      console.log('Is playing:', state.isPlaying);
+      console.log('Current time:', state.currentTime);
+      console.log('Duration:', state.duration);
+      console.log('Gain:', state.gain);
+      console.log('Loop:', state.loop);
     }
   }, []);
 
-  const createDJTransition = () => {
+  const handlePlayback = () => {
     if (!deckRef.current) return;
 
-    // Fade out over 3 seconds, then stop
-    const startGain = deckRef.current.getState().gain;
-    let progress = 0;
-
-    const interval = setInterval(() => {
-      progress += 0.05;
-      if (progress <= 1 && deckRef.current) {
-        const newGain = startGain * (1 - progress);
-        deckRef.current.setGain(newGain);
-      } else {
-        clearInterval(interval);
-        deckRef.current?.stop();
-      }
-    }, 150);
+    // Control playback
+    deckRef.current.play();
+    // deckRef.current.pause();
+    // deckRef.current.stop();
   };
 
   const skipToChorus = () => {
@@ -312,30 +310,30 @@ function App() {
     deckRef.current?.seek(60);
   };
 
+  const loadNewFile = (file: File) => {
+    deckRef.current?.loadFile(file);
+  };
+
   return (
     <>
-      <MP3Deck ref={deckRef} output={deckOut}>
-        {({ loadFile, play }) => (
-          <input
-            type="file"
-            accept="audio/*"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) {
-                loadFile(file);
-                setTimeout(play, 100);
-              }
-            }}
-          />
-        )}
-      </MP3Deck>
-      <button onClick={createDJTransition}>Fade Out & Stop</button>
+      <MP3Deck ref={deckRef} output={deckOut} />
+      <button onClick={handlePlayback}>Play</button>
       <button onClick={skipToChorus}>Skip to Chorus</button>
+      <input
+        type="file"
+        accept="audio/*"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) loadNewFile(file);
+        }}
+      />
       <Monitor input={deckOut} />
     </>
   );
 }
 ```
+
+**Note:** The imperative handle provides `play()`, `pause()`, `stop()`, `seek()`, and `loadFile()` methods for playback control, plus `getState()` for read-only state access. To control gain and loop programmatically, use the controlled props pattern shown above.
 
 ## Important Notes
 

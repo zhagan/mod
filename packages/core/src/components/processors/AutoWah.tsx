@@ -1,6 +1,16 @@
-import { useEffect, useState, useRef, ReactNode } from 'react';
+import React, { useEffect, useRef, ReactNode, useImperativeHandle } from 'react';
 import { useAudioContext } from '../../context/AudioContext';
 import { ModStreamRef } from '../../types/ModStream';
+import { useControlledState } from '../../hooks/useControlledState';
+
+export interface AutoWahHandle {
+  getState: () => {
+    sensitivity: number;
+    baseFreq: number;
+    maxFreq: number;
+    Q: number;
+  };
+}
 
 export interface AutoWahRenderProps {
   sensitivity: number;
@@ -18,20 +28,36 @@ export interface AutoWahProps {
   input: ModStreamRef;
   output: ModStreamRef;
   label?: string;
+  sensitivity?: number;
+  onSensitivityChange?: (value: number) => void;
+  baseFreq?: number;
+  onBaseFreqChange?: (value: number) => void;
+  maxFreq?: number;
+  onMaxFreqChange?: (value: number) => void;
+  Q?: number;
+  onQChange?: (value: number) => void;
   children?: (props: AutoWahRenderProps) => ReactNode;
 }
 
-export const AutoWah: React.FC<AutoWahProps> = ({
+export const AutoWah = React.forwardRef<AutoWahHandle, AutoWahProps>(({
   input,
   output,
   label = 'autowah',
+  sensitivity: controlledSensitivity,
+  onSensitivityChange,
+  baseFreq: controlledBaseFreq,
+  onBaseFreqChange,
+  maxFreq: controlledMaxFreq,
+  onMaxFreqChange,
+  Q: controlledQ,
+  onQChange,
   children,
-}) => {
+}, ref) => {
   const audioContext = useAudioContext();
-  const [sensitivity, setSensitivity] = useState(1000); // Envelope sensitivity
-  const [baseFreq, setBaseFreq] = useState(200); // Base frequency
-  const [maxFreq, setMaxFreq] = useState(2000); // Maximum frequency
-  const [Q, setQ] = useState(5); // Filter resonance
+  const [sensitivity, setSensitivity] = useControlledState(controlledSensitivity, 1000, onSensitivityChange);
+  const [baseFreq, setBaseFreq] = useControlledState(controlledBaseFreq, 200, onBaseFreqChange);
+  const [maxFreq, setMaxFreq] = useControlledState(controlledMaxFreq, 2000, onMaxFreqChange);
+  const [Q, setQ] = useControlledState(controlledQ, 5, onQChange);
 
   const filterRef = useRef<BiquadFilterNode | null>(null);
   const scriptNodeRef = useRef<ScriptProcessorNode | null>(null);
@@ -166,6 +192,11 @@ export const AutoWah: React.FC<AutoWahProps> = ({
     }
   }, [Q]);
 
+  // Expose imperative handle
+  useImperativeHandle(ref, () => ({
+    getState: () => ({ sensitivity, baseFreq, maxFreq, Q }),
+  }), [sensitivity, baseFreq, maxFreq, Q]);
+
   // Render children with state
   if (children) {
     return <>{children({
@@ -182,4 +213,6 @@ export const AutoWah: React.FC<AutoWahProps> = ({
   }
 
   return null;
-};
+});
+
+AutoWah.displayName = 'AutoWah';

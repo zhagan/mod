@@ -1,6 +1,15 @@
-import { useEffect, useState, useRef, ReactNode } from 'react';
+import React, { useEffect, useRef, ReactNode, useImperativeHandle } from 'react';
 import { useAudioContext } from '../../context/AudioContext';
 import { ModStreamRef } from '../../types/ModStream';
+import { useControlledState } from '../../hooks/useControlledState';
+
+export interface GateHandle {
+  getState: () => {
+    threshold: number;
+    attack: number;
+    release: number;
+  };
+}
 
 export interface GateRenderProps {
   threshold: number;
@@ -16,19 +25,31 @@ export interface GateProps {
   input: ModStreamRef;
   output: ModStreamRef;
   label?: string;
+  threshold?: number;
+  onThresholdChange?: (value: number) => void;
+  attack?: number;
+  onAttackChange?: (value: number) => void;
+  release?: number;
+  onReleaseChange?: (value: number) => void;
   children?: (props: GateRenderProps) => ReactNode;
 }
 
-export const Gate: React.FC<GateProps> = ({
+export const Gate = React.forwardRef<GateHandle, GateProps>(({
   input,
   output,
   label = 'gate',
+  threshold: controlledThreshold,
+  onThresholdChange,
+  attack: controlledAttack,
+  onAttackChange,
+  release: controlledRelease,
+  onReleaseChange,
   children,
-}) => {
+}, ref) => {
   const audioContext = useAudioContext();
-  const [threshold, setThreshold] = useState(-40); // Threshold in dB
-  const [attack, setAttack] = useState(0.01); // Attack time in seconds
-  const [release, setRelease] = useState(0.1); // Release time in seconds
+  const [threshold, setThreshold] = useControlledState(controlledThreshold, -40, onThresholdChange);
+  const [attack, setAttack] = useControlledState(controlledAttack, 0.01, onAttackChange);
+  const [release, setRelease] = useControlledState(controlledRelease, 0.1, onReleaseChange);
 
   const scriptNodeRef = useRef<ScriptProcessorNode | null>(null);
   const outputGainRef = useRef<GainNode | null>(null);
@@ -142,6 +163,11 @@ export const Gate: React.FC<GateProps> = ({
     };
   }, [input.current?.audioNode ? String(input.current.audioNode) : 'null']);
 
+  // Expose imperative handle
+  useImperativeHandle(ref, () => ({
+    getState: () => ({ threshold, attack, release }),
+  }), [threshold, attack, release]);
+
   // Render children with state
   if (children) {
     return <>{children({
@@ -156,4 +182,6 @@ export const Gate: React.FC<GateProps> = ({
   }
 
   return null;
-};
+});
+
+Gate.displayName = 'Gate';

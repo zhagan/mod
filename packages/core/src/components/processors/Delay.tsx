@@ -1,6 +1,15 @@
-import { useEffect, useState, useRef, ReactNode } from 'react';
+import React, { useEffect, useRef, ReactNode, useImperativeHandle } from 'react';
 import { useAudioContext } from '../../context/AudioContext';
 import { ModStreamRef } from '../../types/ModStream';
+import { useControlledState } from '../../hooks/useControlledState';
+
+export interface DelayHandle {
+  getState: () => {
+    time: number;
+    feedback: number;
+    wet: number;
+  };
+}
 
 export interface DelayRenderProps {
   time: number;
@@ -16,19 +25,31 @@ export interface DelayProps {
   input: ModStreamRef;
   output: ModStreamRef;
   label?: string;
+  time?: number;
+  onTimeChange?: (time: number) => void;
+  feedback?: number;
+  onFeedbackChange?: (feedback: number) => void;
+  wet?: number;
+  onWetChange?: (wet: number) => void;
   children?: (props: DelayRenderProps) => ReactNode;
 }
 
-export const Delay: React.FC<DelayProps> = ({
+export const Delay = React.forwardRef<DelayHandle, DelayProps>(({
   input,
   output,
   label = 'delay',
+  time: controlledTime,
+  onTimeChange,
+  feedback: controlledFeedback,
+  onFeedbackChange,
+  wet: controlledWet,
+  onWetChange,
   children,
-}) => {
+}, ref) => {
   const audioContext = useAudioContext();
-  const [time, setTime] = useState(0.5);
-  const [feedback, setFeedback] = useState(0.3);
-  const [wet, setWet] = useState(0.5);
+  const [time, setTime] = useControlledState(controlledTime, 0.5, onTimeChange);
+  const [feedback, setFeedback] = useControlledState(controlledFeedback, 0.3, onFeedbackChange);
+  const [wet, setWet] = useControlledState(controlledWet, 0.5, onWetChange);
 
   // Track input changes
   const inputKey = input.current?.audioNode ? String(input.current.audioNode) : 'null';
@@ -155,6 +176,11 @@ export const Delay: React.FC<DelayProps> = ({
     }
   }, [wet, output]);
 
+  // Expose imperative handle
+  useImperativeHandle(ref, () => ({
+    getState: () => ({ time, feedback, wet }),
+  }), [time, feedback, wet]);
+
   // Render children with state
   if (children) {
     return <>{children({
@@ -169,4 +195,6 @@ export const Delay: React.FC<DelayProps> = ({
   }
 
   return null;
-};
+});
+
+Delay.displayName = 'Delay';

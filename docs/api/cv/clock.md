@@ -8,7 +8,9 @@ The `Clock` component generates precise timing pulses (gate signals) that can tr
 |------|------|---------|-------------|
 | `output` | `ModStreamRef` | Required | Reference to output the clock pulses |
 | `label` | `string` | `'clock'` | Label for the component in metadata |
-| `bpm` | `number` | `120` | Initial tempo in beats per minute |
+| `bpm` | `number` | `120` | Tempo in beats per minute (controlled or initial value) |
+| `onBpmChange` | `(bpm: number) => void` | - | Callback when BPM changes |
+| `onRunningChange` | `(isRunning: boolean) => void` | - | Callback when running state changes |
 | `children` | `function` | - | Render prop function receiving control props |
 
 ## Render Props
@@ -223,15 +225,14 @@ function App() {
         output={clockOut}
         bpm={bpm}
         onBpmChange={setBpm}
-        isRunning={isRunning}
         onRunningChange={setRunning}
-      />
-
-      <div>
-        <button onClick={() => setRunning(!isRunning)}>
-          {isRunning ? 'Stop' : 'Start'}
-        </button>
-      </div>
+      >
+        {({ start, stop }) => (
+          <button onClick={isRunning ? stop : start}>
+            {isRunning ? 'Stop' : 'Start'}
+          </button>
+        )}
+      </Clock>
 
       <div>
         <label>Tempo: {bpm} BPM</label>
@@ -254,7 +255,7 @@ function App() {
 
 ### Imperative Refs
 
-For programmatic control, you can use refs to access methods directly:
+For programmatic access to state and transport control, you can use refs:
 
 ```tsx
 import { Clock, ClockHandle, ADSR, ToneGenerator, Monitor } from '@mode-7/mod';
@@ -267,44 +268,21 @@ function App() {
   const toneOut = useRef(null);
 
   useEffect(() => {
-    // Direct programmatic control
+    // Access current state
     if (clockRef.current) {
-      clockRef.current.setBpm(120);
-      clockRef.current.start();
-
-      // Get current state
       const state = clockRef.current.getState();
-      console.log(state.bpm, state.isRunning);
+      console.log('BPM:', state.bpm);
+      console.log('Is running:', state.isRunning);
     }
   }, []);
 
-  const tempoRamp = () => {
+  const handleTransport = () => {
     if (!clockRef.current) return;
 
-    let currentBpm = 60;
-    clockRef.current.setBpm(currentBpm);
+    // Use imperative transport methods
     clockRef.current.start();
-
-    const interval = setInterval(() => {
-      if (currentBpm < 180 && clockRef.current) {
-        currentBpm += 5;
-        clockRef.current.setBpm(currentBpm);
-      } else {
-        clearInterval(interval);
-      }
-    }, 500);
-  };
-
-  const tapTempo = () => {
-    // Implement tap tempo functionality
-    // This is a simplified example
-    if (!clockRef.current) return;
-
-    const now = Date.now();
-    // Store tap times and calculate BPM
-    // For demo purposes, just set a tempo
-    clockRef.current.setBpm(140);
-    clockRef.current.start();
+    // clockRef.current.stop();
+    // clockRef.current.reset();
   };
 
   return (
@@ -312,13 +290,14 @@ function App() {
       <Clock ref={clockRef} output={clockOut} />
       <ADSR gate={clockOut} output={adsrOut} />
       <ToneGenerator output={toneOut} cv={adsrOut} cvAmount={1.0} />
-      <button onClick={tempoRamp}>Tempo Ramp (60-180 BPM)</button>
-      <button onClick={tapTempo}>Tap Tempo</button>
+      <button onClick={handleTransport}>Start</button>
       <Monitor input={toneOut} />
     </>
   );
 }
 ```
+
+**Note:** The imperative handle provides `start()`, `stop()`, and `reset()` for transport control, plus `getState()` for read-only access. To control BPM programmatically, use the controlled props pattern shown above.
 
 ## Important Notes
 

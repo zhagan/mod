@@ -38,52 +38,52 @@ export type { ClockProps, ClockRenderProps } from './components/cv/Clock';
 
 // Processor Components
 export { Delay } from './components/processors/Delay';
-export type { DelayProps, DelayRenderProps } from './components/processors/Delay';
+export type { DelayProps, DelayRenderProps, DelayHandle } from './components/processors/Delay';
 
 export { Reverb } from './components/processors/Reverb';
-export type { ReverbProps, ReverbRenderProps } from './components/processors/Reverb';
+export type { ReverbProps, ReverbRenderProps, ReverbHandle } from './components/processors/Reverb';
 
 export { Filter } from './components/processors/Filter';
-export type { FilterProps, FilterRenderProps } from './components/processors/Filter';
+export type { FilterProps, FilterRenderProps, FilterHandle } from './components/processors/Filter';
 
 export { Compressor } from './components/processors/Compressor';
-export type { CompressorProps, CompressorRenderProps } from './components/processors/Compressor';
+export type { CompressorProps, CompressorRenderProps, CompressorHandle } from './components/processors/Compressor';
 
 export { Distortion } from './components/processors/Distortion';
-export type { DistortionProps, DistortionRenderProps } from './components/processors/Distortion';
+export type { DistortionProps, DistortionRenderProps, DistortionHandle } from './components/processors/Distortion';
 
 export { Panner } from './components/processors/Panner';
-export type { PannerProps, PannerRenderProps } from './components/processors/Panner';
+export type { PannerProps, PannerRenderProps, PannerHandle } from './components/processors/Panner';
 
 export { EQ } from './components/processors/EQ';
-export type { EQProps, EQRenderProps } from './components/processors/EQ';
+export type { EQProps, EQRenderProps, EQHandle } from './components/processors/EQ';
 
 export { Chorus } from './components/processors/Chorus';
-export type { ChorusProps, ChorusRenderProps } from './components/processors/Chorus';
+export type { ChorusProps, ChorusRenderProps, ChorusHandle } from './components/processors/Chorus';
 
 export { Phaser } from './components/processors/Phaser';
-export type { PhaserProps, PhaserRenderProps } from './components/processors/Phaser';
+export type { PhaserProps, PhaserRenderProps, PhaserHandle } from './components/processors/Phaser';
 
 export { Flanger } from './components/processors/Flanger';
-export type { FlangerProps, FlangerRenderProps } from './components/processors/Flanger';
+export type { FlangerProps, FlangerRenderProps, FlangerHandle } from './components/processors/Flanger';
 
 export { Tremolo } from './components/processors/Tremolo';
-export type { TremoloProps, TremoloRenderProps } from './components/processors/Tremolo';
+export type { TremoloProps, TremoloRenderProps, TremoloHandle } from './components/processors/Tremolo';
 
 export { BitCrusher } from './components/processors/BitCrusher';
-export type { BitCrusherProps, BitCrusherRenderProps } from './components/processors/BitCrusher';
+export type { BitCrusherProps, BitCrusherRenderProps, BitCrusherHandle } from './components/processors/BitCrusher';
 
 export { Limiter } from './components/processors/Limiter';
-export type { LimiterProps, LimiterRenderProps } from './components/processors/Limiter';
+export type { LimiterProps, LimiterRenderProps, LimiterHandle } from './components/processors/Limiter';
 
 export { Gate } from './components/processors/Gate';
-export type { GateProps, GateRenderProps } from './components/processors/Gate';
+export type { GateProps, GateRenderProps, GateHandle } from './components/processors/Gate';
 
 export { AutoWah } from './components/processors/AutoWah';
-export type { AutoWahProps, AutoWahRenderProps } from './components/processors/AutoWah';
+export type { AutoWahProps, AutoWahRenderProps, AutoWahHandle } from './components/processors/AutoWah';
 
 export { RingModulator } from './components/processors/RingModulator';
-export type { RingModulatorProps, RingModulatorRenderProps } from './components/processors/RingModulator';
+export type { RingModulatorProps, RingModulatorRenderProps, RingModulatorHandle } from './components/processors/RingModulator';
 
 // Mixer Components
 export { CrossFade } from './components/mixers/CrossFade';

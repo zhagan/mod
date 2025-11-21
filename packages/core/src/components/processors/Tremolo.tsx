@@ -1,6 +1,14 @@
-import { useEffect, useState, useRef, ReactNode } from 'react';
+import React, { useEffect, useRef, ReactNode, useImperativeHandle } from 'react';
 import { useAudioContext } from '../../context/AudioContext';
 import { ModStreamRef } from '../../types/ModStream';
+import { useControlledState } from '../../hooks/useControlledState';
+
+export interface TremoloHandle {
+  getState: () => {
+    rate: number;
+    depth: number;
+  };
+}
 
 export interface TremoloRenderProps {
   rate: number;
@@ -14,18 +22,26 @@ export interface TremoloProps {
   input: ModStreamRef;
   output: ModStreamRef;
   label?: string;
+  rate?: number;
+  onRateChange?: (rate: number) => void;
+  depth?: number;
+  onDepthChange?: (depth: number) => void;
   children?: (props: TremoloRenderProps) => ReactNode;
 }
 
-export const Tremolo: React.FC<TremoloProps> = ({
+export const Tremolo = React.forwardRef<TremoloHandle, TremoloProps>(({
   input,
   output,
   label = 'tremolo',
+  rate: controlledRate,
+  onRateChange,
+  depth: controlledDepth,
+  onDepthChange,
   children,
-}) => {
+}, ref) => {
   const audioContext = useAudioContext();
-  const [rate, setRate] = useState(5); // LFO rate in Hz
-  const [depth, setDepth] = useState(0.5); // Modulation depth (0-1)
+  const [rate, setRate] = useControlledState(controlledRate, 5, onRateChange);
+  const [depth, setDepth] = useControlledState(controlledDepth, 0.5, onDepthChange);
 
   const gainNodeRef = useRef<GainNode | null>(null);
   const lfoRef = useRef<OscillatorNode | null>(null);
@@ -126,6 +142,11 @@ export const Tremolo: React.FC<TremoloProps> = ({
     }
   }, [depth]);
 
+  // Expose imperative handle
+  useImperativeHandle(ref, () => ({
+    getState: () => ({ rate, depth }),
+  }), [rate, depth]);
+
   // Render children with state
   if (children) {
     return <>{children({
@@ -138,4 +159,6 @@ export const Tremolo: React.FC<TremoloProps> = ({
   }
 
   return null;
-};
+});
+
+Tremolo.displayName = 'Tremolo';

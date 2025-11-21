@@ -73,7 +73,10 @@ export const ModuleWrapper = React.memo<ModuleWrapperProps>(({
     if ((e.target as HTMLElement).closest('.port') ||
         (e.target as HTMLElement).closest('input') ||
         (e.target as HTMLElement).closest('button') ||
-        (e.target as HTMLElement).closest('select')) {
+        (e.target as HTMLElement).closest('select') ||
+        (e.target as HTMLElement).closest('.select-trigger') ||
+        (e.target as HTMLElement).closest('.select-content') ||
+        (e.target as HTMLElement).closest('.select-item')) {
       return;
     }
 

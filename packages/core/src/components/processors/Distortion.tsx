@@ -1,6 +1,13 @@
-import { useEffect, useState, useRef, ReactNode } from 'react';
+import React, { useEffect, useRef, ReactNode, useImperativeHandle } from 'react';
 import { useAudioContext } from '../../context/AudioContext';
 import { ModStreamRef } from '../../types/ModStream';
+import { useControlledState } from '../../hooks/useControlledState';
+
+export interface DistortionHandle {
+  getState: () => {
+    amount: number;
+  };
+}
 
 export interface DistortionRenderProps {
   amount: number;
@@ -12,17 +19,21 @@ export interface DistortionProps {
   input: ModStreamRef;
   output: ModStreamRef;
   label?: string;
+  amount?: number;
+  onAmountChange?: (amount: number) => void;
   children?: (props: DistortionRenderProps) => ReactNode;
 }
 
-export const Distortion: React.FC<DistortionProps> = ({
+export const Distortion = React.forwardRef<DistortionHandle, DistortionProps>(({
   input,
   output,
   label = 'distortion',
+  amount: controlledAmount,
+  onAmountChange,
   children,
-}) => {
+}, ref) => {
   const audioContext = useAudioContext();
-  const [amount, setAmount] = useState(50);
+  const [amount, setAmount] = useControlledState(controlledAmount, 50, onAmountChange);
 
   const waveShaperNodeRef = useRef<WaveShaperNode | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
@@ -108,6 +119,11 @@ export const Distortion: React.FC<DistortionProps> = ({
     }
   }, [amount]);
 
+  // Expose imperative handle
+  useImperativeHandle(ref, () => ({
+    getState: () => ({ amount }),
+  }), [amount]);
+
   // Render children with state
   if (children) {
     return <>{children({
@@ -118,4 +134,6 @@ export const Distortion: React.FC<DistortionProps> = ({
   }
 
   return null;
-};
+});
+
+Distortion.displayName = 'Distortion';

@@ -9,6 +9,14 @@ The `Microphone` component captures audio from a microphone or other audio input
 | `output` | `ModStreamRef` | Required | Reference to output the captured audio signal |
 | `label` | `string` | `'microphone'` | Label for the component in metadata |
 | `deviceId` | `string` | - | Optional device ID to pre-select a specific microphone |
+| `gain` | `number` | `1.0` | Gain level 0-2+ (controlled or initial value) |
+| `onGainChange` | `(gain: number) => void` | - | Callback when gain changes |
+| `isMuted` | `boolean` | `false` | Whether microphone is muted (controlled or initial value) |
+| `onMutedChange` | `(isMuted: boolean) => void` | - | Callback when mute state changes |
+| `selectedDeviceId` | `string \| null` | - | Selected device ID (controlled or initial value) |
+| `onSelectedDeviceIdChange` | `(deviceId: string \| null) => void` | - | Callback when selected device changes |
+| `onDevicesChange` | `(devices: AudioDevice[]) => void` | - | Callback when device list changes |
+| `onError` | `(error: string \| null) => void` | - | Callback when error state changes |
 | `children` | `function` | - | Render prop function receiving control props |
 
 ## Render Props
@@ -196,7 +204,7 @@ function App() {
 
 ### Imperative Refs
 
-For programmatic control, you can use refs to access methods directly:
+For programmatic access to state and device management, you can use refs:
 
 ```tsx
 import { Microphone, MicrophoneHandle, Monitor } from '@mode-7/mod';
@@ -207,58 +215,38 @@ function App() {
   const micOut = useRef(null);
 
   useEffect(() => {
-    // Direct programmatic control
+    // Access current state
     if (micRef.current) {
-      micRef.current.setGain(1.0);
-      micRef.current.setMuted(false);
-
-      // Get current state
       const state = micRef.current.getState();
-      console.log(state.gain, state.isMuted, state.selectedDeviceId);
+      console.log('Current gain:', state.gain);
+      console.log('Is muted:', state.isMuted);
+      console.log('Selected device:', state.selectedDeviceId);
+      console.log('Available devices:', state.devices);
+      console.log('Error:', state.error);
     }
   }, []);
 
-  const toggleMicrophoneWithFade = () => {
+  const handleDeviceChange = async () => {
     if (!micRef.current) return;
 
-    const state = micRef.current.getState();
+    // Select a different device
+    micRef.current.selectDevice('some-device-id');
 
-    if (!state.isMuted) {
-      // Fade out before muting
-      let gain = state.gain;
-      const interval = setInterval(() => {
-        if (gain > 0 && micRef.current) {
-          gain -= 0.1;
-          micRef.current.setGain(Math.max(0, gain));
-        } else {
-          clearInterval(interval);
-          micRef.current?.setMuted(true);
-        }
-      }, 50);
-    } else {
-      // Unmute and fade in
-      micRef.current.setMuted(false);
-      let gain = 0;
-      const interval = setInterval(() => {
-        if (gain < 1.0 && micRef.current) {
-          gain += 0.1;
-          micRef.current.setGain(Math.min(1.0, gain));
-        } else {
-          clearInterval(interval);
-        }
-      }, 50);
-    }
+    // Refresh device list
+    await micRef.current.refreshDevices();
   };
 
   return (
     <>
       <Microphone ref={micRef} output={micOut} />
-      <button onClick={toggleMicrophoneWithFade}>Toggle Microphone (with fade)</button>
+      <button onClick={handleDeviceChange}>Change Device</button>
       <Monitor input={micOut} />
     </>
   );
 }
 ```
+
+**Note:** The imperative handle provides `getState()` for read-only access, plus `selectDevice()` and `refreshDevices()` for device management. To control gain and mute programmatically, use the controlled props pattern shown above.
 
 ## Important Notes
 

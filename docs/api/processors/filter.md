@@ -15,6 +15,16 @@ The `Filter` component applies frequency-based filtering to audio signals. It su
 | `gain` | `number` | `0` | Gain in dB (for peaking/shelving filters) |
 | `cv` | `ModStreamRef` | - | Optional CV input for frequency modulation |
 | `cvAmount` | `number` | `1000` | Amount of CV modulation in Hz |
+| `frequency` | `number` | `1000` | Filter frequency in Hz (controlled or initial value) |
+| `onFrequencyChange` | `(frequency: number) => void` | `-` | Callback when frequency changes |
+| `Q` | `number` | `1` | Filter Q/resonance (controlled or initial value) |
+| `onQChange` | `(Q: number) => void` | `-` | Callback when Q changes |
+| `type` | `BiquadFilterType` | `'lowpass'` | Filter type (controlled or initial value) |
+| `onTypeChange` | `(type: BiquadFilterType) => void` | `-` | Callback when type changes |
+| `gain` | `number` | `0` | Filter gain in dB (controlled or initial value) |
+| `onGainChange` | `(gain: number) => void` | `-` | Callback when gain changes |
+| `cv` | `ModStreamRef` | `-` | Optional CV input for frequency modulation |
+| `cvAmount` | `number` | `1000` | Amount of CV modulation to apply |
 | `children` | `function` | - | Render prop function receiving control props |
 
 ### Filter Types
@@ -286,79 +296,43 @@ function App() {
 
 ### Imperative Refs
 
-For programmatic control, you can use refs to access methods directly:
+For programmatic access to state, you can use refs:
 
 ```tsx
-import { ToneGenerator, Filter, FilterHandle, Monitor } from '@mode-7/mod';
+import { Filter, FilterHandle, Monitor } from '@mode-7/mod';
 import { useRef, useEffect } from 'react';
 
 function App() {
   const filterRef = useRef<FilterHandle>(null);
-  const toneOut = useRef(null);
-  const filterOut = useRef(null);
+  const inputRef = useRef(null);
+  const outputRef = useRef(null);
 
   useEffect(() => {
-    // Direct programmatic control
+    // Access current state
     if (filterRef.current) {
-      filterRef.current.setFrequency(1000);
-      filterRef.current.setQ(5.0);
-      filterRef.current.setType('lowpass');
-
-      // Get current state
       const state = filterRef.current.getState();
-      console.log(state.frequency, state.Q, state.type);
+      console.log('frequency:', state.frequency);
+      console.log('Q:', state.Q);
+      console.log('type:', state.type);
+      console.log('gain:', state.gain);
     }
   }, []);
 
-  const filterSweep = () => {
-    if (!filterRef.current) return;
-
-    let freq = 200;
-    const interval = setInterval(() => {
-      if (freq < 5000 && filterRef.current) {
-        freq += 100;
-        filterRef.current.setFrequency(freq);
-      } else {
-        clearInterval(interval);
-      }
-    }, 50);
-  };
-
-  const wobbleBass = () => {
-    if (!filterRef.current) return;
-
-    filterRef.current.setType('lowpass');
-    filterRef.current.setQ(10);
-
-    // Create wobble effect with frequency changes
-    let direction = 1;
-    let freq = 200;
-
-    const interval = setInterval(() => {
-      if (filterRef.current) {
-        freq += direction * 50;
-        if (freq >= 1000) direction = -1;
-        if (freq <= 200) direction = 1;
-        filterRef.current.setFrequency(freq);
-      }
-    }, 100);
-
-    // Stop after 5 seconds
-    setTimeout(() => clearInterval(interval), 5000);
-  };
-
   return (
     <>
-      <ToneGenerator output={toneOut} frequency={55} waveform="sawtooth" />
-      <Filter ref={filterRef} input={toneOut} output={filterOut} />
-      <button onClick={filterSweep}>Filter Sweep</button>
-      <button onClick={wobbleBass}>Wobble Bass</button>
-      <Monitor input={filterOut} />
+      <SomeSource output={inputRef} />
+      <Filter
+        ref={filterRef}
+        input={inputRef}
+        output={outputRef}
+      />
+      <Monitor input={outputRef} />
     </>
   );
 }
 ```
 
+**Note:** The imperative handle provides read-only access via `getState()`. To control the component programmatically, use the controlled props pattern shown above.
 ## Important Notes
 
 ### Frequency Range

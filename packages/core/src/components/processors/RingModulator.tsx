@@ -1,6 +1,14 @@
-import { useEffect, useState, useRef, ReactNode } from 'react';
+import React, { useEffect, useRef, ReactNode, useImperativeHandle } from 'react';
 import { useAudioContext } from '../../context/AudioContext';
 import { ModStreamRef } from '../../types/ModStream';
+import { useControlledState } from '../../hooks/useControlledState';
+
+export interface RingModulatorHandle {
+  getState: () => {
+    frequency: number;
+    wet: number;
+  };
+}
 
 export interface RingModulatorRenderProps {
   frequency: number;
@@ -14,18 +22,26 @@ export interface RingModulatorProps {
   input: ModStreamRef;
   output: ModStreamRef;
   label?: string;
+  frequency?: number;
+  onFrequencyChange?: (value: number) => void;
+  wet?: number;
+  onWetChange?: (value: number) => void;
   children?: (props: RingModulatorRenderProps) => ReactNode;
 }
 
-export const RingModulator: React.FC<RingModulatorProps> = ({
+export const RingModulator = React.forwardRef<RingModulatorHandle, RingModulatorProps>(({
   input,
   output,
   label = 'ringmod',
+  frequency: controlledFrequency,
+  onFrequencyChange,
+  wet: controlledWet,
+  onWetChange,
   children,
-}) => {
+}, ref) => {
   const audioContext = useAudioContext();
-  const [frequency, setFrequency] = useState(440); // Carrier frequency
-  const [wet, setWet] = useState(0.5); // Wet/dry mix
+  const [frequency, setFrequency] = useControlledState(controlledFrequency, 440, onFrequencyChange);
+  const [wet, setWet] = useControlledState(controlledWet, 0.5, onWetChange);
 
   const dryGainRef = useRef<GainNode | null>(null);
   const wetGainRef = useRef<GainNode | null>(null);
@@ -146,6 +162,11 @@ export const RingModulator: React.FC<RingModulatorProps> = ({
     }
   }, [wet]);
 
+  // Expose imperative handle
+  useImperativeHandle(ref, () => ({
+    getState: () => ({ frequency, wet }),
+  }), [frequency, wet]);
+
   // Render children with state
   if (children) {
     return <>{children({
@@ -158,4 +179,6 @@ export const RingModulator: React.FC<RingModulatorProps> = ({
   }
 
   return null;
-};
+});
+
+RingModulator.displayName = 'RingModulator';

@@ -8,6 +8,12 @@ The `LFO` (Low Frequency Oscillator) component generates slow-moving control vol
 |------|------|---------|-------------|
 | `output` | `ModStreamRef` | Required | Reference to output the CV signal |
 | `label` | `string` | `'lfo'` | Label for the component in metadata |
+| `frequency` | `number` | `1` | Frequency in Hz (controlled or initial value), typically 0.1-20 Hz |
+| `onFrequencyChange` | `(frequency: number) => void` | - | Callback when frequency changes |
+| `amplitude` | `number` | `1` | Amplitude 0-1 (controlled or initial value) |
+| `onAmplitudeChange` | `(amplitude: number) => void` | - | Callback when amplitude changes |
+| `waveform` | `LFOWaveform` | `'sine'` | Waveform type (controlled or initial value): `'sine'`, `'square'`, `'sawtooth'`, or `'triangle'` |
+| `onWaveformChange` | `(waveform: LFOWaveform) => void` | - | Callback when waveform changes |
 | `children` | `function` | - | Render prop function receiving control props |
 
 ## Render Props
@@ -247,7 +253,7 @@ function App() {
 
 ### Imperative Refs
 
-For programmatic control, you can use refs to access methods directly:
+For programmatic access to state, you can use refs:
 
 ```tsx
 import { LFO, LFOHandle, ToneGenerator, Monitor } from '@mode-7/mod';
@@ -259,33 +265,14 @@ function App() {
   const toneOut = useRef(null);
 
   useEffect(() => {
-    // Direct programmatic control
+    // Access current state
     if (lfoRef.current) {
-      lfoRef.current.setFrequency(2.0);
-      lfoRef.current.setAmplitude(1.0);
-      lfoRef.current.setWaveform('sine');
-
-      // Get current state
       const state = lfoRef.current.getState();
-      console.log(state.frequency, state.amplitude, state.waveform);
+      console.log('Frequency:', state.frequency);
+      console.log('Amplitude:', state.amplitude);
+      console.log('Waveform:', state.waveform);
     }
   }, []);
-
-  const createVibratoEffect = () => {
-    if (!lfoRef.current) return;
-
-    // Gradually increase vibrato depth
-    let depth = 0;
-    const interval = setInterval(() => {
-      if (depth < 1.0 && lfoRef.current) {
-        depth += 0.05;
-        lfoRef.current.setAmplitude(Math.min(1.0, depth));
-        lfoRef.current.setFrequency(5 + depth * 2); // Speed up as depth increases
-      } else {
-        clearInterval(interval);
-      }
-    }, 100);
-  };
 
   return (
     <>
@@ -296,12 +283,13 @@ function App() {
         cv={lfoOut}
         cvAmount={20}  // Vibrato of ±20Hz
       />
-      <button onClick={createVibratoEffect}>Create Vibrato Effect</button>
       <Monitor input={toneOut} />
     </>
   );
 }
 ```
+
+**Note:** The imperative handle provides read-only access via `getState()`. To control the LFO programmatically, use the controlled props pattern shown above.
 
 ## Important Notes
 

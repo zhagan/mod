@@ -1,6 +1,16 @@
-import { useEffect, useState, useRef, ReactNode } from 'react';
+import React, { useEffect, useRef, ReactNode, useImperativeHandle } from 'react';
 import { useAudioContext } from '../../context/AudioContext';
 import { ModStreamRef } from '../../types/ModStream';
+import { useControlledState } from '../../hooks/useControlledState';
+
+export interface FilterHandle {
+  getState: () => {
+    frequency: number;
+    Q: number;
+    type: BiquadFilterType;
+    gain: number;
+  };
+}
 
 export interface FilterRenderProps {
   frequency: number;
@@ -18,34 +28,41 @@ export interface FilterProps {
   input: ModStreamRef;
   output: ModStreamRef;
   label?: string;
-  // Initial values (can be overridden by children)
   frequency?: number;
+  onFrequencyChange?: (frequency: number) => void;
   Q?: number;
+  onQChange?: (Q: number) => void;
   type?: BiquadFilterType;
+  onTypeChange?: (type: BiquadFilterType) => void;
   gain?: number;
+  onGainChange?: (gain: number) => void;
   // CV inputs
   cv?: ModStreamRef;
   cvAmount?: number;
   children?: (props: FilterRenderProps) => ReactNode;
 }
 
-export const Filter: React.FC<FilterProps> = ({
+export const Filter = React.forwardRef<FilterHandle, FilterProps>(({
   input,
   output,
   label = 'filter',
-  frequency: initialFrequency = 1000,
-  Q: initialQ = 1,
-  type: initialType = 'lowpass',
-  gain: initialGain = 0,
+  frequency: controlledFrequency,
+  onFrequencyChange,
+  Q: controlledQ,
+  onQChange,
+  type: controlledType,
+  onTypeChange,
+  gain: controlledGain,
+  onGainChange,
   cv,
   cvAmount = 1000,
   children,
-}) => {
+}, ref) => {
   const audioContext = useAudioContext();
-  const [frequency, setFrequency] = useState(initialFrequency);
-  const [Q, setQ] = useState(initialQ);
-  const [type, setType] = useState<BiquadFilterType>(initialType);
-  const [gain, setGain] = useState(initialGain);
+  const [frequency, setFrequency] = useControlledState(controlledFrequency, 1000, onFrequencyChange);
+  const [Q, setQ] = useControlledState(controlledQ, 1, onQChange);
+  const [type, setType] = useControlledState<BiquadFilterType>(controlledType, 'lowpass', onTypeChange);
+  const [gain, setGain] = useControlledState(controlledGain, 0, onGainChange);
 
   const filterNodeRef = useRef<BiquadFilterNode | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
@@ -177,6 +194,11 @@ export const Filter: React.FC<FilterProps> = ({
     }
   }, [cvAmount]);
 
+  // Expose imperative handle
+  useImperativeHandle(ref, () => ({
+    getState: () => ({ frequency, Q, type, gain }),
+  }), [frequency, Q, type, gain]);
+
   // Render children with state
   if (children) {
     return <>{children({
@@ -193,4 +215,6 @@ export const Filter: React.FC<FilterProps> = ({
   }
 
   return null;
-};
+});
+
+Filter.displayName = 'Filter';

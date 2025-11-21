@@ -8,6 +8,15 @@ The `StreamingAudioDeck` component plays streaming audio from URLs (internet rad
 |------|------|---------|-------------|
 | `output` | `ModStreamRef` | Required | Reference to output the audio signal |
 | `label` | `string` | `'streaming-audio-deck'` | Label for the component in metadata |
+| `url` | `string` | `''` | Stream URL (controlled or initial value) |
+| `onUrlChange` | `(url: string) => void` | - | Callback when URL changes |
+| `gain` | `number` | `1.0` | Gain level 0-1+ (controlled or initial value) |
+| `onGainChange` | `(gain: number) => void` | - | Callback when gain changes |
+| `loop` | `boolean` | `false` | Whether stream loops (controlled or initial value) |
+| `onLoopChange` | `(loop: boolean) => void` | - | Callback when loop state changes |
+| `onPlayingChange` | `(isPlaying: boolean) => void` | - | Callback when playback state changes |
+| `onTimeUpdate` | `(currentTime: number, duration: number) => void` | - | Callback when playback position updates |
+| `onError` | `(error: string \| null) => void` | - | Callback when error state changes |
 | `children` | `function` | - | Render prop function receiving control props |
 
 ## Render Props
@@ -20,9 +29,15 @@ When using the `children` render prop, the following controls are provided:
 | `setUrl` | `(url: string) => void` | Set stream URL |
 | `gain` | `number` | Current gain level (0-1+) |
 | `setGain` | `(value: number) => void` | Update the gain level |
+| `loop` | `boolean` | Whether the stream loops |
+| `setLoop` | `(value: boolean) => void` | Enable or disable looping |
 | `isPlaying` | `boolean` | Whether stream is currently playing |
 | `play` | `() => void` | Start streaming |
 | `pause` | `() => void` | Pause streaming |
+| `stop` | `() => void` | Stop streaming and reset to start |
+| `currentTime` | `number` | Current playback position in seconds |
+| `duration` | `number` | Total duration in seconds (if available) |
+| `seek` | `(time: number) => void` | Seek to a specific time in seconds |
 | `isActive` | `boolean` | Whether the deck is active |
 | `error` | `string \| null` | Error message if streaming failed |
 
@@ -185,7 +200,6 @@ function App() {
         onUrlChange={setUrl}
         gain={gain}
         onGainChange={setGain}
-        isPlaying={isPlaying}
         onPlayingChange={setPlaying}
       />
 
@@ -228,7 +242,7 @@ function App() {
 
 ### Imperative Refs
 
-For programmatic control, you can use refs to access methods directly:
+For programmatic control of playback, you can use refs:
 
 ```tsx
 import { StreamingAudioDeck, StreamingAudioDeckHandle, Monitor } from '@mode-7/mod';
@@ -239,76 +253,39 @@ function App() {
   const streamOut = useRef(null);
 
   useEffect(() => {
-    // Direct programmatic control
+    // Access current state
     if (streamRef.current) {
-      streamRef.current.setUrl('https://example.com/stream');
-      streamRef.current.setGain(0.8);
-
-      // Get current state
       const state = streamRef.current.getState();
-      console.log(state.url, state.isPlaying, state.gain);
+      console.log('URL:', state.url);
+      console.log('Is playing:', state.isPlaying);
+      console.log('Gain:', state.gain);
+      console.log('Loop:', state.loop);
+      console.log('Current time:', state.currentTime);
+      console.log('Duration:', state.duration);
     }
   }, []);
 
-  const stations = [
-    { name: 'Jazz FM', url: 'https://example.com/jazz' },
-    { name: 'Rock Radio', url: 'https://example.com/rock' },
-    { name: 'Classical', url: 'https://example.com/classical' },
-  ];
-
-  const switchStation = (stationUrl: string) => {
+  const handlePlayback = () => {
     if (!streamRef.current) return;
 
-    // Fade out current station
-    const currentGain = streamRef.current.getState().gain;
-    let gain = currentGain;
-
-    const fadeOut = setInterval(() => {
-      if (gain > 0 && streamRef.current) {
-        gain -= 0.1;
-        streamRef.current.setGain(Math.max(0, gain));
-      } else {
-        clearInterval(fadeOut);
-
-        // Switch station
-        streamRef.current?.pause();
-        streamRef.current?.setUrl(stationUrl);
-        streamRef.current?.play();
-
-        // Fade in new station
-        gain = 0;
-        const fadeIn = setInterval(() => {
-          if (gain < currentGain && streamRef.current) {
-            gain += 0.1;
-            streamRef.current.setGain(Math.min(currentGain, gain));
-          } else {
-            clearInterval(fadeIn);
-          }
-        }, 50);
-      }
-    }, 50);
+    // Control playback
+    streamRef.current.play();
+    // streamRef.current.pause();
+    // streamRef.current.stop();
+    // streamRef.current.seek(30); // Seek to 30 seconds if supported
   };
 
   return (
     <>
       <StreamingAudioDeck ref={streamRef} output={streamOut} />
-
-      <div>
-        {stations.map(station => (
-          <button
-            key={station.name}
-            onClick={() => switchStation(station.url)}
-          >
-            {station.name}
-          </button>
-        ))}
-      </div>
-
+      <button onClick={handlePlayback}>Play</button>
       <Monitor input={streamOut} />
     </>
   );
 }
 ```
+
+**Note:** The imperative handle provides `play()`, `pause()`, `stop()`, and `seek()` methods for playback control, plus `getState()` for read-only state access. To control URL, gain, and loop programmatically, use the controlled props pattern shown above.
 
 ## Important Notes
 

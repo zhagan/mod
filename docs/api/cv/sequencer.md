@@ -10,6 +10,12 @@ The `Sequencer` component generates a sequence of CV values that step through a 
 | `gateOutput` | `ModStreamRef` | - | Optional separate output for gate/trigger signals |
 | `label` | `string` | `'sequencer'` | Label for the component in metadata |
 | `numSteps` | `number` | `8` | Number of steps in the sequence |
+| `steps` | `number[]` | `Array(numSteps).fill(0.5)` | Sequence step values (controlled or initial value) |
+| `onStepsChange` | `(steps: number[]) => void` | - | Callback when steps change |
+| `bpm` | `number` | `120` | Tempo in beats per minute (controlled or initial value) |
+| `onBpmChange` | `(bpm: number) => void` | - | Callback when BPM changes |
+| `onCurrentStepChange` | `(currentStep: number) => void` | - | Callback when current step changes |
+| `onPlayingChange` | `(isPlaying: boolean) => void` | - | Callback when playback state changes |
 | `children` | `function` | - | Render prop function receiving control props |
 
 ## Render Props
@@ -238,7 +244,7 @@ function App() {
   const toneOut = useRef(null);
   const [steps, setSteps] = useState([0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]);
   const [bpm, setBpm] = useState(120);
-  const [isPlaying, setPlaying] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
 
   return (
     <>
@@ -249,28 +255,28 @@ function App() {
         onStepsChange={setSteps}
         bpm={bpm}
         onBpmChange={setBpm}
-        isPlaying={isPlaying}
-        onPlayingChange={setPlaying}
+        onCurrentStepChange={setCurrentStep}
       >
-        {({ currentStep }) => (
-          <div style={{ display: 'flex', gap: '4px' }}>
-            {steps.map((_, index) => (
-              <div
-                key={index}
-                style={{
-                  width: '20px',
-                  height: '20px',
-                  backgroundColor: currentStep === index ? 'blue' : 'gray',
-                }}
-              />
-            ))}
-          </div>
+        {({ play, pause, isPlaying }) => (
+          <>
+            <div style={{ display: 'flex', gap: '4px' }}>
+              {steps.map((_, index) => (
+                <div
+                  key={index}
+                  style={{
+                    width: '20px',
+                    height: '20px',
+                    backgroundColor: currentStep === index ? 'blue' : 'gray',
+                  }}
+                />
+              ))}
+            </div>
+            <button onClick={isPlaying ? pause : play}>
+              {isPlaying ? 'Pause' : 'Play'}
+            </button>
+          </>
         )}
       </Sequencer>
-
-      <button onClick={() => setPlaying(!isPlaying)}>
-        {isPlaying ? 'Pause' : 'Play'}
-      </button>
 
       <div>
         <label>BPM: {bpm}</label>
@@ -292,7 +298,7 @@ function App() {
 
 ### Imperative Refs
 
-For programmatic control, you can use refs to access methods directly:
+For programmatic access to state and transport control, you can use refs:
 
 ```tsx
 import { Sequencer, SequencerHandle, ToneGenerator, Monitor } from '@mode-7/mod';
@@ -304,46 +310,37 @@ function App() {
   const toneOut = useRef(null);
 
   useEffect(() => {
-    // Direct programmatic control
+    // Access current state
     if (seqRef.current) {
-      const melody = [1.0, 0.8, 0.6, 0.7, 0.5, 0.6, 0.4, 0.5];
-      seqRef.current.setSteps(melody);
-      seqRef.current.setBpm(140);
-
-      // Get current state
       const state = seqRef.current.getState();
-      console.log(state.steps, state.bpm, state.currentStep);
+      console.log('Steps:', state.steps);
+      console.log('Current step:', state.currentStep);
+      console.log('BPM:', state.bpm);
+      console.log('Is playing:', state.isPlaying);
     }
   }, []);
 
-  const randomizeSequence = () => {
+  const handleTransport = () => {
     if (!seqRef.current) return;
 
-    const randomSteps = Array.from({ length: 8 }, () => Math.random());
-    seqRef.current.setSteps(randomSteps);
-  };
-
-  const createArpeggio = () => {
-    if (!seqRef.current) return;
-
-    // Create ascending arpeggio pattern
-    const arpeggio = [0.0, 0.25, 0.5, 0.75, 1.0, 0.75, 0.5, 0.25];
-    seqRef.current.setSteps(arpeggio);
-    seqRef.current.setBpm(160);
+    // Use imperative transport methods
     seqRef.current.play();
+    // seqRef.current.pause();
+    // seqRef.current.reset();
   };
 
   return (
     <>
       <Sequencer ref={seqRef} output={seqOut} numSteps={8} />
       <ToneGenerator output={toneOut} frequency={220} cv={seqOut} cvAmount={440} />
-      <button onClick={randomizeSequence}>Randomize</button>
-      <button onClick={createArpeggio}>Create Arpeggio</button>
+      <button onClick={handleTransport}>Play</button>
       <Monitor input={toneOut} />
     </>
   );
 }
 ```
+
+**Note:** The imperative handle provides `play()`, `pause()`, and `reset()` for transport control, plus `getState()` for read-only access. To control steps and BPM programmatically, use the controlled props pattern shown above.
 
 ## Important Notes
 

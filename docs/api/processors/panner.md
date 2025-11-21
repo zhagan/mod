@@ -12,6 +12,10 @@ The `Panner` component controls the stereo position of an audio signal, allowing
 | `pan` | `number` | `0` | Initial pan position (-1 to 1) |
 | `cv` | `ModStreamRef` | - | Optional CV input for modulation |
 | `cvAmount` | `number` | `0.5` | Amount of CV modulation |
+| `pan` | `number` | `0` | Pan position -1 (left) to 1 (right) (controlled or initial value) |
+| `onPanChange` | `(pan: number) => void` | `-` | Callback when pan changes |
+| `cv` | `ModStreamRef` | `-` | Optional CV input for pan modulation |
+| `cvAmount` | `number` | `0.5` | Amount of CV modulation to apply |
 | `children` | `function` | - | Render prop function receiving control props |
 
 ## Render Props
@@ -252,45 +256,40 @@ function App() {
 
 ### Imperative Refs
 
-Control panner programmatically using refs:
+For programmatic access to state, you can use refs:
 
 ```tsx
-import { Panner, PannerHandle } from '@mode-7/mod';
+import { Panner, PannerHandle, Monitor } from '@mode-7/mod';
 import { useRef, useEffect } from 'react';
 
 function App() {
+  const pannerRef = useRef<PannerHandle>(null);
   const inputRef = useRef(null);
-  const panOut = useRef(null);
-  const panRef = useRef<PannerHandle>(null);
+  const outputRef = useRef(null);
 
   useEffect(() => {
-    if (panRef.current) {
-      // Auto-pan left to right
-      let position = -1;
-      let direction = 1;
-
-      const interval = setInterval(() => {
-        position += direction * 0.05;
-        if (position >= 1 || position <= -1) {
-          direction *= -1;
-        }
-        panRef.current?.setPan(position);
-      }, 50);
-
-      return () => clearInterval(interval);
+    // Access current state
+    if (pannerRef.current) {
+      const state = pannerRef.current.getState();
+      console.log('pan:', state.pan);
     }
   }, []);
 
   return (
-    <Panner
-      ref={panRef}
-      input={inputRef}
-      output={panOut}
-    />
+    <>
+      <SomeSource output={inputRef} />
+      <Panner
+        ref={pannerRef}
+        input={inputRef}
+        output={outputRef}
+      />
+      <Monitor input={outputRef} />
+    </>
   );
 }
 ```
 
+**Note:** The imperative handle provides read-only access via `getState()`. To control the component programmatically, use the controlled props pattern shown above.
 ## Important Notes
 
 ### Pan Values

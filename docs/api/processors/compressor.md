@@ -9,6 +9,16 @@ The `Compressor` component controls the dynamic range of audio signals, reducing
 | `input` | `ModStreamRef` | Required | Audio signal to compress |
 | `output` | `ModStreamRef` | Required | Compressed audio output |
 | `label` | `string` | `'compressor'` | Label for the component in metadata |
+| `threshold` | `number` | `-24` | Threshold in dB (controlled or initial value) |
+| `onThresholdChange` | `(threshold: number) => void` | `-` | Callback when threshold changes |
+| `knee` | `number` | `30` | Knee width (controlled or initial value) |
+| `onKneeChange` | `(knee: number) => void` | `-` | Callback when knee changes |
+| `ratio` | `number` | `12` | Compression ratio (controlled or initial value) |
+| `onRatioChange` | `(ratio: number) => void` | `-` | Callback when ratio changes |
+| `attack` | `number` | `0.003` | Attack time in seconds (controlled or initial value) |
+| `onAttackChange` | `(attack: number) => void` | `-` | Callback when attack changes |
+| `release` | `number` | `0.25` | Release time in seconds (controlled or initial value) |
+| `onReleaseChange` | `(release: number) => void` | `-` | Callback when release changes |
 | `children` | `function` | - | Render prop function receiving control props |
 
 ## Render Props
@@ -326,42 +336,44 @@ function App() {
 
 ### Imperative Refs
 
-Control the compressor programmatically using refs:
+For programmatic access to state, you can use refs:
 
 ```tsx
-import { Compressor, CompressorHandle } from '@mode-7/mod';
+import { Compressor, CompressorHandle, Monitor } from '@mode-7/mod';
 import { useRef, useEffect } from 'react';
 
 function App() {
+  const compressorRef = useRef<CompressorHandle>(null);
   const inputRef = useRef(null);
-  const compOut = useRef(null);
-  const compRef = useRef<CompressorHandle>(null);
+  const outputRef = useRef(null);
 
   useEffect(() => {
-    if (compRef.current) {
-      // Apply vocal compression preset
-      compRef.current.setThreshold(-18);
-      compRef.current.setRatio(4);
-      compRef.current.setKnee(10);
-      compRef.current.setAttack(0.005);
-      compRef.current.setRelease(0.05);
-
-      // Get current state
-      const state = compRef.current.getState();
-      console.log('Compressor settings:', state);
+    // Access current state
+    if (compressorRef.current) {
+      const state = compressorRef.current.getState();
+      console.log('threshold:', state.threshold);
+      console.log('knee:', state.knee);
+      console.log('ratio:', state.ratio);
+      console.log('attack:', state.attack);
+      console.log('release:', state.release);
     }
   }, []);
 
   return (
-    <Compressor
-      ref={compRef}
-      input={inputRef}
-      output={compOut}
-    />
+    <>
+      <SomeSource output={inputRef} />
+      <Compressor
+        ref={compressorRef}
+        input={inputRef}
+        output={outputRef}
+      />
+      <Monitor input={outputRef} />
+    </>
   );
 }
 ```
 
+**Note:** The imperative handle provides read-only access via `getState()`. To control the component programmatically, use the controlled props pattern shown above.
 ## Important Notes
 
 ### Threshold

@@ -9,6 +9,12 @@ The `Delay` component creates echo effects by delaying the input signal and feed
 | `input` | `ModStreamRef` | Required | Audio signal to delay |
 | `output` | `ModStreamRef` | Required | Delayed audio output |
 | `label` | `string` | `'delay'` | Label for the component in metadata |
+| `time` | `number` | `0.5` | Delay time in seconds (controlled or initial value) |
+| `onTimeChange` | `(time: number) => void` | - | Callback when delay time changes |
+| `feedback` | `number` | `0.3` | Feedback amount 0-1 (controlled or initial value) |
+| `onFeedbackChange` | `(feedback: number) => void` | - | Callback when feedback changes |
+| `wet` | `number` | `0.5` | Wet/dry mix 0-1 (controlled or initial value) |
+| `onWetChange` | `(wet: number) => void` | - | Callback when wet/dry mix changes |
 | `children` | `function` | - | Render prop function receiving control props |
 
 ## Render Props
@@ -265,7 +271,7 @@ function App() {
 
 ### Imperative Refs
 
-For programmatic control, you can use refs to access methods directly:
+For programmatic access to state, you can use refs:
 
 ```tsx
 import { ToneGenerator, Delay, DelayHandle, Monitor } from '@mode-7/mod';
@@ -277,65 +283,26 @@ function App() {
   const delayOut = useRef(null);
 
   useEffect(() => {
-    // Direct programmatic control
+    // Access current state
     if (delayRef.current) {
-      delayRef.current.setTime(0.5);
-      delayRef.current.setFeedback(0.4);
-      delayRef.current.setWet(0.3);
-
-      // Get current state
       const state = delayRef.current.getState();
-      console.log(state.time, state.feedback, state.wet);
+      console.log('Time:', state.time);
+      console.log('Feedback:', state.feedback);
+      console.log('Wet:', state.wet);
     }
   }, []);
-
-  const tempoSyncDelay = (bpm: number, division: number = 0.5) => {
-    if (!delayRef.current) return;
-
-    const delayTime = (60 / bpm) * division;
-    delayRef.current.setTime(delayTime);
-  };
-
-  const dubDelay = () => {
-    if (!delayRef.current) return;
-
-    // Classic dub delay settings
-    delayRef.current.setTime(0.375);  // Dotted eighth at 120 BPM
-    delayRef.current.setFeedback(0.7);
-    delayRef.current.setWet(0.5);
-  };
-
-  const modulate DelayTime = () => {
-    if (!delayRef.current) return;
-
-    let time = 0.1;
-    let direction = 1;
-
-    const interval = setInterval(() => {
-      if (delayRef.current) {
-        time += direction * 0.05;
-        if (time >= 1.0) direction = -1;
-        if (time <= 0.1) direction = 1;
-        delayRef.current.setTime(time);
-      }
-    }, 100);
-
-    // Stop after 10 seconds
-    setTimeout(() => clearInterval(interval), 10000);
-  };
 
   return (
     <>
       <ToneGenerator output={toneOut} />
       <Delay ref={delayRef} input={toneOut} output={delayOut} />
-      <button onClick={() => tempoSyncDelay(120, 0.5)}>Sync to 120 BPM (8th note)</button>
-      <button onClick={dubDelay}>Dub Delay</button>
-      <button onClick={modulateDelayTime}>Modulate Delay Time</button>
       <Monitor input={delayOut} />
     </>
   );
 }
 ```
+
+**Note:** The imperative handle provides read-only access via `getState()`. To control the component programmatically, use the controlled props pattern shown above.
 
 ## Important Notes
 

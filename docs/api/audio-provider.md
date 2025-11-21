@@ -2,10 +2,20 @@
 
 The `AudioProvider` component initializes and manages the Web Audio context for your application. It must wrap all other mod components.
 
+## Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `children` | `ReactNode` | Required | Child components that will have access to the audio context |
+
+The Audio Context is created automatically when the component mounts.
+
 ## Usage
 
+### Basic Setup
+
 ```tsx
-import { AudioProvider } from '@mode-7/mod';
+import { AudioProvider } from '@mod-audio/core';
 
 function App() {
   return (
@@ -16,16 +26,12 @@ function App() {
 }
 ```
 
-## Props
-
-The AudioProvider accepts no props. The Audio Context is created automatically when the component mounts.
-
-## Context
+### Accessing the Audio Context
 
 AudioProvider creates a React context that provides the AudioContext instance to all child components. You can access it using the `useAudioContext` hook:
 
 ```tsx
-import { useAudioContext } from '@mode-7/mod';
+import { useAudioContext } from '@mod-audio/core';
 
 function MyComponent() {
   const audioContext = useAudioContext();
@@ -38,48 +44,10 @@ function MyComponent() {
 }
 ```
 
-## Important Notes
-
-### User Gesture Requirement
-
-On some browsers (particularly iOS Safari), the AudioContext must be resumed in response to a user gesture. The AudioProvider handles this automatically, but you may want to provide a "Start" button for the best user experience:
+### With Audio Components
 
 ```tsx
-import { AudioProvider, useAudioContext } from '@mode-7/mod';
-import { useState } from 'react';
-
-function App() {
-  const [started, setStarted] = useState(false);
-
-  return (
-    <AudioProvider>
-      {!started && (
-        <button onClick={() => setStarted(true)}>
-          Start Audio
-        </button>
-      )}
-      {started && (
-        <YourAudioApp />
-      )}
-    </AudioProvider>
-  );
-}
-```
-
-### Single Instance
-
-Only one AudioProvider should exist in your application. Nested AudioProviders are not supported and will cause issues.
-
-::: warning
-Do not nest AudioProvider components. Only one should exist at the root of your app.
-:::
-
-## Examples
-
-### Basic Setup
-
-```tsx
-import { AudioProvider, ToneGenerator, Monitor } from '@mode-7/mod';
+import { AudioProvider, ToneGenerator, Monitor } from '@mod-audio/core';
 import { useRef } from 'react';
 
 function App() {
@@ -96,8 +64,10 @@ function App() {
 
 ### With User Activation
 
+On some browsers (particularly iOS Safari), the AudioContext must be resumed in response to a user gesture. You may want to provide a "Start" button for the best user experience:
+
 ```tsx
-import { AudioProvider } from '@mode-7/mod';
+import { AudioProvider } from '@mod-audio/core';
 import { useState } from 'react';
 
 function App() {
@@ -121,6 +91,14 @@ function App() {
   );
 }
 ```
+
+## Important Notes
+
+- Only one AudioProvider should exist in your application
+- Nested AudioProviders are not supported and will cause issues
+- The AudioContext is created automatically when the component mounts
+- On iOS Safari and some browsers, user interaction may be required to start audio
+- All mod components must be children of AudioProvider to function properly
 
 ## Related
 
