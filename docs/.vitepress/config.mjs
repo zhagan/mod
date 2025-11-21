@@ -6,14 +6,14 @@ export default defineConfig({
   base: '/mod/',
 
   head: [
-    ['link', { rel: 'icon', href: '/mod/logo.png' }],
+    ['link', { rel: 'icon', href: '/logo.png' }],
     ['link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' }],
     ['link', { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' }],
     ['link', { href: 'https://fonts.googleapis.com/css2?family=Audiowide&display=swap', rel: 'stylesheet' }]
   ],
 
   themeConfig: {
-    logo: '/mod/logo.png',
+    logo: '/logo.png',
 
     nav: [
       { text: 'Guide', link: '/guide/getting-started' },
