@@ -40,7 +40,7 @@ When using the `children` render prop, the following controls are provided:
 ### Basic Usage
 
 ```tsx
-import { AutoWah } from '@mod-audio/core';
+import { AutoWah } from '@mode-7/mod';
 
 function MyComponent() {
   const inputRef = useRef<ModStreamRef>(null);
@@ -62,7 +62,7 @@ function MyComponent() {
 ### With Render Props
 
 ```tsx
-import { AutoWah } from '@mod-audio/core';
+import { AutoWah } from '@mode-7/mod';
 
 function MyComponent() {
   const inputRef = useRef<ModStreamRef>(null);
@@ -126,7 +126,7 @@ function MyComponent() {
 ### Controlled Props
 
 ```tsx
-import { AutoWah } from '@mod-audio/core';
+import { AutoWah } from '@mode-7/mod';
 import { useState } from 'react';
 
 function MyComponent() {
@@ -162,7 +162,7 @@ function MyComponent() {
 ### Imperative Refs
 
 ```tsx
-import { AutoWah } from '@mod-audio/core';
+import { AutoWah } from '@mode-7/mod';
 import { useRef } from 'react';
 
 function MyComponent() {

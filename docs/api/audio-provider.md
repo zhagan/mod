@@ -15,7 +15,7 @@ The Audio Context is created automatically when the component mounts.
 ### Basic Setup
 
 ```tsx
-import { AudioProvider } from '@mod-audio/core';
+import { AudioProvider } from '@mode-7/mod';
 
 function App() {
   return (
@@ -31,7 +31,7 @@ function App() {
 AudioProvider creates a React context that provides the AudioContext instance to all child components. You can access it using the `useAudioContext` hook:
 
 ```tsx
-import { useAudioContext } from '@mod-audio/core';
+import { useAudioContext } from '@mode-7/mod';
 
 function MyComponent() {
   const audioContext = useAudioContext();
@@ -47,7 +47,7 @@ function MyComponent() {
 ### With Audio Components
 
 ```tsx
-import { AudioProvider, ToneGenerator, Monitor } from '@mod-audio/core';
+import { AudioProvider, ToneGenerator, Monitor } from '@mode-7/mod';
 import { useRef } from 'react';
 
 function App() {
@@ -67,7 +67,7 @@ function App() {
 On some browsers (particularly iOS Safari), the AudioContext must be resumed in response to a user gesture. You may want to provide a "Start" button for the best user experience:
 
 ```tsx
-import { AudioProvider } from '@mod-audio/core';
+import { AudioProvider } from '@mode-7/mod';
 import { useState } from 'react';
 
 function App() {

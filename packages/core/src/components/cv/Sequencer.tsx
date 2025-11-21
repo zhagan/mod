@@ -46,7 +46,7 @@ export interface SequencerProps {
 
 export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
   output,
-  gateOutput: _gateOutput,
+  gateOutput,
   label = 'sequencer',
   numSteps = 8,
   steps: controlledSteps,
@@ -65,6 +65,8 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
 
   const constantSourceRef = useRef<ConstantSourceNode | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
+  const gateSourceRef = useRef<ConstantSourceNode | null>(null);
+  const gateGainRef = useRef<GainNode | null>(null);
   const intervalRef = useRef<number | null>(null);
 
   // Store refs for current state
@@ -107,6 +109,30 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
       },
     };
 
+    // Create gate output if provided
+    if (gateOutput) {
+      const gateSource = audioContext.createConstantSource();
+      gateSource.offset.value = 0; // Gate starts low
+      gateSourceRef.current = gateSource;
+
+      const gateGain = audioContext.createGain();
+      gateGain.gain.value = 1.0;
+      gateGainRef.current = gateGain;
+
+      gateSource.connect(gateGain);
+      gateSource.start(0);
+
+      gateOutput.current = {
+        audioNode: gateSource,
+        gain: gateGain,
+        context: audioContext,
+        metadata: {
+          label: `${label}-gate`,
+          sourceType: 'cv',
+        },
+      };
+    }
+
     // Cleanup
     return () => {
       if (intervalRef.current !== null) {
@@ -118,8 +144,21 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
       output.current = null;
       constantSourceRef.current = null;
       gainNodeRef.current = null;
+
+      if (gateSourceRef.current) {
+        gateSourceRef.current.stop();
+        gateSourceRef.current.disconnect();
+        gateSourceRef.current = null;
+      }
+      if (gateGainRef.current) {
+        gateGainRef.current.disconnect();
+        gateGainRef.current = null;
+      }
+      if (gateOutput) {
+        gateOutput.current = null;
+      }
     };
-  }, [audioContext, label]);
+  }, [audioContext, label, gateOutput]);
 
   // Play function
   const play = () => {
@@ -136,6 +175,16 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
         if (constantSourceRef.current) {
           const now = audioContext.currentTime;
           constantSourceRef.current.offset.setValueAtTime(stepsRef.current[nextStep], now);
+        }
+
+        // Trigger gate pulse
+        if (gateSourceRef.current) {
+          const now = audioContext.currentTime;
+          const gateDuration = stepDuration * 0.8; // Gate held for 80% of step duration
+
+          // Pulse high then low
+          gateSourceRef.current.offset.setValueAtTime(1, now);
+          gateSourceRef.current.offset.setValueAtTime(0, now + gateDuration);
         }
 
         return nextStep;
@@ -184,6 +233,16 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
           if (constantSourceRef.current) {
             const now = audioContext.currentTime;
             constantSourceRef.current.offset.setValueAtTime(stepsRef.current[nextStep], now);
+          }
+
+          // Trigger gate pulse
+          if (gateSourceRef.current) {
+            const now = audioContext.currentTime;
+            const gateDuration = 0.01; // 10ms gate pulse
+
+            // Pulse high then low
+            gateSourceRef.current.offset.setValueAtTime(1, now);
+            gateSourceRef.current.offset.setValueAtTime(0, now + gateDuration);
           }
 
           return nextStep;

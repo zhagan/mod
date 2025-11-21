@@ -70,7 +70,7 @@ export const MODULE_DEFINITIONS: Record<string, ModuleDefinition> = {
     category: 'cv',
     color: '#ffecd2',
     inputs: 0,
-    outputs: 1,
+    outputs: 2, // CV output + Gate output
     defaultParams: { steps: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5], bpm: 120, isPlaying: false },
   },
   Clock: {
@@ -225,6 +225,15 @@ export const MODULE_DEFINITIONS: Record<string, ModuleDefinition> = {
     inputs: 1,
     outputs: 1,
     defaultParams: { frequency: 440, wet: 0.5 },
+  },
+  VCA: {
+    type: 'VCA',
+    label: 'VCA',
+    category: 'processor',
+    color: '#a8edea',
+    inputs: 1,
+    outputs: 1,
+    defaultParams: { gain: 1.0, cvAmount: 1.0 },
   },
   CrossFade: {
     type: 'CrossFade',

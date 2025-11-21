@@ -1,0 +1,51 @@
+.modui-file-picker {
+  position: relative;
+  width: 100%;
+}
+
+.modui-file-picker-input {
+  display: none;
+}
+
+.modui-file-picker-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.15s;
+  width: 100%;
+  font-family: inherit;
+}
+
+.modui-file-picker-button:hover:not(.modui-file-picker-disabled) {
+  background: #333;
+  border-color: #4CAF50;
+}
+
+.modui-file-picker-button:active:not(.modui-file-picker-disabled) {
+  transform: scale(0.98);
+}
+
+.modui-file-picker-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.modui-file-picker-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modui-file-picker-label {
+  display: flex;
+  align-items: center;
+}

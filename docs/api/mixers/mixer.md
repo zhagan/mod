@@ -9,6 +9,8 @@ The `Mixer` component combines multiple audio signals into a single output, with
 | `inputs` | `ModStreamRef[]` | Required | Array of audio signals to mix |
 | `output` | `ModStreamRef` | Required | Mixed audio output |
 | `label` | `string` | `'mixer'` | Label for the component in metadata |
+| `levels` | `number[]` | - | Controlled levels array (0-1+) for each input |
+| `onLevelsChange` | `(levels: number[]) => void` | - | Callback when levels change (for controlled mode) |
 | `children` | `function` | - | Render prop function receiving control props |
 
 ## Render Props
@@ -282,47 +284,46 @@ function App() {
 }
 ```
 
-### Imperative Refs
+### Programmatic Control
 
-Control mixer programmatically using refs:
+Control mixer programmatically using controlled state:
 
 ```tsx
-import { Mixer, MixerHandle } from '@mode-7/mod';
-import { useRef, useEffect } from 'react';
+import { Mixer } from '@mode-7/mod';
+import { useRef, useState, useEffect } from 'react';
 
 function App() {
   const input1 = useRef(null);
   const input2 = useRef(null);
   const input3 = useRef(null);
   const mixOut = useRef(null);
-  const mixerRef = useRef<MixerHandle>(null);
+  const [levels, setLevels] = useState([0, 0, 0]);
 
   useEffect(() => {
-    if (mixerRef.current) {
-      // Fade in channels one by one
-      let channel = 0;
-      const interval = setInterval(() => {
-        if (channel < 3) {
-          mixerRef.current?.setLevel(channel, 1);
-          channel++;
-        } else {
-          clearInterval(interval);
-        }
-      }, 1000);
+    // Fade in channels one by one
+    let channel = 0;
+    const interval = setInterval(() => {
+      if (channel < 3) {
+        setLevels(prev => {
+          const newLevels = [...prev];
+          newLevels[channel] = 1;
+          return newLevels;
+        });
+        channel++;
+      } else {
+        clearInterval(interval);
+      }
+    }, 1000);
 
-      // Get current state
-      const state = mixerRef.current.getState();
-      console.log('Mixer levels:', state.levels);
-
-      return () => clearInterval(interval);
-    }
+    return () => clearInterval(interval);
   }, []);
 
   return (
     <Mixer
-      ref={mixerRef}
       inputs={[input1, input2, input3]}
       output={mixOut}
+      levels={levels}
+      onLevelsChange={setLevels}
     />
   );
 }

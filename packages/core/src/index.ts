@@ -85,6 +85,9 @@ export type { AutoWahProps, AutoWahRenderProps, AutoWahHandle } from './componen
 export { RingModulator } from './components/processors/RingModulator';
 export type { RingModulatorProps, RingModulatorRenderProps, RingModulatorHandle } from './components/processors/RingModulator';
 
+export { VCA } from './components/processors/VCA';
+export type { VCAProps, VCARenderProps, VCAHandle } from './components/processors/VCA';
+
 // Mixer Components
 export { CrossFade } from './components/mixers/CrossFade';
 export type { CrossFadeProps, CrossFadeRenderProps, CrossFadeMode } from './components/mixers/CrossFade';
@@ -105,3 +108,37 @@ export type { SpectrumAnalyzerProps, SpectrumAnalyzerRenderProps } from './compo
 
 export { LevelMeter } from './components/visualizations/LevelMeter';
 export type { LevelMeterProps, LevelMeterRenderProps } from './components/visualizations/LevelMeter';
+
+// ModUI - Visual Components
+export { Slider } from './modui/Slider';
+export type { SliderProps } from './modui/Slider';
+
+export { Knob } from './modui/Knob';
+export type { KnobProps } from './modui/Knob';
+
+export { XYPad } from './modui/XYPad';
+export type { XYPadProps } from './modui/XYPad';
+
+export { Button } from './modui/Button';
+export type { ButtonProps } from './modui/Button';
+
+export { Select } from './modui/Select';
+export type { SelectProps, SelectOption } from './modui/Select';
+
+export { Oscilloscope as OscilloscopeCanvas } from './modui/Oscilloscope';
+export type { OscilloscopeProps as OscilloscopeCanvasProps } from './modui/Oscilloscope';
+
+export { SpectrumAnalyzer as SpectrumAnalyzerCanvas } from './modui/SpectrumAnalyzer';
+export type { SpectrumAnalyzerProps as SpectrumAnalyzerCanvasProps } from './modui/SpectrumAnalyzer';
+
+export { LevelMeter as LevelMeterCanvas } from './modui/LevelMeter';
+export type { LevelMeterProps as LevelMeterCanvasProps } from './modui/LevelMeter';
+
+export { FilePicker } from './modui/FilePicker';
+export type { FilePickerProps } from './modui/FilePicker';
+
+export { TextInput } from './modui/TextInput';
+export type { TextInputProps } from './modui/TextInput';
+
+export { ProgressBar } from './modui/ProgressBar';
+export type { ProgressBarProps } from './modui/ProgressBar';

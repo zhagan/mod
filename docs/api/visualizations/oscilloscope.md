@@ -84,7 +84,9 @@ function App() {
 }
 ```
 
-### Using Pre-built Canvas Component
+### Using ModUI OscilloscopeCanvas Component
+
+MOD includes a pre-built `OscilloscopeCanvas` ModUI component that provides a styled, ready-to-use oscilloscope visualization:
 
 ```tsx
 import { Oscilloscope, OscilloscopeCanvas } from '@mode-7/mod';
@@ -98,23 +100,68 @@ function App() {
 
       <Oscilloscope input={audioIn}>
         {({ dataArray, bufferLength, isActive }) => (
-          <div style={{ width: '100%', height: '200px' }}>
-            {isActive ? (
-              <OscilloscopeCanvas
-                dataArray={dataArray}
-                bufferLength={bufferLength}
-                color="#00ff88"
-                lineWidth={2}
-              />
-            ) : (
-              <div>No Signal</div>
-            )}
-          </div>
+          isActive ? (
+            <OscilloscopeCanvas
+              dataArray={dataArray}
+              bufferLength={bufferLength}
+              height={150}
+              color="#00ff88"
+              lineWidth={2}
+            />
+          ) : (
+            <div>No Signal</div>
+          )
         )}
       </Oscilloscope>
     </>
   );
 }
+```
+
+## OscilloscopeCanvas Props
+
+The `OscilloscopeCanvas` ModUI component accepts the following props:
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `dataArray` | `Uint8Array` | Required | Time-domain audio data from Oscilloscope |
+| `bufferLength` | `number` | Required | Length of the data array |
+| `width` | `number \| string` | `'100%'` | Canvas width (px or CSS string) |
+| `height` | `number \| string` | `150` | Canvas height (px or CSS string) |
+| `color` | `string` | `'#00ff88'` | Waveform line color |
+| `lineWidth` | `number` | `2` | Waveform line thickness |
+| `backgroundColor` | `string` | `'#0a0a0a'` | Canvas background color |
+| `gridColor` | `string` | `'#1a1a1a'` | Grid lines color |
+| `showGrid` | `boolean` | `true` | Show/hide grid lines |
+| `className` | `string` | `''` | Additional CSS classes for container |
+| `canvasClassName` | `string` | `''` | Additional CSS classes for canvas |
+
+### Styling Examples
+
+```tsx
+// Custom colors
+<OscilloscopeCanvas
+  dataArray={dataArray}
+  bufferLength={bufferLength}
+  color="#ff00ff"
+  backgroundColor="#000000"
+  gridColor="#333333"
+/>
+
+// No grid
+<OscilloscopeCanvas
+  dataArray={dataArray}
+  bufferLength={bufferLength}
+  showGrid={false}
+/>
+
+// Custom size
+<OscilloscopeCanvas
+  dataArray={dataArray}
+  bufferLength={bufferLength}
+  width={600}
+  height={200}
+/>
 ```
 
 ## Notes

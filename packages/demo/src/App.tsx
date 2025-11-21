@@ -1,5 +1,6 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { flushSync } from 'react-dom';
+import '@mode-7/mod/dist/index.css';
 import {
   AudioProvider,
   // Sources
@@ -118,6 +119,8 @@ function ModularSynth() {
       ports.push({ id: `${id}-cv-gain`, type: 'input', label: 'CV' });
     } else if (type === 'Panner') {
       ports.push({ id: `${id}-cv-pan`, type: 'input', label: 'CV' });
+    } else if (type === 'VCA') {
+      ports.push({ id: `${id}-cv-gain`, type: 'input', label: 'CV' });
     } else if (type === 'ADSR') {
       ports.push({ id: `${id}-cv-gate`, type: 'input', label: 'Gate' });
     }
@@ -369,6 +372,7 @@ function ModularSynth() {
           {renderModuleButton('Gate')}
           {renderModuleButton('AutoWah')}
           {renderModuleButton('RingModulator')}
+          {renderModuleButton('VCA')}
         </div>
 
         <div className="module-category">

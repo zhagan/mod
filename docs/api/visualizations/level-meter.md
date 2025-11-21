@@ -79,7 +79,9 @@ function App() {
 }
 ```
 
-### Using Pre-built Canvas Component
+### Using ModUI LevelMeterCanvas Component
+
+MOD includes a pre-built `LevelMeterCanvas` ModUI component that provides a styled, ready-to-use level meter visualization:
 
 ```tsx
 import { LevelMeter, LevelMeterCanvas } from '@mode-7/mod';
@@ -93,18 +95,17 @@ function App() {
 
       <LevelMeter input={audioIn}>
         {({ level, peak, isClipping, isActive }) => (
-          <div style={{ width: '100%', height: '60px' }}>
-            {isActive ? (
-              <LevelMeterCanvas
-                level={level}
-                peak={peak}
-                isClipping={isClipping}
-                orientation="horizontal"
-              />
-            ) : (
-              <div>No Signal</div>
-            )}
-          </div>
+          isActive ? (
+            <LevelMeterCanvas
+              level={level}
+              peak={peak}
+              isClipping={isClipping}
+              height={60}
+              orientation="horizontal"
+            />
+          ) : (
+            <div>No Signal</div>
+          )
         )}
       </LevelMeter>
     </>
@@ -112,21 +113,71 @@ function App() {
 }
 ```
 
+## LevelMeterCanvas Props
+
+The `LevelMeterCanvas` ModUI component accepts the following props:
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `level` | `number` | Required | Current RMS level (0-1) from LevelMeter |
+| `peak` | `number` | Required | Peak level (0-1) from LevelMeter |
+| `isClipping` | `boolean` | Required | Clipping state from LevelMeter |
+| `width` | `number \| string` | `'100%'` | Meter width (px or CSS string) |
+| `height` | `number \| string` | `60` | Meter height (px or CSS string) |
+| `orientation` | `'horizontal' \| 'vertical'` | `'horizontal'` | Meter orientation |
+| `backgroundColor` | `string` | `'#0a0a0a'` | Canvas background color |
+| `showScale` | `boolean` | `true` | Show/hide dB scale marks |
+| `className` | `string` | `''` | Additional CSS classes for container |
+| `canvasClassName` | `string` | `''` | Additional CSS classes for canvas |
+
 ### Vertical Orientation
 
 ```tsx
 <LevelMeter input={audioIn}>
   {({ level, peak, isClipping, isActive }) => (
-    <div style={{ width: '40px', height: '200px' }}>
-      <LevelMeterCanvas
-        level={level}
-        peak={peak}
-        isClipping={isClipping}
-        orientation="vertical"
-      />
-    </div>
+    <LevelMeterCanvas
+      level={level}
+      peak={peak}
+      isClipping={isClipping}
+      width={40}
+      height={200}
+      orientation="vertical"
+    />
   )}
 </LevelMeter>
+```
+
+### Styling Examples
+
+```tsx
+// Horizontal meter with custom size
+<LevelMeterCanvas
+  level={level}
+  peak={peak}
+  isClipping={isClipping}
+  width={300}
+  height={80}
+  orientation="horizontal"
+/>
+
+// Vertical meter without scale
+<LevelMeterCanvas
+  level={level}
+  peak={peak}
+  isClipping={isClipping}
+  width={30}
+  height={150}
+  orientation="vertical"
+  showScale={false}
+/>
+
+// Custom background
+<LevelMeterCanvas
+  level={level}
+  peak={peak}
+  isClipping={isClipping}
+  backgroundColor="#000000"
+/>
 ```
 
 ## Configuration

@@ -84,10 +84,12 @@ function App() {
 }
 ```
 
-### Using Pre-built Canvas Component
+### Using ModUI SpectrumAnalyzerCanvas Component
+
+MOD includes a pre-built `SpectrumAnalyzerCanvas` ModUI component that provides a styled, ready-to-use spectrum analyzer visualization:
 
 ```tsx
-import { SpectrumAnalyzer, SpectrumCanvas } from '@mode-7/mod';
+import { SpectrumAnalyzer, SpectrumAnalyzerCanvas } from '@mode-7/mod';
 
 function App() {
   const audioIn = useRef(null);
@@ -103,24 +105,72 @@ function App() {
         maxDecibels={-10}
       >
         {({ dataArray, bufferLength, isActive }) => (
-          <div style={{ width: '100%', height: '200px' }}>
-            {isActive ? (
-              <SpectrumCanvas
-                dataArray={dataArray}
-                bufferLength={bufferLength}
-                color="#00ff88"
-                backgroundColor="#0a0a0a"
-                barGap={2}
-              />
-            ) : (
-              <div>No Signal</div>
-            )}
-          </div>
+          isActive ? (
+            <SpectrumAnalyzerCanvas
+              dataArray={dataArray}
+              bufferLength={bufferLength}
+              height={150}
+              barGap={2}
+            />
+          ) : (
+            <div>No Signal</div>
+          )
         )}
       </SpectrumAnalyzer>
     </>
   );
 }
+```
+
+## SpectrumAnalyzerCanvas Props
+
+The `SpectrumAnalyzerCanvas` ModUI component accepts the following props:
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `dataArray` | `Uint8Array` | Required | Frequency-domain data from SpectrumAnalyzer |
+| `bufferLength` | `number` | Required | Length of the data array |
+| `width` | `number \| string` | `'100%'` | Canvas width (px or CSS string) |
+| `height` | `number \| string` | `150` | Canvas height (px or CSS string) |
+| `barGap` | `number` | `2` | Gap between frequency bars (px) |
+| `backgroundColor` | `string` | `'#0a0a0a'` | Canvas background color |
+| `colorMode` | `'gradient' \| 'solid'` | `'gradient'` | Bar coloring mode |
+| `color` | `string` | `'#00ff88'` | Bar color (used in solid mode) |
+| `className` | `string` | `''` | Additional CSS classes for container |
+| `canvasClassName` | `string` | `''` | Additional CSS classes for canvas |
+
+### Styling Examples
+
+```tsx
+// Gradient mode (default) - rainbow frequency colors
+<SpectrumAnalyzerCanvas
+  dataArray={dataArray}
+  bufferLength={bufferLength}
+  colorMode="gradient"
+/>
+
+// Solid color mode
+<SpectrumAnalyzerCanvas
+  dataArray={dataArray}
+  bufferLength={bufferLength}
+  colorMode="solid"
+  color="#ff00ff"
+/>
+
+// Tight bars
+<SpectrumAnalyzerCanvas
+  dataArray={dataArray}
+  bufferLength={bufferLength}
+  barGap={1}
+/>
+
+// Custom size
+<SpectrumAnalyzerCanvas
+  dataArray={dataArray}
+  bufferLength={bufferLength}
+  width={600}
+  height={200}
+/>
 ```
 
 ## Configuration

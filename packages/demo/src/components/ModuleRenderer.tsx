@@ -28,6 +28,7 @@ import {
   Gate,
   AutoWah,
   RingModulator,
+  VCA,
   // Mixers
   CrossFade,
   Mixer,
@@ -37,16 +38,22 @@ import {
   Oscilloscope,
   SpectrumAnalyzer,
   LevelMeter,
+  // ModUI
+  Slider as ModUISlider,
+  Knob,
+  XYPad,
+  Select as ModUISelect,
+  Button as ModUIButton,
 } from '@mode-7/mod';
 import { Volume2, VolumeX, Play, Pause, RefreshCw, Mic, MicOff, Square, Upload, Repeat, Zap, X, RotateCcw } from 'lucide-react';
-import { Slider } from './controls/Slider';
-import { Select } from './controls/Select';
-import { IconButton } from './controls/IconButton';
-import { FileUpload } from './controls/FileUpload';
-import { TextInput } from './controls/TextInput';
-import { OscilloscopeCanvas } from './visualizers/OscilloscopeCanvas';
-import { SpectrumCanvas } from './visualizers/SpectrumCanvas';
-import { LevelMeterCanvas } from './visualizers/LevelMeterCanvas';
+import {
+  OscilloscopeCanvas,
+  SpectrumAnalyzerCanvas,
+  LevelMeterCanvas,
+  FilePicker as ModUIFilePicker,
+  TextInput as ModUITextInput,
+  ProgressBar as ModUIProgressBar,
+} from '@mode-7/mod';
 
 interface ModuleRendererProps {
   moduleType: string;
@@ -76,7 +83,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
         <ToneGenerator output={output} cv={cv}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <Slider
+              <ModUISlider
                 label="Frequency"
                 value={controls.frequency}
                 onChange={controls.setFrequency}
@@ -86,7 +93,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 unit=" Hz"
                 formatValue={(v) => `${v.toFixed(0)} Hz`}
               />
-              <Slider
+              <ModUISlider
                 label="Gain"
                 value={controls.gain}
                 onChange={controls.setGain}
@@ -95,9 +102,9 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 step={0.01}
                 formatValue={(v) => v.toFixed(2)}
               />
-              <Select
+              <ModUISelect
                 value={controls.waveform}
-                onValueChange={(v) => controls.setWaveform(v as any)}
+                onChange={(v) => controls.setWaveform(v as any)}
                 options={[
                   { value: 'sine', label: 'Sine' },
                   { value: 'square', label: 'Square' },
@@ -115,7 +122,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
         <NoiseGenerator output={output} cv={cv}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <Slider
+              <ModUISlider
                 label="Gain"
                 value={controls.gain}
                 onChange={controls.setGain}
@@ -124,9 +131,9 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 step={0.01}
                 formatValue={(v) => v.toFixed(2)}
               />
-              <Select
+              <ModUISelect
                 value={controls.type}
-                onValueChange={(v) => controls.setType(v as any)}
+                onChange={(v) => controls.setType(v as any)}
                 options={[
                   { value: 'white', label: 'White' },
                   { value: 'pink', label: 'Pink' },
@@ -142,7 +149,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
         <Microphone output={output}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <Slider
+              <ModUISlider
                 label="Gain"
                 value={controls.gain}
                 onChange={controls.setGain}
@@ -151,9 +158,9 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 step={0.01}
                 formatValue={(v) => v.toFixed(2)}
               />
-              <Select
+              <ModUISelect
                 value={controls.selectedDeviceId || '__default__'}
-                onValueChange={(deviceId) => controls.selectDevice(deviceId === '__default__' ? '' : deviceId)}
+                onChange={(deviceId) => controls.selectDevice(deviceId === '__default__' ? '' : deviceId)}
                 options={[
                   { value: '__default__', label: 'Default Device' },
                   ...controls.devices
@@ -166,14 +173,14 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 placeholder="Select Input Device"
               />
               <div style={{ display: 'flex', gap: '8px' }}>
-                <IconButton
+                <ModUIButton
                   icon={controls.isMuted ? <MicOff size={16} /> : <Mic size={16} />}
                   active={controls.isMuted}
                   onClick={() => controls.setMuted(!controls.isMuted)}
                   variant="danger"
                   title={controls.isMuted ? 'Unmute' : 'Mute'}
                 />
-                <IconButton
+                <ModUIButton
                   icon={<RefreshCw size={16} />}
                   onClick={() => controls.refreshDevices()}
                   title="Refresh Input Devices"
@@ -189,7 +196,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
         <Monitor input={input || { current: null }}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <Slider
+              <ModUISlider
                 label="Volume"
                 value={controls.gain}
                 onChange={controls.setGain}
@@ -198,9 +205,9 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 step={0.01}
                 formatValue={(v) => v.toFixed(2)}
               />
-              <Select
+              <ModUISelect
                 value={controls.selectedDeviceId || '__default__'}
-                onValueChange={(deviceId) => controls.selectDevice(deviceId === '__default__' ? '' : deviceId)}
+                onChange={(deviceId) => controls.selectDevice(deviceId === '__default__' ? '' : deviceId)}
                 options={[
                   { value: '__default__', label: 'Default Device' },
                   ...controls.devices
@@ -213,14 +220,14 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 placeholder="Select Output Device"
               />
               <div style={{ display: 'flex', gap: '8px' }}>
-                <IconButton
+                <ModUIButton
                   icon={controls.isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
                   active={controls.isMuted}
                   onClick={() => controls.setMuted(!controls.isMuted)}
                   variant="danger"
                   title={controls.isMuted ? 'Unmute' : 'Mute'}
                 />
-                <IconButton
+                <ModUIButton
                   icon={<RefreshCw size={16} />}
                   onClick={() => controls.refreshDevices()}
                   title="Refresh Output Devices"
@@ -235,28 +242,27 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
       return output ? (
         <Filter input={input || { current: null }} output={output} cv={cv}>
           {(controls) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <Slider
-                label="Frequency"
-                value={controls.frequency}
-                onChange={controls.setFrequency}
-                min={20}
-                max={20000}
-                step={10}
-                formatValue={(v) => `${v.toFixed(0)} Hz`}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
+              <XYPad
+                valueX={controls.frequency}
+                valueY={controls.Q}
+                onChangeX={controls.setFrequency}
+                onChangeY={controls.setQ}
+                minX={20}
+                maxX={20000}
+                minY={0.0001}
+                maxY={30}
+                stepX={10}
+                stepY={0.1}
+                labelX="Freq"
+                labelY="Q"
+                formatValueX={(v) => `${v.toFixed(0)} Hz`}
+                formatValueY={(v) => v.toFixed(2)}
+                size={180}
               />
-              <Slider
-                label="Q"
-                value={controls.Q}
-                onChange={controls.setQ}
-                min={0.0001}
-                max={30}
-                step={0.1}
-                formatValue={(v) => v.toFixed(2)}
-              />
-              <Select
+              <ModUISelect
                 value={controls.type}
-                onValueChange={(v) => controls.setType(v as any)}
+                onChange={(v) => controls.setType(v as any)}
                 options={[
                   { value: 'lowpass', label: 'Low Pass' },
                   { value: 'highpass', label: 'High Pass' },
@@ -279,7 +285,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
         <Delay input={input || { current: null }} output={output}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <Slider
+              <ModUISlider
                 label="Time"
                 value={controls.time}
                 onChange={controls.setTime}
@@ -288,7 +294,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 step={0.01}
                 formatValue={(v) => `${v.toFixed(2)}s`}
               />
-              <Slider
+              <ModUISlider
                 label="Feedback"
                 value={controls.feedback}
                 onChange={controls.setFeedback}
@@ -297,7 +303,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 step={0.01}
                 formatValue={(v) => v.toFixed(2)}
               />
-              <Slider
+              <ModUISlider
                 label="Wet"
                 value={controls.wet}
                 onChange={controls.setWet}
@@ -316,7 +322,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
         <Reverb input={input || { current: null }} output={output}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <Slider
+              <ModUISlider
                 label="Wet"
                 value={controls.wet}
                 onChange={controls.setWet}
@@ -325,7 +331,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 step={0.01}
                 formatValue={(v) => v.toFixed(2)}
               />
-              <Slider
+              <ModUISlider
                 label="Duration"
                 value={controls.duration}
                 onChange={controls.setDuration}
@@ -334,7 +340,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 step={0.1}
                 formatValue={(v) => `${v.toFixed(2)}s`}
               />
-              <Slider
+              <ModUISlider
                 label="Decay"
                 value={controls.decay}
                 onChange={controls.setDecay}
@@ -353,7 +359,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
         <Compressor input={input || { current: null }} output={output}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <Slider
+              <ModUISlider
                 label="Threshold"
                 value={controls.threshold}
                 onChange={controls.setThreshold}
@@ -362,7 +368,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 step={1}
                 formatValue={(v) => `${v.toFixed(0)} dB`}
               />
-              <Slider
+              <ModUISlider
                 label="Ratio"
                 value={controls.ratio}
                 onChange={controls.setRatio}
@@ -381,7 +387,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
         <Distortion input={input || { current: null }} output={output}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <Slider
+              <ModUISlider
                 label="Amount"
                 value={controls.amount}
                 onChange={controls.setAmount}
@@ -400,7 +406,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
         <Panner input={input || { current: null }} output={output} cv={cv}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <Slider
+              <ModUISlider
                 label="Pan"
                 value={controls.pan}
                 onChange={controls.setPan}
@@ -419,7 +425,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
         <CrossFade inputs={[input || { current: null }, input2 || { current: null }]} output={output}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <Slider
+              <ModUISlider
                 label="Mix"
                 value={controls.mix}
                 onChange={controls.setMix}
@@ -428,9 +434,9 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 step={0.01}
                 formatValue={(v) => v.toFixed(2)}
               />
-              <Select
+              <ModUISelect
                 value={controls.mode}
-                onValueChange={(v) => controls.setMode(v as any)}
+                onChange={(v) => controls.setMode(v as any)}
                 options={[
                   { value: 'linear', label: 'Linear' },
                   { value: 'equal-power', label: 'Equal Power' },
@@ -457,7 +463,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {controls.levels.map((level, i) => (
-                <Slider
+                <ModUISlider
                   key={i}
                   label={`Ch${i + 1}`}
                   value={level}
@@ -478,7 +484,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
         <EQ input={input || { current: null }} output={output}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <Slider
+              <ModUISlider
                 label="Low"
                 value={controls.lowGain}
                 onChange={controls.setLowGain}
@@ -487,7 +493,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 step={1}
                 formatValue={(v) => `${v.toFixed(1)} dB`}
               />
-              <Slider
+              <ModUISlider
                 label="Mid"
                 value={controls.midGain}
                 onChange={controls.setMidGain}
@@ -496,7 +502,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 step={1}
                 formatValue={(v) => `${v.toFixed(1)} dB`}
               />
-              <Slider
+              <ModUISlider
                 label="High"
                 value={controls.highGain}
                 onChange={controls.setHighGain}
@@ -514,26 +520,25 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
       return output ? (
         <Chorus input={input || { current: null }} output={output}>
           {(controls) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <Slider
-                label="Rate"
-                value={controls.rate}
-                onChange={controls.setRate}
-                min={0.1}
-                max={10}
-                step={0.1}
-                formatValue={(v) => `${v.toFixed(2)} Hz`}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
+              <XYPad
+                valueX={controls.rate}
+                valueY={controls.depth}
+                onChangeX={controls.setRate}
+                onChangeY={controls.setDepth}
+                minX={0.1}
+                maxX={10}
+                minY={0}
+                maxY={0.01}
+                stepX={0.1}
+                stepY={0.0001}
+                labelX="Rate"
+                labelY="Depth"
+                formatValueX={(v) => `${v.toFixed(1)} Hz`}
+                formatValueY={(v) => v.toFixed(4)}
+                size={160}
               />
-              <Slider
-                label="Depth"
-                value={controls.depth}
-                onChange={controls.setDepth}
-                min={0}
-                max={0.01}
-                step={0.0001}
-                formatValue={(v) => v.toFixed(4)}
-              />
-              <Slider
+              <ModUISlider
                 label="Wet"
                 value={controls.wet}
                 onChange={controls.setWet}
@@ -551,26 +556,25 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
       return output ? (
         <Phaser input={input || { current: null }} output={output}>
           {(controls) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <Slider
-                label="Rate"
-                value={controls.rate}
-                onChange={controls.setRate}
-                min={0.1}
-                max={10}
-                step={0.1}
-                formatValue={(v) => `${v.toFixed(2)} Hz`}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
+              <XYPad
+                valueX={controls.rate}
+                valueY={controls.depth}
+                onChangeX={controls.setRate}
+                onChangeY={controls.setDepth}
+                minX={0.1}
+                maxX={10}
+                minY={0}
+                maxY={2000}
+                stepX={0.1}
+                stepY={10}
+                labelX="Rate"
+                labelY="Depth"
+                formatValueX={(v) => `${v.toFixed(1)} Hz`}
+                formatValueY={(v) => `${v.toFixed(0)} Hz`}
+                size={160}
               />
-              <Slider
-                label="Depth"
-                value={controls.depth}
-                onChange={controls.setDepth}
-                min={0}
-                max={2000}
-                step={10}
-                formatValue={(v) => `${v.toFixed(0)} Hz`}
-              />
-              <Slider
+              <ModUISlider
                 label="Feedback"
                 value={controls.feedback}
                 onChange={controls.setFeedback}
@@ -588,26 +592,25 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
       return output ? (
         <Flanger input={input || { current: null }} output={output}>
           {(controls) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <Slider
-                label="Rate"
-                value={controls.rate}
-                onChange={controls.setRate}
-                min={0.1}
-                max={10}
-                step={0.1}
-                formatValue={(v) => `${v.toFixed(2)} Hz`}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
+              <XYPad
+                valueX={controls.rate}
+                valueY={controls.depth}
+                onChangeX={controls.setRate}
+                onChangeY={controls.setDepth}
+                minX={0.1}
+                maxX={10}
+                minY={0}
+                maxY={0.01}
+                stepX={0.1}
+                stepY={0.0001}
+                labelX="Rate"
+                labelY="Depth"
+                formatValueX={(v) => `${v.toFixed(1)} Hz`}
+                formatValueY={(v) => v.toFixed(4)}
+                size={160}
               />
-              <Slider
-                label="Depth"
-                value={controls.depth}
-                onChange={controls.setDepth}
-                min={0}
-                max={0.01}
-                step={0.0001}
-                formatValue={(v) => v.toFixed(4)}
-              />
-              <Slider
+              <ModUISlider
                 label="Feedback"
                 value={controls.feedback}
                 onChange={controls.setFeedback}
@@ -625,24 +628,23 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
       return output ? (
         <Tremolo input={input || { current: null }} output={output}>
           {(controls) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <Slider
-                label="Rate"
-                value={controls.rate}
-                onChange={controls.setRate}
-                min={0.1}
-                max={20}
-                step={0.1}
-                formatValue={(v) => `${v.toFixed(1)} Hz`}
-              />
-              <Slider
-                label="Depth"
-                value={controls.depth}
-                onChange={controls.setDepth}
-                min={0}
-                max={1}
-                step={0.01}
-                formatValue={(v) => v.toFixed(2)}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
+              <XYPad
+                valueX={controls.rate}
+                valueY={controls.depth}
+                onChangeX={controls.setRate}
+                onChangeY={controls.setDepth}
+                minX={0.1}
+                maxX={20}
+                minY={0}
+                maxY={1}
+                stepX={0.1}
+                stepY={0.01}
+                labelX="Rate"
+                labelY="Depth"
+                formatValueX={(v) => `${v.toFixed(1)} Hz`}
+                formatValueY={(v) => v.toFixed(2)}
+                size={160}
               />
             </div>
           )}
@@ -654,7 +656,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
         <BitCrusher input={input || { current: null }} output={output}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <Slider
+              <ModUISlider
                 label="Bit Depth"
                 value={controls.bitDepth}
                 onChange={controls.setBitDepth}
@@ -663,7 +665,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 step={1}
                 formatValue={(v) => v.toFixed(0)}
               />
-              <Slider
+              <ModUISlider
                 label="Sample Reduction"
                 value={controls.sampleReduction}
                 onChange={controls.setSampleReduction}
@@ -682,7 +684,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
         <Limiter input={input || { current: null }} output={output}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <Slider
+              <ModUISlider
                 label="Threshold"
                 value={controls.threshold}
                 onChange={controls.setThreshold}
@@ -691,7 +693,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 step={0.1}
                 formatValue={(v) => `${v.toFixed(1)} dB`}
               />
-              <Slider
+              <ModUISlider
                 label="Release"
                 value={controls.release}
                 onChange={controls.setRelease}
@@ -710,7 +712,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
         <Gate input={input || { current: null }} output={output}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <Slider
+              <ModUISlider
                 label="Threshold"
                 value={controls.threshold}
                 onChange={controls.setThreshold}
@@ -719,7 +721,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 step={1}
                 formatValue={(v) => `${v.toFixed(0)} dB`}
               />
-              <Slider
+              <ModUISlider
                 label="Attack"
                 value={controls.attack}
                 onChange={controls.setAttack}
@@ -728,7 +730,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 step={0.001}
                 formatValue={(v) => `${v.toFixed(3)}s`}
               />
-              <Slider
+              <ModUISlider
                 label="Release"
                 value={controls.release}
                 onChange={controls.setRelease}
@@ -747,7 +749,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
         <AutoWah input={input || { current: null }} output={output}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <Slider
+              <ModUISlider
                 label="Sensitivity"
                 value={controls.sensitivity}
                 onChange={controls.setSensitivity}
@@ -756,7 +758,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 step={10}
                 formatValue={(v) => v.toFixed(0)}
               />
-              <Slider
+              <ModUISlider
                 label="Base Freq"
                 value={controls.baseFreq}
                 onChange={controls.setBaseFreq}
@@ -765,7 +767,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 step={10}
                 formatValue={(v) => `${v.toFixed(0)} Hz`}
               />
-              <Slider
+              <ModUISlider
                 label="Q"
                 value={controls.Q}
                 onChange={controls.setQ}
@@ -784,7 +786,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
         <RingModulator input={input || { current: null }} output={output}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <Slider
+              <ModUISlider
                 label="Frequency"
                 value={controls.frequency}
                 onChange={controls.setFrequency}
@@ -793,7 +795,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 step={1}
                 formatValue={(v) => `${v.toFixed(0)} Hz`}
               />
-              <Slider
+              <ModUISlider
                 label="Wet"
                 value={controls.wet}
                 onChange={controls.setWet}
@@ -807,12 +809,31 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
         </RingModulator>
       ) : null;
 
+    case 'VCA':
+      return output ? (
+        <VCA input={input || { current: null }} output={output} cv={cv}>
+          {(controls) => (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <ModUISlider
+                label="Gain"
+                value={controls.gain}
+                onChange={controls.setGain}
+                min={0}
+                max={2}
+                step={0.01}
+                formatValue={(v) => `${(v * 100).toFixed(0)}%`}
+              />
+            </div>
+          )}
+        </VCA>
+      ) : null;
+
     case 'LFO':
       return output ? (
         <LFO output={output}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <Slider
+              <ModUISlider
                 label="Frequency"
                 value={controls.frequency}
                 onChange={controls.setFrequency}
@@ -821,7 +842,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 step={0.1}
                 formatValue={(v) => `${v.toFixed(2)} Hz`}
               />
-              <Slider
+              <ModUISlider
                 label="Amplitude"
                 value={controls.amplitude}
                 onChange={controls.setAmplitude}
@@ -830,9 +851,9 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 step={0.01}
                 formatValue={(v) => v.toFixed(2)}
               />
-              <Select
+              <ModUISelect
                 value={controls.waveform}
-                onValueChange={(v) => controls.setWaveform(v as any)}
+                onChange={(v) => controls.setWaveform(v as any)}
                 options={[
                   { value: 'sine', label: 'Sine' },
                   { value: 'square', label: 'Square' },
@@ -850,7 +871,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
         <ADSR gate={cv} output={output}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <Slider
+              <ModUISlider
                 label="Attack"
                 value={controls.attack}
                 onChange={controls.setAttack}
@@ -859,7 +880,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 step={0.001}
                 formatValue={(v) => `${v.toFixed(3)}s`}
               />
-              <Slider
+              <ModUISlider
                 label="Decay"
                 value={controls.decay}
                 onChange={controls.setDecay}
@@ -868,7 +889,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 step={0.001}
                 formatValue={(v) => `${v.toFixed(3)}s`}
               />
-              <Slider
+              <ModUISlider
                 label="Sustain"
                 value={controls.sustain}
                 onChange={controls.setSustain}
@@ -877,7 +898,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 step={0.01}
                 formatValue={(v) => v.toFixed(2)}
               />
-              <Slider
+              <ModUISlider
                 label="Release"
                 value={controls.release}
                 onChange={controls.setRelease}
@@ -887,13 +908,13 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 formatValue={(v) => `${v.toFixed(3)}s`}
               />
               <div style={{ display: 'flex', gap: '8px' }}>
-                <IconButton
+                <ModUIButton
                   icon={<Zap size={16} />}
                   onClick={controls.trigger}
                   variant="success"
                   title="Trigger"
                 />
-                <IconButton
+                <ModUIButton
                   icon={<X size={16} />}
                   onClick={controls.releaseGate}
                   variant="danger"
@@ -906,11 +927,12 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
       ) : null;
 
     case 'Sequencer':
+      const gateOutput = outputStreams[1] || null;
       return output ? (
-        <Sequencer output={output}>
+        <Sequencer output={output} gateOutput={gateOutput}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <Slider
+              <ModUISlider
                 label="BPM"
                 value={controls.bpm}
                 onChange={controls.setBpm}
@@ -921,7 +943,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
               />
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {controls.steps.map((step, i) => (
-                  <Slider
+                  <ModUISlider
                     key={i}
                     label={`Step ${i + 1}`}
                     value={step}
@@ -939,14 +961,14 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 ))}
               </div>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <IconButton
+                <ModUIButton
                   icon={controls.isPlaying ? <Pause size={16} /> : <Play size={16} />}
                   active={controls.isPlaying}
                   onClick={controls.isPlaying ? controls.pause : controls.play}
                   variant="success"
                   title={controls.isPlaying ? 'Pause' : 'Play'}
                 />
-                <IconButton
+                <ModUIButton
                   icon={<RotateCcw size={16} />}
                   onClick={controls.reset}
                   title="Reset"
@@ -961,30 +983,40 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
       return output ? (
         <Clock output={output}>
           {(controls) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <Slider
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
+              <Knob
                 label="BPM"
                 value={controls.bpm}
                 onChange={controls.setBpm}
                 min={20}
                 max={300}
                 step={1}
+                size={80}
                 formatValue={(v) => v.toFixed(0)}
+                className="clock-knob"
               />
               <div style={{ display: 'flex', gap: '8px' }}>
-                <IconButton
+                <ModUIButton
                   icon={controls.isRunning ? <Pause size={16} /> : <Play size={16} />}
                   active={controls.isRunning}
                   onClick={controls.isRunning ? controls.stop : controls.start}
                   variant="success"
                   title={controls.isRunning ? 'Stop' : 'Start'}
                 />
-                <IconButton
+                <ModUIButton
                   icon={<RotateCcw size={16} />}
                   onClick={controls.reset}
                   title="Reset"
                 />
               </div>
+              <style>{`
+                .clock-knob .modui-knob-center {
+                  color: #1a1a1a;
+                }
+                .clock-knob .modui-knob-control:hover:not(.modui-knob-disabled) .modui-knob-center {
+                  color: #222;
+                }
+              `}</style>
             </div>
           )}
         </Clock>
@@ -1005,12 +1037,13 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <FileUpload
+                <ModUIFilePicker
                   onFileSelect={(file) => controls.loadFile(file)}
                   accept="audio/*"
                   label="Load Audio"
+                  icon={<Upload size={14} />}
                 />
-                <Slider
+                <ModUISlider
                   label="Gain"
                   value={controls.gain}
                   onChange={controls.setGain}
@@ -1020,7 +1053,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                   formatValue={(v) => v.toFixed(2)}
                 />
                 <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                  <IconButton
+                  <ModUIButton
                     icon={controls.isPlaying ? <Pause size={16} /> : <Play size={16} />}
                     active={controls.isPlaying}
                     onClick={controls.isPlaying ? controls.pause : controls.play}
@@ -1028,13 +1061,13 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                     title={controls.isPlaying ? 'Pause' : 'Play'}
                     disabled={!hasAudio}
                   />
-                  <IconButton
+                  <ModUIButton
                     icon={<Square size={16} />}
                     onClick={controls.stop}
                     title="Stop"
                     disabled={!hasAudio}
                   />
-                  <IconButton
+                  <ModUIButton
                     icon={<Repeat size={16} />}
                     active={controls.loop}
                     onClick={() => controls.setLoop(!controls.loop)}
@@ -1042,28 +1075,15 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                     disabled={!hasAudio}
                   />
                 </div>
-                <div style={{
-                  fontSize: '12px',
-                  color: hasAudio ? '#999' : '#555',
-                  fontFamily: 'monospace',
-                  textAlign: 'center'
-                }}>
-                  {hasAudio ? `${formatTime(controls.currentTime)} / ${formatTime(controls.duration)}` : '0:00 / 0:00'}
-                </div>
-                <input
-                  type="range"
+                <ModUIProgressBar
+                  value={controls.currentTime}
+                  onChange={(value) => controls.seek(value)}
                   min={0}
                   max={controls.duration || 100}
                   step={0.1}
-                  value={controls.currentTime}
-                  onChange={(e) => controls.seek(parseFloat(e.target.value))}
                   disabled={!hasAudio}
-                  style={{
-                    width: '100%',
-                    cursor: hasAudio ? 'pointer' : 'not-allowed',
-                    accentColor: '#00ff88',
-                    opacity: hasAudio ? 1 : 0.5
-                  }}
+                  showValue={true}
+                  formatValue={() => hasAudio ? `${formatTime(controls.currentTime)} / ${formatTime(controls.duration)}` : '0:00 / 0:00'}
                 />
               </div>
             );
@@ -1086,13 +1106,14 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <TextInput
+                <ModUITextInput
                   value={controls.url}
                   onChange={controls.setUrl}
                   placeholder="Stream URL"
                   label="URL"
+                  type="url"
                 />
-                <Slider
+                <ModUISlider
                   label="Gain"
                   value={controls.gain}
                   onChange={controls.setGain}
@@ -1102,7 +1123,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                   formatValue={(v) => v.toFixed(2)}
                 />
                 <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                  <IconButton
+                  <ModUIButton
                     icon={controls.isPlaying ? <Pause size={16} /> : <Play size={16} />}
                     active={controls.isPlaying}
                     onClick={controls.isPlaying ? controls.pause : controls.play}
@@ -1110,13 +1131,13 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                     title={controls.isPlaying ? 'Pause' : 'Play'}
                     disabled={!hasAudio}
                   />
-                  <IconButton
+                  <ModUIButton
                     icon={<Square size={16} />}
                     onClick={controls.stop}
                     title="Stop"
                     disabled={!hasAudio}
                   />
-                  <IconButton
+                  <ModUIButton
                     icon={<Repeat size={16} />}
                     active={controls.loop}
                     onClick={() => controls.setLoop(!controls.loop)}
@@ -1124,28 +1145,15 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                     disabled={!hasAudio}
                   />
                 </div>
-                <div style={{
-                  fontSize: '12px',
-                  color: hasAudio ? '#999' : '#555',
-                  fontFamily: 'monospace',
-                  textAlign: 'center'
-                }}>
-                  {hasAudio ? `${formatTime(controls.currentTime)} / ${formatTime(controls.duration)}` : '0:00 / 0:00'}
-                </div>
-                <input
-                  type="range"
+                <ModUIProgressBar
+                  value={controls.currentTime}
+                  onChange={(value) => controls.seek(value)}
                   min={0}
                   max={controls.duration || 100}
                   step={0.1}
-                  value={controls.currentTime}
-                  onChange={(e) => controls.seek(parseFloat(e.target.value))}
                   disabled={!hasAudio}
-                  style={{
-                    width: '100%',
-                    cursor: hasAudio ? 'pointer' : 'not-allowed',
-                    accentColor: '#00ff88',
-                    opacity: hasAudio ? 1 : 0.5
-                  }}
+                  showValue={true}
+                  formatValue={() => hasAudio ? `${formatTime(controls.currentTime)} / ${formatTime(controls.duration)}` : '0:00 / 0:00'}
                 />
               </div>
             );
@@ -1157,20 +1165,19 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
       return input ? (
         <Oscilloscope input={input}>
           {({ dataArray, bufferLength, isActive }) => (
-            <div style={{ width: '100%', height: '150px', backgroundColor: '#0a0a0a', borderRadius: '4px', overflow: 'hidden' }}>
-              {isActive ? (
-                <OscilloscopeCanvas
-                  dataArray={dataArray}
-                  bufferLength={bufferLength}
-                  color="#00ff88"
-                  lineWidth={2}
-                />
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#666', fontSize: '12px' }}>
-                  No Signal
-                </div>
-              )}
-            </div>
+            isActive ? (
+              <OscilloscopeCanvas
+                dataArray={dataArray}
+                bufferLength={bufferLength}
+                height={150}
+                color="#00ff88"
+                lineWidth={2}
+              />
+            ) : (
+              <div style={{ width: '100%', height: '150px', backgroundColor: '#0a0a0a', borderRadius: '4px', border: '1px solid #1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666', fontSize: '12px' }}>
+                No Signal
+              </div>
+            )
           )}
         </Oscilloscope>
       ) : (
@@ -1187,18 +1194,17 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
       return input ? (
         <SpectrumAnalyzer input={input}>
           {({ dataArray, bufferLength, isActive }) => (
-            <div style={{ width: '100%', height: '150px', backgroundColor: '#0a0a0a', borderRadius: '4px', overflow: 'hidden' }}>
-              {isActive ? (
-                <SpectrumCanvas
-                  dataArray={dataArray}
-                  bufferLength={bufferLength}
-                />
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#666', fontSize: '12px' }}>
-                  No Signal
-                </div>
-              )}
-            </div>
+            isActive ? (
+              <SpectrumAnalyzerCanvas
+                dataArray={dataArray}
+                bufferLength={bufferLength}
+                height={150}
+              />
+            ) : (
+              <div style={{ width: '100%', height: '150px', backgroundColor: '#0a0a0a', borderRadius: '4px', border: '1px solid #1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666', fontSize: '12px' }}>
+                No Signal
+              </div>
+            )
           )}
         </SpectrumAnalyzer>
       ) : (
@@ -1215,20 +1221,19 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
       return input ? (
         <LevelMeter input={input}>
           {({ level, peak, isClipping, isActive }) => (
-            <div style={{ width: '100%', height: '60px', backgroundColor: '#0a0a0a', borderRadius: '4px', overflow: 'hidden' }}>
-              {isActive ? (
-                <LevelMeterCanvas
-                  level={level}
-                  peak={peak}
-                  isClipping={isClipping}
-                  orientation="horizontal"
-                />
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#666', fontSize: '12px' }}>
-                  No Signal
-                </div>
-              )}
-            </div>
+            isActive ? (
+              <LevelMeterCanvas
+                level={level}
+                peak={peak}
+                isClipping={isClipping}
+                height={60}
+                orientation="horizontal"
+              />
+            ) : (
+              <div style={{ width: '100%', height: '60px', backgroundColor: '#0a0a0a', borderRadius: '4px', border: '1px solid #1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666', fontSize: '12px' }}>
+                No Signal
+              </div>
+            )
           )}
         </LevelMeter>
       ) : (

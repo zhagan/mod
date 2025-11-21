@@ -53,6 +53,7 @@ export interface MP3DeckProps {
   onPlayingChange?: (isPlaying: boolean) => void;
   onTimeUpdate?: (currentTime: number, duration: number) => void;
   onError?: (error: string | null) => void;
+  onEnd?: () => void;
   // Render props
   children?: (props: MP3DeckRenderProps) => ReactNode;
 }
@@ -69,6 +70,7 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
   onPlayingChange,
   onTimeUpdate,
   onError,
+  onEnd,
   children,
 }, ref) => {
   const audioContext = useAudioContext();
@@ -132,7 +134,10 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
 
         audioElement.addEventListener('play', () => setIsPlaying(true));
         audioElement.addEventListener('pause', () => setIsPlaying(false));
-        audioElement.addEventListener('ended', () => setIsPlaying(false));
+        audioElement.addEventListener('ended', () => {
+          setIsPlaying(false);
+          onEnd?.();
+        });
 
         audioElement.addEventListener('error', (e) => {
           setError('Failed to load audio file');

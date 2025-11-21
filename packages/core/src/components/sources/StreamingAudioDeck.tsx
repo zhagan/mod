@@ -51,6 +51,7 @@ export interface StreamingAudioDeckProps {
   onPlayingChange?: (isPlaying: boolean) => void;
   onTimeUpdate?: (currentTime: number, duration: number) => void;
   onError?: (error: string | null) => void;
+  onEnd?: () => void;
   // Render props
   children?: (props: StreamingAudioDeckRenderProps) => ReactNode;
 }
@@ -67,6 +68,7 @@ export const StreamingAudioDeck = React.forwardRef<StreamingAudioDeckHandle, Str
   onPlayingChange,
   onTimeUpdate,
   onError,
+  onEnd,
   children,
 }, ref) => {
   const audioContext = useAudioContext();
@@ -168,7 +170,10 @@ export const StreamingAudioDeck = React.forwardRef<StreamingAudioDeckHandle, Str
         // Set up event listeners
         const handlePlay = () => setIsPlaying(true);
         const handlePause = () => setIsPlaying(false);
-        const handleEnded = () => setIsPlaying(false);
+        const handleEnded = () => {
+          setIsPlaying(false);
+          onEnd?.();
+        };
         const handleLoadedMetadata = () => {
           setDuration(audioElement!.duration);
         };

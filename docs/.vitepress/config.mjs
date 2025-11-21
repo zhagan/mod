@@ -18,6 +18,7 @@ export default defineConfig({
     nav: [
       { text: 'Guide', link: '/guide/getting-started' },
       { text: 'API', link: '/api/overview' },
+      { text: 'UI', link: '/api/ui/overview' },
       { text: 'Playground', link: '/playground/index.html', target: '_self' }
     ],
 
@@ -104,7 +105,8 @@ export default defineConfig({
             { text: 'Limiter', link: '/api/processors/limiter' },
             { text: 'Gate', link: '/api/processors/gate' },
             { text: 'AutoWah', link: '/api/processors/autowah' },
-            { text: 'RingModulator', link: '/api/processors/ringmodulator' }
+            { text: 'RingModulator', link: '/api/processors/ringmodulator' },
+            { text: 'VCA', link: '/api/processors/vca' }
           ]
         },
         {
@@ -126,6 +128,54 @@ export default defineConfig({
             { text: 'Oscilloscope', link: '/api/visualizations/oscilloscope' },
             { text: 'SpectrumAnalyzer', link: '/api/visualizations/spectrum-analyzer' },
             { text: 'LevelMeter', link: '/api/visualizations/level-meter' }
+          ]
+        },
+        {
+          text: 'UI Components',
+          items: [
+            { text: 'Overview', link: '/api/ui/overview' }
+          ]
+        },
+        {
+          text: 'UI - Controls',
+          items: [
+            { text: 'Slider', link: '/api/ui/controls/slider' },
+            { text: 'Knob', link: '/api/ui/controls/knob' },
+            { text: 'XY Pad', link: '/api/ui/controls/xypad' },
+            { text: 'Button', link: '/api/ui/controls/button' },
+            { text: 'Select', link: '/api/ui/controls/select' },
+            { text: 'FilePicker', link: '/api/ui/controls/filepicker' },
+            { text: 'TextInput', link: '/api/ui/controls/textinput' },
+            { text: 'ProgressBar', link: '/api/ui/controls/progressbar' }
+          ]
+        }
+      ],
+      '/api/ui/': [
+        {
+          text: 'UI Components',
+          items: [
+            { text: 'Overview', link: '/api/ui/overview' }
+          ]
+        },
+        {
+          text: 'Controls',
+          items: [
+            { text: 'Slider', link: '/api/ui/controls/slider' },
+            { text: 'Knob', link: '/api/ui/controls/knob' },
+            { text: 'XY Pad', link: '/api/ui/controls/xypad' },
+            { text: 'Button', link: '/api/ui/controls/button' },
+            { text: 'Select', link: '/api/ui/controls/select' },
+            { text: 'FilePicker', link: '/api/ui/controls/filepicker' },
+            { text: 'TextInput', link: '/api/ui/controls/textinput' },
+            { text: 'ProgressBar', link: '/api/ui/controls/progressbar' }
+          ]
+        },
+        {
+          text: 'Visualizations',
+          items: [
+            { text: 'OscilloscopeCanvas', link: '/api/ui/visualizations/oscilloscope' },
+            { text: 'SpectrumAnalyzerCanvas', link: '/api/ui/visualizations/spectrum-analyzer' },
+            { text: 'LevelMeterCanvas', link: '/api/ui/visualizations/level-meter' }
           ]
         }
       ]

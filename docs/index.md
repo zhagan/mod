@@ -102,9 +102,50 @@ npm install @mode-7/mod
 - ✅ **Reusable** - Create custom modules and share them
 - ✅ **Testable** - Components are easy to test in isolation
 
+## Build with AI Assistants
+
+MOD is designed to work seamlessly with AI coding assistants like Claude, ChatGPT, and Copilot. Our comprehensive documentation makes it easy for LLMs to generate working audio applications.
+
+**Get started with an AI assistant:**
+
+::: code-group
+```bash [Claude Code]
+# In Claude Code, reference the LLM guide:
+@https://mode7labs.github.io/mod/llm-guide
+
+# Then ask to build anything:
+"Build me a synthesizer with an LFO-modulated filter"
+"Create a drum machine with a step sequencer"
+"Make an effects processor with reverb and delay"
+```
+
+```bash [Claude Desktop]
+# In Claude Desktop, start with:
+Read https://mode7labs.github.io/mod/llm-guide
+
+# Then describe what you want:
+"Build a simple synth with envelope control"
+"Create a mixer with multiple channels"
+```
+
+```bash [Chat]
+# In any AI chat:
+Based on the mod documentation at mode7labs.github.io/mod,
+create an audio visualizer with oscilloscope and spectrum analyzer
+```
+:::
+
+Our [LLM Guide](/llm-guide) includes:
+- Complete component reference with props
+- 10+ common patterns with working code
+- Signal flow examples
+- Troubleshooting tips
+- Full synthesizer example
+
 ## Ready to dive in?
 
 <div class="vp-doc" style="margin-top: 2rem;">
   <a href="/guide/getting-started" class="vp-button brand" style="margin-right: 1rem;">Get Started</a>
+  <a href="/llm-guide" class="vp-button brand" style="margin-right: 1rem;">LLM Guide</a>
   <a href="/api/overview" class="vp-button alt">API Reference</a>
 </div>

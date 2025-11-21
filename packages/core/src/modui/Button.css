@@ -1,0 +1,134 @@
+/* ModUI Button - Default Styles */
+
+.modui-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: #999;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.modui-button:hover:not(.modui-button-disabled) {
+  background: #333;
+  border-color: #555;
+  color: #ccc;
+}
+
+.modui-button:active:not(.modui-button-disabled) {
+  transform: scale(0.97);
+}
+
+.modui-button-active {
+  background: #3a3a3a;
+  border-color: #4CAF50;
+  color: #4CAF50;
+}
+
+.modui-button-active:hover:not(.modui-button-disabled) {
+  background: #404040;
+  border-color: #5DBF64;
+  color: #5DBF64;
+}
+
+.modui-button-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Sizes */
+.modui-button-small {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+}
+
+.modui-button-medium {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+}
+
+.modui-button-large {
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+}
+
+/* Icon only */
+.modui-button-icon-only {
+  padding: 0.5rem;
+}
+
+.modui-button-icon-only.modui-button-small {
+  padding: 0.375rem;
+}
+
+.modui-button-icon-only.modui-button-large {
+  padding: 0.75rem;
+}
+
+/* Variants */
+.modui-button-danger {
+  border-color: #d32f2f;
+  color: #d32f2f;
+}
+
+.modui-button-danger:hover:not(.modui-button-disabled) {
+  background: #333;
+  border-color: #f44336;
+  color: #f44336;
+}
+
+.modui-button-danger.modui-button-active {
+  background: #3a2222;
+  border-color: #f44336;
+  color: #f44336;
+}
+
+.modui-button-success {
+  border-color: #4CAF50;
+  color: #4CAF50;
+}
+
+.modui-button-success:hover:not(.modui-button-disabled) {
+  background: #333;
+  border-color: #5DBF64;
+  color: #5DBF64;
+}
+
+.modui-button-success.modui-button-active {
+  background: #223a22;
+  border-color: #5DBF64;
+  color: #5DBF64;
+}
+
+.modui-button-ghost {
+  background: transparent;
+  border-color: transparent;
+}
+
+.modui-button-ghost:hover:not(.modui-button-disabled) {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: #333;
+}
+
+/* Icon */
+.modui-button-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+
+.modui-button-text {
+  line-height: 1;
+}
