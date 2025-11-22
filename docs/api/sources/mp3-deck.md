@@ -17,6 +17,7 @@ The `MP3Deck` component loads and plays local audio files (MP3, WAV, etc.). It p
 | `onPlayingChange` | `(isPlaying: boolean) => void` | - | Callback when playback state changes |
 | `onTimeUpdate` | `(currentTime: number, duration: number) => void` | - | Callback when playback position updates |
 | `onError` | `(error: string \| null) => void` | - | Callback when error state changes |
+| `onEnd` | `() => void` | - | Callback when track finishes playing |
 | `children` | `function` | - | Render prop function receiving control props |
 
 ## Render Props
@@ -40,6 +41,7 @@ When using the `children` render prop, the following controls are provided:
 | `duration` | `number` | Total duration of audio in seconds |
 | `seek` | `(time: number) => void` | Seek to a specific time in seconds |
 | `isActive` | `boolean` | Whether the audio deck is active |
+| `isReady` | `boolean` | Whether the audio is loaded and ready to play |
 | `error` | `string \| null` | Error message if loading failed |
 
 ## Usage
@@ -85,6 +87,7 @@ function App() {
       {({
         loadFile,
         isPlaying,
+        isReady,
         play,
         pause,
         stop,
@@ -110,7 +113,9 @@ function App() {
           />
 
           <div>
-            <button onClick={play} disabled={isPlaying}>Play</button>
+            <button onClick={play} disabled={!isReady || isPlaying}>
+              {!isReady ? 'Loading...' : 'Play'}
+            </button>
             <button onClick={pause} disabled={!isPlaying}>Pause</button>
             <button onClick={stop}>Stop</button>
           </div>
@@ -172,21 +177,21 @@ function App() {
   return (
     <>
       <MP3Deck output={deckOut}>
-        {({ loadFile, play, pause, isPlaying }) => (
+        {({ loadFile, play, pause, isPlaying, isReady }) => (
           <div>
             <input
               type="file"
               accept="audio/*"
               onChange={(e) => {
                 const file = e.target.files?.[0];
-                if (file) {
-                  loadFile(file);
-                  setTimeout(play, 100); // Auto-play after load
-                }
+                if (file) loadFile(file);
               }}
             />
-            <button onClick={isPlaying ? pause : play}>
-              {isPlaying ? 'Pause' : 'Play'}
+            <button
+              onClick={isPlaying ? pause : play}
+              disabled={!isReady}
+            >
+              {!isReady ? 'Loading...' : isPlaying ? 'Pause' : 'Play'}
             </button>
           </div>
         )}
@@ -289,6 +294,7 @@ function App() {
       const state = deckRef.current.getState();
       console.log('Source:', state.src);
       console.log('Is playing:', state.isPlaying);
+      console.log('Is ready:', state.isReady);
       console.log('Current time:', state.currentTime);
       console.log('Duration:', state.duration);
       console.log('Gain:', state.gain);
@@ -351,7 +357,8 @@ function App() {
 ### CORS Considerations
 
 - Remote audio files must have appropriate CORS headers
-- The `crossOrigin="anonymous"` attribute is set automatically
+- The `crossOrigin="anonymous"` attribute is set automatically for remote URLs
+- Local blob URLs (from File objects) do not use crossOrigin
 
 ::: tip User Gesture Required
 Some browsers require a user gesture (like a button click) before audio can play. Make sure playback is triggered by user interaction.

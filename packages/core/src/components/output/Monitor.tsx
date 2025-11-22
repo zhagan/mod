@@ -40,7 +40,7 @@ export const Monitor: React.FC<MonitorProps> = ({
 
   const gainNodeRef = useRef<GainNode | null>(null);
 
-  // Only recreate when specific input stream changes, not refs
+  // Track when input changes for reconnection
   const inputKey = input.current?.audioNode ? String(input.current.audioNode) : 'null';
 
   // Get available audio output devices
@@ -74,7 +74,9 @@ export const Monitor: React.FC<MonitorProps> = ({
 
   // Setup audio routing
   useEffect(() => {
-    if (!audioContext || !input.current) return;
+    if (!audioContext || !input.current) {
+      return;
+    }
 
     // Create output gain for volume control
     const outputGain = audioContext.createGain();

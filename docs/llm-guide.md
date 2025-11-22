@@ -88,7 +88,7 @@ Combine multiple signals. Have multiple inputs, one output.
 | Component | Purpose | Key Props |
 |-----------|---------|-----------|
 | [Mixer](/api/mixers/mixer) | Mix N channels | inputs (array of refs) |
-| [CrossFade](/api/mixers/crossfade) | Blend two sources | inputA, inputB, position (0-1), mode |
+| [CrossFade](/api/mixers/crossfade) | Blend two sources | inputs ([ref, ref]), mix (0-1), mode |
 
 ### Output
 Send to speakers. Have `input` prop only.
@@ -486,7 +486,7 @@ const output = useModStream();
 
 <ToneGenerator output={sourceA} frequency={220} />
 <NoiseGenerator output={sourceB} type="white" />
-<CrossFade inputA={sourceA} inputB={sourceB} output={output} position={0.5} />
+<CrossFade inputs={[sourceA, sourceB]} output={output} mix={0.5} />
 <Monitor input={output} />
 ```
 

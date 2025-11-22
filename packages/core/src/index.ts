@@ -3,6 +3,7 @@ export { AudioProvider, useAudioContext } from './context/AudioContext';
 
 // Hooks
 export { useModStream } from './hooks/useModStream';
+export { useModStreamToMediaStream } from './hooks/useModStreamToMediaStream';
 
 // Types
 export type { ModStream, ModStreamRef } from './types/ModStream';

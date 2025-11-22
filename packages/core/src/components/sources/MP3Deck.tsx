@@ -14,6 +14,7 @@ export interface MP3DeckHandle {
     gain: number;
     loop: boolean;
     isPlaying: boolean;
+    isReady: boolean;
     currentTime: number;
     duration: number;
     error: string | null;
@@ -36,6 +37,7 @@ export interface MP3DeckRenderProps {
   duration: number;
   seek: (time: number) => void;
   isActive: boolean;
+  isReady: boolean;
   error: string | null;
 }
 
@@ -81,51 +83,106 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [isReady, setIsReady] = useState(false);
 
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
+  const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
   const blobUrlRef = useRef<string | null>(null);
 
-  // Create audio nodes once
+  // Create output gain once (stable connection for Monitor)
   useEffect(() => {
-    if (!audioContext || !src) return;
+    if (!audioContext) return;
+
+    const gainNode = audioContext.createGain();
+    gainNode.gain.value = gain;
+    gainNodeRef.current = gainNode;
+
+    // Set output ref with stable gain node
+    output.current = {
+      audioNode: gainNode,
+      gain: gainNode,
+      context: audioContext,
+      metadata: {
+        label,
+        sourceType: 'mp3',
+      },
+    };
+
+    return () => {
+      gainNode.disconnect();
+      output.current = null;
+      gainNodeRef.current = null;
+    };
+  }, [audioContext, label]);
+
+  // Handle source changes separately
+  useEffect(() => {
+    if (!audioContext || !src || !gainNodeRef.current) return;
 
     let audioElement: HTMLAudioElement | null = null;
     let sourceNode: MediaElementAudioSourceNode | null = null;
+    const currentSrc = src; // Capture current src for cleanup
 
     const setupAudio = async () => {
       try {
-        // Create audio element
-        audioElement = new Audio(src);
+        // Clean up previous source if it exists
+        if (sourceNodeRef.current) {
+          try {
+            sourceNodeRef.current.disconnect();
+          } catch (e) {
+            // Already disconnected
+          }
+          sourceNodeRef.current = null;
+        }
+
+        // Stop and clean up previous audio element
+        if (audioElementRef.current) {
+          const oldElement = audioElementRef.current;
+          oldElement.pause();
+          // Safe cleanup - removeAttribute may not exist in test environments
+          if (typeof oldElement.removeAttribute === 'function') {
+            oldElement.removeAttribute('src');
+          } else {
+            oldElement.src = '';
+          }
+          oldElement.load();
+          audioElementRef.current = null;
+        }
+
+        // Reset state when loading new audio
+        setIsReady(false);
+        setIsPlaying(false);
+        setError(null);
+        setCurrentTime(0);
+        setDuration(0);
+
+        // Create fresh audio element
+        audioElement = new Audio();
         audioElement.loop = loop;
-        audioElement.crossOrigin = 'anonymous';
+        // Only set crossOrigin for remote URLs, not blob URLs
+        if (!src.startsWith('blob:')) {
+          audioElement.crossOrigin = 'anonymous';
+        }
+        audioElement.preload = 'auto';
+        audioElement.src = src;
         audioElementRef.current = audioElement;
 
         // Create source from audio element
         sourceNode = audioContext.createMediaElementSource(audioElement);
+        sourceNodeRef.current = sourceNode;
 
-        // Create gain node
-        const gainNode = audioContext.createGain();
-        gainNode.gain.value = gain;
-        gainNodeRef.current = gainNode;
-
-        // Connect source to gain
-        sourceNode.connect(gainNode);
-
-        // Set output ref
-        output.current = {
-          audioNode: sourceNode,
-          gain: gainNode,
-          context: audioContext,
-          metadata: {
-            label,
-            sourceType: 'mp3',
-          },
-        };
+        // Connect source to existing stable gain node
+        sourceNode.connect(gainNodeRef.current!);
 
         // Set up event listeners
         audioElement.addEventListener('loadedmetadata', () => {
           setDuration(audioElement!.duration);
+        });
+
+        audioElement.addEventListener('canplaythrough', () => {
+          // Audio is fully loaded and ready to play
+          setIsReady(true);
         });
 
         audioElement.addEventListener('timeupdate', () => {
@@ -139,14 +196,14 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
           onEnd?.();
         });
 
-        audioElement.addEventListener('error', (e) => {
+        audioElement.addEventListener('error', () => {
           setError('Failed to load audio file');
-          console.error('Audio error:', e);
+          setIsReady(false);
         });
 
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load audio');
-        console.error('MP3Deck error:', err);
+        setIsReady(false);
       }
     };
 
@@ -156,24 +213,24 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
     return () => {
       if (audioElement) {
         audioElement.pause();
-        audioElement.src = '';
+        // Safe cleanup - removeAttribute may not exist in test environments
+        if (typeof audioElement.removeAttribute === 'function') {
+          audioElement.removeAttribute('src');
+        } else {
+          audioElement.src = '';
+        }
+        audioElement.load();
       }
       if (sourceNode) {
         sourceNode.disconnect();
       }
-      if (output.current?.gain) {
-        output.current.gain.disconnect();
-      }
-      // Revoke blob URL on unmount
-      if (blobUrlRef.current) {
-        URL.revokeObjectURL(blobUrlRef.current);
+      // Only revoke blob URL if it matches the one we were using
+      if (blobUrlRef.current === currentSrc && currentSrc.startsWith('blob:')) {
+        URL.revokeObjectURL(currentSrc);
         blobUrlRef.current = null;
       }
-      output.current = null;
-      audioElementRef.current = null;
-      gainNodeRef.current = null;
     };
-  }, [audioContext, src, label, output]);
+  }, [audioContext, src]);
 
   // Update loop when it changes
   useEffect(() => {
@@ -223,9 +280,8 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
       if (audioContext.state === 'suspended') {
         await audioContext.resume();
       }
-      audioElementRef.current.play().catch(err => {
+      audioElementRef.current.play().catch(() => {
         setError('Playback failed. User interaction may be required.');
-        console.warn('Play failed:', err);
       });
     }
   };
@@ -256,8 +312,8 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
     stop,
     seek,
     loadFile,
-    getState: () => ({ src, gain, loop, isPlaying, currentTime, duration, error }),
-  }), [src, gain, loop, isPlaying, currentTime, duration, error]);
+    getState: () => ({ src, gain, loop, isPlaying, isReady, currentTime, duration, error }),
+  }), [src, gain, loop, isPlaying, isReady, currentTime, duration, error]);
 
   // Event callback effects
   useEffect(() => {
@@ -294,6 +350,7 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
       duration,
       seek,
       isActive: !!output.current,
+      isReady,
       error,
     })}</>;
   }

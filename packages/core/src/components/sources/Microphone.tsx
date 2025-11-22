@@ -142,26 +142,26 @@ export const Microphone = React.forwardRef<MicrophoneHandle, MicrophoneProps>(({
         const sourceNode = audioContext.createMediaStreamSource(mediaStream);
         sourceNodeRef.current = sourceNode;
 
-        // Create gain node (if not exists)
+        // Create gain node (if not exists) - this persists across device changes
         if (!gainNodeRef.current) {
           const gainNode = audioContext.createGain();
           gainNode.gain.value = isMuted ? 0 : gain;
           gainNodeRef.current = gainNode;
+
+          // Set output ref ONCE - downstream components connect to the gain, not the source
+          output.current = {
+            audioNode: gainNode, // Expose the GAIN as the audioNode, not the source
+            gain: gainNode,
+            context: audioContext,
+            metadata: {
+              label,
+              sourceType: 'microphone',
+            },
+          };
         }
 
-        // Connect source to gain
+        // Connect new source to existing gain
         sourceNode.connect(gainNodeRef.current);
-
-        // Set output ref
-        output.current = {
-          audioNode: sourceNode,
-          gain: gainNodeRef.current,
-          context: audioContext,
-          metadata: {
-            label,
-            sourceType: 'microphone',
-          },
-        };
 
         setError(null);
       } catch (err) {
@@ -172,23 +172,41 @@ export const Microphone = React.forwardRef<MicrophoneHandle, MicrophoneProps>(({
 
     setupMicrophone();
 
-    // Cleanup
+    // Cleanup when device changes or unmount
     return () => {
+      // Disconnect and stop the old source
       if (sourceNodeRef.current) {
         sourceNodeRef.current.disconnect();
+        sourceNodeRef.current = null;
       }
       if (mediaStreamRef.current) {
         mediaStreamRef.current.getTracks().forEach(track => track.stop());
+        mediaStreamRef.current = null;
       }
-      if (gainNodeRef.current) {
-        gainNodeRef.current.disconnect();
-      }
-      output.current = null;
-      sourceNodeRef.current = null;
-      mediaStreamRef.current = null;
-      gainNodeRef.current = null;
+      // Keep gainNode connected - it persists across device changes
+      // Only clean up on full unmount (when no dependencies remain)
     };
   }, [audioContext, label, selectedDeviceId, devices.length]);
+
+  // Cleanup on component unmount
+  useEffect(() => {
+    return () => {
+      // Full cleanup on unmount
+      if (gainNodeRef.current) {
+        gainNodeRef.current.disconnect();
+        gainNodeRef.current = null;
+      }
+      if (sourceNodeRef.current) {
+        sourceNodeRef.current.disconnect();
+        sourceNodeRef.current = null;
+      }
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach(track => track.stop());
+        mediaStreamRef.current = null;
+      }
+      output.current = null;
+    };
+  }, []); // Empty deps - only runs on mount/unmount
 
   // Update gain when it changes
   useEffect(() => {

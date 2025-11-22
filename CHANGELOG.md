@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.8] - 2025-01-22
+
+### Added
+- `useModStreamToMediaStream` hook for converting ModStreams to MediaStream API
+- `isReady` state to MP3Deck for reliable audio loading detection
+- Documentation for `useModStream` and `useModStreamToMediaStream` hooks
+- Hooks section in API documentation
+
+### Changed
+- MP3Deck now uses stable gain node architecture for reliable queue playback
+- Microphone now uses stable gain node to prevent disconnection on device changes
+- CrossFade improved input tracking using key-based dependencies
+- useModStream now triggers reactive updates on connection state changes
+- Updated MP3Deck documentation with `isReady` usage patterns
+- Improved CORS handling in MP3Deck (only applies to remote URLs, not blob URLs)
+
+### Fixed
+- MP3Deck queue playback issues (tracks not advancing, audio dropout)
+- Blob URL revocation timing causing "WebKitBlobResource error 1"
+- MP3Deck play button not disabling when audio not ready
+- Monitor connection stability when switching tracks
+- Performance stuttering on MP3Deck pause/resume
+- Missing `onEnd` callback documentation in MP3Deck
+
+## [0.1.7] - 2025-01-22
+
 ### Added
 - VCA (Voltage Controlled Amplifier) component for amplitude modulation
 - Sequencer gate output for triggering envelopes
@@ -40,5 +66,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Modular signal routing system
 - Basic documentation
 
-[Unreleased]: https://github.com/Mode7Labs/mod/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Mode7Labs/mod/compare/v0.1.8...HEAD
+[0.1.8]: https://github.com/Mode7Labs/mod/compare/v0.1.7...v0.1.8
+[0.1.7]: https://github.com/Mode7Labs/mod/compare/v0.1.0...v0.1.7
 [0.1.0]: https://github.com/Mode7Labs/mod/releases/tag/v0.1.0

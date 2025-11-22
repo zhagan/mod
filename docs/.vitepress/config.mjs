@@ -131,6 +131,13 @@ export default defineConfig({
           ]
         },
         {
+          text: 'Hooks',
+          items: [
+            { text: 'useModStream', link: '/api/hooks/use-mod-stream' },
+            { text: 'useModStreamToMediaStream', link: '/api/hooks/use-mod-stream-to-media-stream' }
+          ]
+        },
+        {
           text: 'UI Components',
           items: [
             { text: 'Overview', link: '/api/ui/overview' }

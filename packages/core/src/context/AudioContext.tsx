@@ -26,9 +26,7 @@ export const AudioProvider: React.FC<AudioProviderProps> = ({ children }) => {
     // Resume context on user interaction (required by browsers)
     const resumeAudio = () => {
       if (ctx.state === 'suspended') {
-        ctx.resume().then(() => {
-          console.log('AudioContext resumed');
-        });
+        ctx.resume();
       }
     };
 

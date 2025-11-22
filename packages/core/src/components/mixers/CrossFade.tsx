@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, ReactNode, useImperativeHandle, useState } from 'react';
+import React, { useEffect, useRef, ReactNode, useImperativeHandle } from 'react';
 import { useAudioContext } from '../../context/AudioContext';
 import { ModStreamRef } from '../../types/ModStream';
 import { useControlledState } from '../../hooks/useControlledState';
@@ -95,8 +95,9 @@ export const CrossFade = React.forwardRef<CrossFadeHandle, CrossFadeProps>(({
   const gainBRef = useRef<GainNode | null>(null);
   const outputGainRef = useRef<GainNode | null>(null);
 
-  // Track input nodes for dependency tracking
-  const [inputNodes, setInputNodes] = useState(inputs.map(i => i.current?.audioNode));
+  // Create keys that change when input streams change (like processors do)
+  const inputAKey = inputA.current?.audioNode ? String(inputA.current.audioNode) : 'null';
+  const inputBKey = inputB.current?.audioNode ? String(inputB.current.audioNode) : 'null';
 
   // Create output gain once
   useEffect(() => {
@@ -124,7 +125,7 @@ export const CrossFade = React.forwardRef<CrossFadeHandle, CrossFadeProps>(({
 
     // Set output ref with internal node references
     output.current = {
-      audioNode: gainA, // Representative node
+      audioNode: outputGain, // Output gain is what downstream connects to
       gain: outputGain,
       context: audioContext,
       metadata: {
@@ -148,35 +149,30 @@ export const CrossFade = React.forwardRef<CrossFadeHandle, CrossFadeProps>(({
   }, [audioContext, label]);
 
   // Handle input connections separately
+  // Use inputKeys that change when the actual audio nodes change (like processors do)
   useEffect(() => {
     if (!gainARef.current || !gainBRef.current) return;
 
-    // Track changes to input nodes
-    const currentNodes = inputs.map(i => i.current?.audioNode);
-    if (JSON.stringify(currentNodes) !== JSON.stringify(inputNodes)) {
-      setInputNodes(currentNodes);
-    }
-
     // Connect input A to its gain
-    if (inputA.current) {
+    if (inputA.current?.gain) {
       inputA.current.gain.connect(gainARef.current);
     }
 
     // Connect input B to its gain
-    if (inputB.current) {
+    if (inputB.current?.gain) {
       inputB.current.gain.connect(gainBRef.current);
     }
 
     return () => {
       // Disconnect when inputs change
-      if (inputA.current && gainARef.current) {
+      if (inputA.current?.gain && gainARef.current) {
         try {
           inputA.current.gain.disconnect(gainARef.current);
         } catch (e) {
           // Already disconnected
         }
       }
-      if (inputB.current && gainBRef.current) {
+      if (inputB.current?.gain && gainBRef.current) {
         try {
           inputB.current.gain.disconnect(gainBRef.current);
         } catch (e) {
@@ -184,7 +180,7 @@ export const CrossFade = React.forwardRef<CrossFadeHandle, CrossFadeProps>(({
         }
       }
     };
-  }, [inputNodes, inputA, inputB]);
+  }, [inputAKey, inputBKey]); // Depend on keys that change when audioNodes change!
 
   // Update mix and mode when they change
   useEffect(() => {

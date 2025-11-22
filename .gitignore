@@ -33,3 +33,6 @@ yarn-error.log*
 
 # Launch tracking (personal progress)
 LAUNCH_CHECKLIST.md
+
+# Test apps
+test-apps/

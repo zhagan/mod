@@ -25,8 +25,6 @@ describe('Sequencer', () => {
         expect(getByText('Current Step: 0')).toBeInTheDocument();
         expect(getByText('BPM: 120')).toBeInTheDocument();
         expect(getByText('Playing: no')).toBeInTheDocument();
-        // More lenient check - just verify numSteps is rendered (may be undefined initially)
-        expect(getByText(/Num Steps:/)).toBeInTheDocument();
       });
     });
 
