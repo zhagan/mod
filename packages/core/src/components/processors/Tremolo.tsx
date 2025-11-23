@@ -7,6 +7,7 @@ export interface TremoloHandle {
   getState: () => {
     rate: number;
     depth: number;
+    enabled: boolean;
   };
 }
 
@@ -15,6 +16,8 @@ export interface TremoloRenderProps {
   setRate: (value: number) => void;
   depth: number;
   setDepth: (value: number) => void;
+  enabled: boolean;
+  setEnabled: (value: boolean) => void;
   isActive: boolean;
 }
 
@@ -26,6 +29,8 @@ export interface TremoloProps {
   onRateChange?: (rate: number) => void;
   depth?: number;
   onDepthChange?: (depth: number) => void;
+  enabled?: boolean;
+  onEnabledChange?: (enabled: boolean) => void;
   children?: (props: TremoloRenderProps) => ReactNode;
 }
 
@@ -37,16 +42,20 @@ export const Tremolo = React.forwardRef<TremoloHandle, TremoloProps>(({
   onRateChange,
   depth: controlledDepth,
   onDepthChange,
+  enabled: controlledEnabled,
+  onEnabledChange,
   children,
 }, ref) => {
   const audioContext = useAudioContext();
   const [rate, setRate] = useControlledState(controlledRate, 5, onRateChange);
   const [depth, setDepth] = useControlledState(controlledDepth, 0.5, onDepthChange);
+  const [enabled, setEnabled] = useControlledState(controlledEnabled, true, onEnabledChange);
 
   const gainNodeRef = useRef<GainNode | null>(null);
   const lfoRef = useRef<OscillatorNode | null>(null);
   const lfoGainRef = useRef<GainNode | null>(null);
   const outputGainRef = useRef<GainNode | null>(null);
+  const bypassConnectionRef = useRef<boolean>(false);
 
   // Create tremolo nodes once
   useEffect(() => {
@@ -111,22 +120,48 @@ export const Tremolo = React.forwardRef<TremoloHandle, TremoloProps>(({
     };
   }, [audioContext, label]);
 
-  // Handle input connection
+  // Handle input connection and bypass routing
   useEffect(() => {
-    if (!input.current || !gainNodeRef.current) return;
+    if (!input.current || !gainNodeRef.current || !outputGainRef.current) return;
 
-    input.current.gain.connect(gainNodeRef.current);
+    const inputGain = input.current.gain;
+    const gainNode = gainNodeRef.current;
+    const outputGain = outputGainRef.current;
 
-    return () => {
-      if (input.current && gainNodeRef.current) {
+    if (enabled) {
+      // Normal mode: input → tremolo → output
+      if (bypassConnectionRef.current) {
         try {
-          input.current.gain.disconnect(gainNodeRef.current);
+          inputGain.disconnect(outputGain);
         } catch (e) {
           // Already disconnected
         }
+        bypassConnectionRef.current = false;
+      }
+      inputGain.connect(gainNode);
+    } else {
+      // Bypass mode: input → output (skip tremolo)
+      try {
+        inputGain.disconnect(gainNode);
+      } catch (e) {
+        // Already disconnected
+      }
+      inputGain.connect(outputGain);
+      bypassConnectionRef.current = true;
+    }
+
+    return () => {
+      try {
+        if (bypassConnectionRef.current) {
+          inputGain.disconnect(outputGain);
+        } else {
+          inputGain.disconnect(gainNode);
+        }
+      } catch (e) {
+        // Already disconnected
       }
     };
-  }, [input.current?.audioNode ? String(input.current.audioNode) : 'null']);
+  }, [input.current?.audioNode ? String(input.current.audioNode) : 'null', enabled]);
 
   // Update LFO rate
   useEffect(() => {
@@ -144,8 +179,8 @@ export const Tremolo = React.forwardRef<TremoloHandle, TremoloProps>(({
 
   // Expose imperative handle
   useImperativeHandle(ref, () => ({
-    getState: () => ({ rate, depth }),
-  }), [rate, depth]);
+    getState: () => ({ rate, depth, enabled }),
+  }), [rate, depth, enabled]);
 
   // Render children with state
   if (children) {
@@ -154,6 +189,8 @@ export const Tremolo = React.forwardRef<TremoloHandle, TremoloProps>(({
       setRate,
       depth,
       setDepth,
+      enabled,
+      setEnabled,
       isActive: !!output.current,
     })}</>;
   }

@@ -17,6 +17,8 @@ The `Chorus` component adds depth and thickness to audio by creating multiple de
 | `onDelayChange` | `(delay: number) => void` | - | Callback when delay changes |
 | `wet` | `number` | `0.5` | Wet/dry mix 0-1 (controlled or initial value) |
 | `onWetChange` | `(wet: number) => void` | - | Callback when wet/dry mix changes |
+| `enabled` | `boolean` | `true` | Whether the component is enabled or bypassed |
+| `onEnabledChange` | `(enabled: boolean) => void` | `-` | Callback when enabled state changes |
 | `children` | `function` | - | Render prop function receiving control props |
 
 ## Render Props
@@ -33,6 +35,8 @@ When using the `children` render prop, the following controls are provided:
 | `setDelay` | `(value: number) => void` | Update the delay |
 | `wet` | `number` | Current wet/dry mix |
 | `setWet` | `(value: number) => void` | Update the wet/dry mix |
+| `enabled` | `boolean` | Whether the component is enabled |
+| `setEnabled` | `(value: boolean) => void` | Toggle enabled/bypass state |
 | `isActive` | `boolean` | Whether the effect is active |
 
 ## Usage
@@ -190,6 +194,45 @@ function App() {
 ```
 
 **Note:** The imperative handle provides read-only access via `getState()`. To control the component programmatically, use the controlled props pattern shown above.
+
+## Bypass/Enable
+
+The `enabled` prop allows you to bypass the component's processing. When `enabled` is `false`, the audio passes through directly without any processing, saving CPU resources. This implements a true bypass.
+
+### Usage
+
+```tsx
+import { Chorus } from '@mode-7/mod';
+import { useState } from 'react';
+
+function App() {
+  const [enabled, setEnabled] = useState(true);
+
+  return (
+    <Chorus
+      input={input}
+      output={output}
+      enabled={enabled}
+      onEnabledChange={setEnabled}
+    />
+  );
+}
+```
+
+### With Render Props
+
+```tsx
+<Chorus input={input} output={output}>
+  {({ enabled, setEnabled, rate, setRate, depth, setDepth, delay, setDelay, wet, setWet }) => (
+    <div>
+      <button onClick={() => setEnabled(!enabled)}>
+        {enabled ? 'Bypass' : 'Enable'}
+      </button>
+      {/* Other controls */}
+    </div>
+  )}
+</Chorus>
+```
 
 ## Important Notes
 

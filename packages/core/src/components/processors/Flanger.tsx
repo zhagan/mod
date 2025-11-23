@@ -9,6 +9,7 @@ export interface FlangerHandle {
     depth: number;
     feedback: number;
     delay: number;
+    enabled: boolean;
   };
 }
 
@@ -21,6 +22,8 @@ export interface FlangerRenderProps {
   setFeedback: (value: number) => void;
   delay: number;
   setDelay: (value: number) => void;
+  enabled: boolean;
+  setEnabled: (value: boolean) => void;
   isActive: boolean;
 }
 
@@ -36,6 +39,8 @@ export interface FlangerProps {
   onFeedbackChange?: (value: number) => void;
   delay?: number;
   onDelayChange?: (value: number) => void;
+  enabled?: boolean;
+  onEnabledChange?: (enabled: boolean) => void;
   children?: (props: FlangerRenderProps) => ReactNode;
 }
 
@@ -51,6 +56,8 @@ export const Flanger = React.forwardRef<FlangerHandle, FlangerProps>(({
   onFeedbackChange,
   delay: controlledDelay,
   onDelayChange,
+  enabled: controlledEnabled,
+  onEnabledChange,
   children,
 }, ref) => {
   const audioContext = useAudioContext();
@@ -58,6 +65,7 @@ export const Flanger = React.forwardRef<FlangerHandle, FlangerProps>(({
   const [depth, setDepth] = useControlledState(controlledDepth, 0.003, onDepthChange);
   const [feedback, setFeedback] = useControlledState(controlledFeedback, 0.5, onFeedbackChange);
   const [delay, setDelay] = useControlledState(controlledDelay, 0.005, onDelayChange);
+  const [enabled, setEnabled] = useControlledState(controlledEnabled, true, onEnabledChange);
 
   const dryGainRef = useRef<GainNode | null>(null);
   const wetGainRef = useRef<GainNode | null>(null);
@@ -66,6 +74,7 @@ export const Flanger = React.forwardRef<FlangerHandle, FlangerProps>(({
   const lfoRef = useRef<OscillatorNode | null>(null);
   const lfoGainRef = useRef<GainNode | null>(null);
   const outputGainRef = useRef<GainNode | null>(null);
+  const bypassConnectionRef = useRef<boolean>(false);
 
   // Create flanger nodes once
   useEffect(() => {
@@ -153,25 +162,52 @@ export const Flanger = React.forwardRef<FlangerHandle, FlangerProps>(({
     };
   }, [audioContext, label]);
 
-  // Handle input connection
+  // Handle input connection and bypass routing
   useEffect(() => {
-    if (!input.current || !dryGainRef.current || !wetGainRef.current) return;
+    if (!input.current || !dryGainRef.current || !wetGainRef.current || !outputGainRef.current) return;
 
-    // Connect input to both dry and wet paths
-    input.current.gain.connect(dryGainRef.current);
-    input.current.gain.connect(wetGainRef.current);
+    const inputGain = input.current.gain;
+    const dryGain = dryGainRef.current;
+    const wetGain = wetGainRef.current;
+    const outputGain = outputGainRef.current;
 
-    return () => {
-      if (input.current && dryGainRef.current && wetGainRef.current) {
+    if (enabled) {
+      // Normal mode: input → dry + wet → output
+      if (bypassConnectionRef.current) {
         try {
-          input.current.gain.disconnect(dryGainRef.current);
-          input.current.gain.disconnect(wetGainRef.current);
+          inputGain.disconnect(outputGain);
         } catch (e) {
           // Already disconnected
         }
+        bypassConnectionRef.current = false;
+      }
+      inputGain.connect(dryGain);
+      inputGain.connect(wetGain);
+    } else {
+      // Bypass mode: input → output (skip flanger processing)
+      try {
+        inputGain.disconnect(dryGain);
+        inputGain.disconnect(wetGain);
+      } catch (e) {
+        // Already disconnected
+      }
+      inputGain.connect(outputGain);
+      bypassConnectionRef.current = true;
+    }
+
+    return () => {
+      try {
+        if (bypassConnectionRef.current) {
+          inputGain.disconnect(outputGain);
+        } else {
+          inputGain.disconnect(dryGain);
+          inputGain.disconnect(wetGain);
+        }
+      } catch (e) {
+        // Already disconnected
       }
     };
-  }, [input.current?.audioNode ? String(input.current.audioNode) : 'null']);
+  }, [input.current?.audioNode ? String(input.current.audioNode) : 'null', enabled]);
 
   // Update LFO rate
   useEffect(() => {
@@ -203,8 +239,8 @@ export const Flanger = React.forwardRef<FlangerHandle, FlangerProps>(({
 
   // Expose imperative handle
   useImperativeHandle(ref, () => ({
-    getState: () => ({ rate, depth, feedback, delay }),
-  }), [rate, depth, feedback, delay]);
+    getState: () => ({ rate, depth, feedback, delay, enabled }),
+  }), [rate, depth, feedback, delay, enabled]);
 
   // Render children with state
   if (children) {
@@ -217,6 +253,8 @@ export const Flanger = React.forwardRef<FlangerHandle, FlangerProps>(({
       setFeedback,
       delay,
       setDelay,
+      enabled,
+      setEnabled,
       isActive: !!output.current,
     })}</>;
   }

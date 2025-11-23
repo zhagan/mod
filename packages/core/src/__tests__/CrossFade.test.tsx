@@ -524,4 +524,179 @@ describe('CrossFade', () => {
       });
     });
   });
+
+  describe('Enabled/Bypass Functionality', () => {
+    it('should default to enabled=true', () => {
+      const input = createMockStreamRef();
+      const input2 = createMockStreamRef();
+      const output = createMockStreamRef();
+      const { getByText } = render(
+        <CrossFade inputs={[input || { current: null }, input2 || { current: null }]} output={output}>
+          {({ enabled }) => <span>Enabled: {enabled ? 'yes' : 'no'}</span>}
+        </CrossFade>
+      );
+
+      expect(getByText('Enabled: yes')).toBeInTheDocument();
+    });
+
+    it('should accept controlled enabled prop', () => {
+      const input = createMockStreamRef();
+      const input2 = createMockStreamRef();
+      const output = createMockStreamRef();
+      const { getByText } = render(
+        <CrossFade inputs={[input || { current: null }, input2 || { current: null }]} output={output} enabled={false}>
+          {({ enabled }) => <span>Enabled: {enabled ? 'yes' : 'no'}</span>}
+        </CrossFade>
+      );
+
+      expect(getByText('Enabled: no')).toBeInTheDocument();
+    });
+
+    it('should allow toggling enabled through render props', async () => {
+      const input = createMockStreamRef();
+      const input2 = createMockStreamRef();
+      const output = createMockStreamRef();
+      const { getByText, getByRole } = render(
+        <CrossFade inputs={[input || { current: null }, input2 || { current: null }]} output={output}>
+          {({ enabled, setEnabled }) => (
+            <div>
+              <span>Enabled: {enabled ? 'yes' : 'no'}</span>
+              <button onClick={() => setEnabled(!enabled)}>Toggle</button>
+            </div>
+          )}
+        </CrossFade>
+      );
+
+      expect(getByText('Enabled: yes')).toBeInTheDocument();
+
+      const button = getByRole('button', { name: /toggle/i });
+
+      act(() => {
+        button.click();
+      });
+
+      await waitFor(() => {
+        expect(getByText('Enabled: no')).toBeInTheDocument();
+      });
+
+      act(() => {
+        button.click();
+      });
+
+      await waitFor(() => {
+        expect(getByText('Enabled: yes')).toBeInTheDocument();
+      });
+    });
+
+    it('should call onEnabledChange when enabled changes', async () => {
+      const input = createMockStreamRef();
+      const input2 = createMockStreamRef();
+      const output = createMockStreamRef();
+      const onEnabledChange = jest.fn();
+
+      const { getByRole } = render(
+        <CrossFade
+          inputs={[input || { current: null }, input2 || { current: null }]}
+          output={output}
+          enabled={true}
+          onEnabledChange={onEnabledChange}
+        >
+          {({ setEnabled }) => (
+            <button onClick={() => setEnabled(false)}>Disable</button>
+          )}
+        </CrossFade>
+      );
+
+      act(() => {
+        getByRole('button').click();
+      });
+
+      await waitFor(() => {
+        expect(onEnabledChange).toHaveBeenCalledWith(false);
+      });
+    });
+
+    it('should expose enabled in getState', () => {
+      const TestComponent = () => {
+        const input = createMockStreamRef();
+        const input2 = createMockStreamRef();
+        const output = createMockStreamRef();
+        const ref = useRef<CrossFadeHandle>(null);
+
+        const handleClick = () => {
+          const state = ref.current?.getState();
+          expect(state?.enabled).toBe(true);
+        };
+
+        return (
+          <>
+            <CrossFade ref={ref} inputs={[input || { current: null }, input2 || { current: null }]} output={output} />
+            <button onClick={handleClick}>Get State</button>
+          </>
+        );
+      };
+
+      const { getByRole } = render(<TestComponent />);
+
+      act(() => {
+        getByRole('button').click();
+      });
+    });
+
+    it('should expose enabled=false in getState when disabled', () => {
+      const TestComponent = () => {
+        const input = createMockStreamRef();
+        const input2 = createMockStreamRef();
+        const output = createMockStreamRef();
+        const ref = useRef<CrossFadeHandle>(null);
+
+        const handleClick = () => {
+          const state = ref.current?.getState();
+          expect(state?.enabled).toBe(false);
+        };
+
+        return (
+          <>
+            <CrossFade ref={ref} inputs={[input || { current: null }, input2 || { current: null }]} output={output} enabled={false} />
+            <button onClick={handleClick}>Get State</button>
+          </>
+        );
+      };
+
+      const { getByRole } = render(<TestComponent />);
+
+      act(() => {
+        getByRole('button').click();
+      });
+    });
+
+    it('should maintain audio graph structure when toggling enabled', async () => {
+      const input = createMockStreamRef();
+      const input2 = createMockStreamRef();
+      const output = createMockStreamRef();
+      const { getByRole } = render(
+        <CrossFade inputs={[input || { current: null }, input2 || { current: null }]} output={output}>
+          {({ setEnabled }) => (
+            <button onClick={() => setEnabled(false)}>Disable</button>
+          )}
+        </CrossFade>
+      );
+
+      // Output should be set regardless of enabled state
+      expect(output.current).toBeDefined();
+      expect(output.current?.audioNode).toBeDefined();
+      expect(output.current?.gain).toBeDefined();
+
+      act(() => {
+        getByRole('button').click();
+      });
+
+      await waitFor(() => {
+        // Output should still be valid after disabling
+        expect(output.current).toBeDefined();
+        expect(output.current?.audioNode).toBeDefined();
+        expect(output.current?.gain).toBeDefined();
+      });
+    });
+  });
 });

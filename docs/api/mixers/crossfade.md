@@ -10,6 +10,8 @@ The `CrossFade` component smoothly blends between two audio signals with various
 | `output` | `ModStreamRef` | Required | Crossfaded audio output |
 | `label` | `string` | `'crossfade'` | Label for the component in metadata |
 | `mode` | `CrossFadeMode` | `'equal-power'` | Crossfade curve type |
+| `enabled` | `boolean` | `true` | Enables/bypasses processing (true bypass) |
+| `onEnabledChange` | `(enabled: boolean) => void` | `-` | Callback when enabled state changes |
 | `children` | `function` | - | Render prop function receiving control props |
 
 ### Crossfade Modes
@@ -31,6 +33,8 @@ When using the `children` render prop, the following controls are provided:
 | `setMix` | `(value: number) => void` | Update the mix position |
 | `mode` | `CrossFadeMode` | Current crossfade mode |
 | `setMode` | `(mode: CrossFadeMode) => void` | Update the crossfade mode |
+| `enabled` | `boolean` | Whether processing is enabled or bypassed |
+| `setEnabled` | `(value: boolean) => void` | Toggle enabled/bypass state |
 | `isActive` | `boolean` | Whether the crossfade is active |
 
 ## Usage

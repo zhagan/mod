@@ -13,6 +13,8 @@ Lo-fi effect that reduces bit depth and sample rate to create digital distortion
 | `onBitDepthChange` | `(value: number) => void` | - | Callback when bitDepth changes |
 | `sampleReduction` | `number` | `1` | Sample rate reduction factor (controlled or initial value) |
 | `onSampleReductionChange` | `(value: number) => void` | - | Callback when sampleReduction changes |
+| `enabled` | `boolean` | `true` | Whether the component is enabled or bypassed |
+| `onEnabledChange` | `(enabled: boolean) => void` | `-` | Callback when enabled state changes |
 | `children` | `function` | - | Render prop function |
 
 ## Render Props
@@ -25,6 +27,8 @@ When using the `children` render prop, the following controls are provided:
 | `setBitDepth` | `(value: number) => void` | Update the bit depth |
 | `sampleReduction` | `number` | Current sample reduction factor |
 | `setSampleReduction` | `(value: number) => void` | Update the sample reduction |
+| `enabled` | `boolean` | Whether the component is enabled |
+| `setEnabled` | `(value: boolean) => void` | Toggle enabled/bypass state |
 | `isActive` | `boolean` | Whether the processor is active |
 
 ## Usage
@@ -154,6 +158,45 @@ function MyComponent() {
 ```
 
 **Note:** The imperative handle provides read-only access via `getState()`. To control the component programmatically, use the controlled props pattern shown above.
+
+## Bypass/Enable
+
+The `enabled` prop allows you to bypass the component's processing. When `enabled` is `false`, the audio passes through directly without any processing, saving CPU resources. This implements a true bypass.
+
+### Usage
+
+```tsx
+import { BitCrusher } from '@mode-7/mod';
+import { useState } from 'react';
+
+function App() {
+  const [enabled, setEnabled] = useState(true);
+
+  return (
+    <BitCrusher
+      input={input}
+      output={output}
+      enabled={enabled}
+      onEnabledChange={setEnabled}
+    />
+  );
+}
+```
+
+### With Render Props
+
+```tsx
+<BitCrusher input={input} output={output}>
+  {({ enabled, setEnabled, bitDepth, setBitDepth, sampleReduction, setSampleReduction }) => (
+    <div>
+      <button onClick={() => setEnabled(!enabled)}>
+        {enabled ? 'Bypass' : 'Enable'}
+      </button>
+      {/* Other controls */}
+    </div>
+  )}
+</BitCrusher>
+```
 
 ## Important Notes
 

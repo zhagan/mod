@@ -7,6 +7,7 @@ export interface BitCrusherHandle {
   getState: () => {
     bitDepth: number;
     sampleReduction: number;
+    enabled: boolean;
   };
 }
 
@@ -15,6 +16,8 @@ export interface BitCrusherRenderProps {
   setBitDepth: (value: number) => void;
   sampleReduction: number;
   setSampleReduction: (value: number) => void;
+  enabled: boolean;
+  setEnabled: (value: boolean) => void;
   isActive: boolean;
 }
 
@@ -26,6 +29,8 @@ export interface BitCrusherProps {
   onBitDepthChange?: (value: number) => void;
   sampleReduction?: number;
   onSampleReductionChange?: (value: number) => void;
+  enabled?: boolean;
+  onEnabledChange?: (enabled: boolean) => void;
   children?: (props: BitCrusherRenderProps) => ReactNode;
 }
 
@@ -37,16 +42,20 @@ export const BitCrusher = React.forwardRef<BitCrusherHandle, BitCrusherProps>(({
   onBitDepthChange,
   sampleReduction: controlledSampleReduction,
   onSampleReductionChange,
+  enabled: controlledEnabled,
+  onEnabledChange,
   children,
 }, ref) => {
   const audioContext = useAudioContext();
   const [bitDepth, setBitDepth] = useControlledState(controlledBitDepth, 8, onBitDepthChange);
   const [sampleReduction, setSampleReduction] = useControlledState(controlledSampleReduction, 1, onSampleReductionChange);
+  const [enabled, setEnabled] = useControlledState(controlledEnabled, true, onEnabledChange);
 
   const scriptNodeRef = useRef<ScriptProcessorNode | null>(null);
   const outputGainRef = useRef<GainNode | null>(null);
   const lastSampleRef = useRef<number>(0);
   const sampleCountRef = useRef<number>(0);
+  const bypassConnectionRef = useRef<boolean>(false);
 
   // Store current parameter values in refs so audio callback can access them
   const bitDepthRef = useRef<number>(bitDepth);
@@ -122,27 +131,53 @@ export const BitCrusher = React.forwardRef<BitCrusherHandle, BitCrusherProps>(({
     };
   }, [audioContext, label]);
 
-  // Handle input connection
+  // Handle input connection and bypass routing
   useEffect(() => {
-    if (!input.current || !scriptNodeRef.current) return;
+    if (!input.current || !scriptNodeRef.current || !outputGainRef.current) return;
 
-    input.current.gain.connect(scriptNodeRef.current);
+    const inputGain = input.current.gain;
+    const scriptNode = scriptNodeRef.current;
+    const outputGain = outputGainRef.current;
 
-    return () => {
-      if (input.current && scriptNodeRef.current) {
+    if (enabled) {
+      // Normal mode: input → bitcrusher → output
+      if (bypassConnectionRef.current) {
         try {
-          input.current.gain.disconnect(scriptNodeRef.current);
+          inputGain.disconnect(outputGain);
         } catch (e) {
           // Already disconnected
         }
+        bypassConnectionRef.current = false;
+      }
+      inputGain.connect(scriptNode);
+    } else {
+      // Bypass mode: input → output (skip bitcrusher)
+      try {
+        inputGain.disconnect(scriptNode);
+      } catch (e) {
+        // Already disconnected
+      }
+      inputGain.connect(outputGain);
+      bypassConnectionRef.current = true;
+    }
+
+    return () => {
+      try {
+        if (bypassConnectionRef.current) {
+          inputGain.disconnect(outputGain);
+        } else {
+          inputGain.disconnect(scriptNode);
+        }
+      } catch (e) {
+        // Already disconnected
       }
     };
-  }, [input.current?.audioNode ? String(input.current.audioNode) : 'null']);
+  }, [input.current?.audioNode ? String(input.current.audioNode) : 'null', enabled]);
 
   // Expose imperative handle
   useImperativeHandle(ref, () => ({
-    getState: () => ({ bitDepth, sampleReduction }),
-  }), [bitDepth, sampleReduction]);
+    getState: () => ({ bitDepth, sampleReduction, enabled }),
+  }), [bitDepth, sampleReduction, enabled]);
 
   // Render children with state
   if (children) {
@@ -151,6 +186,8 @@ export const BitCrusher = React.forwardRef<BitCrusherHandle, BitCrusherProps>(({
       setBitDepth,
       sampleReduction,
       setSampleReduction,
+      enabled,
+      setEnabled,
       isActive: !!output.current,
     })}</>;
   }

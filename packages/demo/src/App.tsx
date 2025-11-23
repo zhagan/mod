@@ -63,6 +63,7 @@ interface ModuleData {
   position: Position;
   ports: Port[];
   color: string;
+  enabled?: boolean;
 }
 
 interface Connection {
@@ -141,6 +142,7 @@ function ModularSynth() {
       position: position || { x: 100 + modules.length * 20, y: 100 + modules.length * 20 },
       ports,
       color: definition.color,
+      enabled: true,
     };
     setModules([...modules, newModule]);
   };
@@ -156,6 +158,18 @@ function ModularSynth() {
     setConnections(prev => prev.filter(c =>
       c.from.moduleId !== id && c.to.moduleId !== id
     ));
+  };
+
+  const toggleModuleEnabled = (id: string) => {
+    setModules(prev => prev.map(m =>
+      m.id === id ? { ...m, enabled: !m.enabled } : m
+    ));
+  };
+
+  // Check if a module type supports the enabled prop
+  const supportsEnabled = (moduleType: string): boolean => {
+    const definition = MODULE_DEFINITIONS[moduleType];
+    return definition && (definition.category === 'processor' || definition.category === 'mixer');
   };
 
   // Clear port position cache when modules move
@@ -504,12 +518,16 @@ function ModularSynth() {
               onPortMouseLeave={() => setHoveredPort(null)}
               isPortConnected={isPortConnected}
               hoveredPortId={hoveredPort?.moduleId === module.id ? hoveredPort.portId : undefined}
+              enabled={module.enabled}
+              onEnabledToggle={toggleModuleEnabled}
+              supportsEnabled={supportsEnabled(module.type)}
             >
               <ModuleRenderer
                 moduleType={module.type}
                 inputStreams={inputStreams}
                 outputStreams={outputStreams}
                 cvInputStreams={cvInputStreams}
+                enabled={module.enabled}
               />
             </ModuleWrapper>
           );

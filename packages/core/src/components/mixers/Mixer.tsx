@@ -6,6 +6,7 @@ import { useControlledState } from '../../hooks/useControlledState';
 export interface MixerHandle {
   getState: () => {
     levels: number[];
+    enabled: boolean;
   };
 }
 
@@ -13,6 +14,8 @@ export interface MixerRenderProps {
   levels: number[];
   setLevels: (levels: number[]) => void;
   setLevel: (index: number, value: number) => void;
+  enabled: boolean;
+  setEnabled: (value: boolean) => void;
   isActive: boolean;
 }
 
@@ -23,6 +26,8 @@ export interface MixerProps {
   // Controlled props
   levels?: number[];
   onLevelsChange?: (levels: number[]) => void;
+  enabled?: boolean;
+  onEnabledChange?: (enabled: boolean) => void;
   // Render props
   children?: (props: MixerRenderProps) => ReactNode;
 }
@@ -33,6 +38,8 @@ export const Mixer = React.forwardRef<MixerHandle, MixerProps>(({
   label = 'mixer',
   levels: controlledLevels,
   onLevelsChange,
+  enabled: controlledEnabled,
+  onEnabledChange,
   children,
 }, ref) => {
   const audioContext = useAudioContext();
@@ -40,10 +47,12 @@ export const Mixer = React.forwardRef<MixerHandle, MixerProps>(({
   // Initialize levels based on inputs length
   const defaultLevels = inputs.map(() => 1.0);
   const [levels, setLevels] = useControlledState(controlledLevels, defaultLevels, onLevelsChange);
+  const [enabled, setEnabled] = useControlledState(controlledEnabled, true, onEnabledChange);
 
   // Keep refs to nodes
   const inputGainsRef = useRef<GainNode[]>([]);
   const outputGainRef = useRef<GainNode | null>(null);
+  const bypassConnectionsRef = useRef<boolean[]>([]);
 
   // Create output gain and input gains once
   useEffect(() => {
@@ -62,6 +71,7 @@ export const Mixer = React.forwardRef<MixerHandle, MixerProps>(({
       return gain;
     });
     inputGainsRef.current = inputGains;
+    bypassConnectionsRef.current = inputs.map(() => false);
 
     // Connect all input gains to output
     inputGains.forEach(gain => {
@@ -87,33 +97,67 @@ export const Mixer = React.forwardRef<MixerHandle, MixerProps>(({
       output.current = null;
       inputGainsRef.current = [];
       outputGainRef.current = null;
+      bypassConnectionsRef.current = [];
     };
   }, [audioContext, label, inputs.length]);
 
-  // Handle input connections separately
+  // Handle input connections and bypass routing
   useEffect(() => {
-    if (!inputGainsRef.current.length) return;
+    if (!inputGainsRef.current.length || !outputGainRef.current) return;
+
+    const inputGains = inputGainsRef.current;
+    const outputGain = outputGainRef.current;
 
     inputs.forEach((input, index) => {
-      if (input.current && inputGainsRef.current[index]) {
-        // Connect new input
-        input.current.gain.connect(inputGainsRef.current[index]);
-      }
-    });
+      if (!input.current || !inputGains[index]) return;
 
-    // Cleanup when inputs change
-    return () => {
-      inputs.forEach((input, index) => {
-        if (input.current && inputGainsRef.current[index]) {
+      const inputGainNode = input.current.gain;
+      const channelGain = inputGains[index];
+
+      if (enabled) {
+        // Normal mode: inputs → channel gains → output
+        // Clean up bypass connection if active
+        if (bypassConnectionsRef.current[index]) {
           try {
-            input.current.gain.disconnect(inputGainsRef.current[index]);
+            inputGainNode.disconnect(outputGain);
           } catch (e) {
             // Already disconnected
           }
+          bypassConnectionsRef.current[index] = false;
+        }
+        inputGainNode.connect(channelGain);
+      } else {
+        // Bypass mode: connect all inputs directly to output
+        try {
+          inputGainNode.disconnect(channelGain);
+        } catch (e) {
+          // Already disconnected
+        }
+        inputGainNode.connect(outputGain);
+        bypassConnectionsRef.current[index] = true;
+      }
+    });
+
+    // Cleanup when inputs or enabled change
+    return () => {
+      inputs.forEach((input, index) => {
+        if (!input.current || !inputGains[index]) return;
+
+        const inputGainNode = input.current.gain;
+        const channelGain = inputGains[index];
+
+        try {
+          if (bypassConnectionsRef.current[index]) {
+            inputGainNode.disconnect(outputGain);
+          } else {
+            inputGainNode.disconnect(channelGain);
+          }
+        } catch (e) {
+          // Already disconnected
         }
       });
     };
-  }, [inputs]);
+  }, [inputs, enabled]);
 
   // Update levels when they change
   useEffect(() => {
@@ -136,8 +180,8 @@ export const Mixer = React.forwardRef<MixerHandle, MixerProps>(({
 
   // Expose imperative handle
   useImperativeHandle(ref, () => ({
-    getState: () => ({ levels }),
-  }), [levels]);
+    getState: () => ({ levels, enabled }),
+  }), [levels, enabled]);
 
   // Render children with state
   if (children) {
@@ -145,6 +189,8 @@ export const Mixer = React.forwardRef<MixerHandle, MixerProps>(({
       levels,
       setLevels,
       setLevel,
+      enabled,
+      setEnabled,
       isActive: !!output.current,
     })}</>;
   }

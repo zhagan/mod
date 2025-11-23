@@ -17,6 +17,8 @@ A phaser effect that modulates all-pass filters to create a sweeping, swirling s
 | `onFeedbackChange` | `(value: number) => void` | - | Callback when feedback changes |
 | `baseFreq` | `number` | `800` | Base frequency of the all-pass filters in Hz (controlled or initial value) |
 | `onBaseFreqChange` | `(value: number) => void` | - | Callback when baseFreq changes |
+| `enabled` | `boolean` | `true` | Whether the component is enabled or bypassed |
+| `onEnabledChange` | `(enabled: boolean) => void` | `-` | Callback when enabled state changes |
 | `children` | `function` | - | Render prop function |
 
 ## Render Props
@@ -33,6 +35,8 @@ When using the `children` render prop, the following controls are provided:
 | `setFeedback` | `(value: number) => void` | Update the feedback |
 | `baseFreq` | `number` | Current base frequency in Hz |
 | `setBaseFreq` | `(value: number) => void` | Update the base frequency |
+| `enabled` | `boolean` | Whether the component is enabled |
+| `setEnabled` | `(value: boolean) => void` | Toggle enabled/bypass state |
 | `isActive` | `boolean` | Whether the processor is active |
 
 ## Usage

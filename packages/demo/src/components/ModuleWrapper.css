@@ -49,6 +49,31 @@
   background: rgba(255, 255, 255, 0.3);
 }
 
+.module-wrapper-enabled-toggle {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+}
+
+.module-wrapper-enabled-toggle:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.enabled-toggle-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
 .module-wrapper-body {
   padding: 12px;
   display: flex;

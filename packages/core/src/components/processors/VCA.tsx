@@ -6,12 +6,15 @@ import { useControlledState } from '../../hooks/useControlledState';
 export interface VCAHandle {
   getState: () => {
     gain: number;
+    enabled: boolean;
   };
 }
 
 export interface VCARenderProps {
   gain: number;
   setGain: (value: number) => void;
+  enabled: boolean;
+  setEnabled: (value: boolean) => void;
   isActive: boolean;
 }
 
@@ -21,6 +24,8 @@ export interface VCAProps {
   label?: string;
   gain?: number;
   onGainChange?: (gain: number) => void;
+  enabled?: boolean;
+  onEnabledChange?: (enabled: boolean) => void;
   // CV inputs
   cv?: ModStreamRef;
   cvAmount?: number;
@@ -33,16 +38,20 @@ export const VCA = React.forwardRef<VCAHandle, VCAProps>(({
   label = 'vca',
   gain: controlledGain,
   onGainChange,
+  enabled: controlledEnabled,
+  onEnabledChange,
   cv,
   cvAmount = 1.0,
   children,
 }, ref) => {
   const audioContext = useAudioContext();
   const [gain, setGain] = useControlledState(controlledGain, 1.0, onGainChange);
+  const [enabled, setEnabled] = useControlledState(controlledEnabled, true, onEnabledChange);
 
   const gainNodeRef = useRef<GainNode | null>(null);
   const outputGainRef = useRef<GainNode | null>(null);
   const cvGainRef = useRef<GainNode | null>(null);
+  const bypassConnectionRef = useRef<boolean>(false);
 
   // Only recreate when specific input stream changes, not refs
   const inputKey = input.current?.audioNode ? String(input.current.audioNode) : 'null';
@@ -90,22 +99,48 @@ export const VCA = React.forwardRef<VCAHandle, VCAProps>(({
     };
   }, [audioContext, label]);
 
-  // Handle input connection
+  // Handle input connection and bypass routing
   useEffect(() => {
-    if (!input.current || !gainNodeRef.current) return;
+    if (!input.current || !gainNodeRef.current || !outputGainRef.current) return;
 
-    input.current.gain.connect(gainNodeRef.current);
+    const inputGain = input.current.gain;
+    const gainNode = gainNodeRef.current;
+    const outputGain = outputGainRef.current;
 
-    return () => {
-      if (input.current && gainNodeRef.current) {
+    if (enabled) {
+      // Normal mode: input → gain → output
+      if (bypassConnectionRef.current) {
         try {
-          input.current.gain.disconnect(gainNodeRef.current);
+          inputGain.disconnect(outputGain);
         } catch (e) {
           // Already disconnected
         }
+        bypassConnectionRef.current = false;
+      }
+      inputGain.connect(gainNode);
+    } else {
+      // Bypass mode: input → output (skip gain processing)
+      try {
+        inputGain.disconnect(gainNode);
+      } catch (e) {
+        // Already disconnected
+      }
+      inputGain.connect(outputGain);
+      bypassConnectionRef.current = true;
+    }
+
+    return () => {
+      try {
+        if (bypassConnectionRef.current) {
+          inputGain.disconnect(outputGain);
+        } else {
+          inputGain.disconnect(gainNode);
+        }
+      } catch (e) {
+        // Already disconnected
       }
     };
-  }, [inputKey]);
+  }, [inputKey, enabled]);
 
   // Handle CV input connection for gain modulation
   useEffect(() => {
@@ -148,14 +183,16 @@ export const VCA = React.forwardRef<VCAHandle, VCAProps>(({
 
   // Expose imperative handle
   useImperativeHandle(ref, () => ({
-    getState: () => ({ gain }),
-  }), [gain]);
+    getState: () => ({ gain, enabled }),
+  }), [gain, enabled]);
 
   // Render children with state
   if (children) {
     return <>{children({
       gain,
       setGain,
+      enabled,
+      setEnabled,
       isActive: !!output.current,
     })}</>;
   }

@@ -10,6 +10,7 @@ export interface EQHandle {
     highGain: number;
     lowFreq: number;
     highFreq: number;
+    enabled: boolean;
   };
 }
 
@@ -24,6 +25,8 @@ export interface EQRenderProps {
   setLowFreq: (value: number) => void;
   highFreq: number;
   setHighFreq: (value: number) => void;
+  enabled: boolean;
+  setEnabled: (value: boolean) => void;
   isActive: boolean;
 }
 
@@ -41,6 +44,8 @@ export interface EQProps {
   onLowFreqChange?: (value: number) => void;
   highFreq?: number;
   onHighFreqChange?: (value: number) => void;
+  enabled?: boolean;
+  onEnabledChange?: (enabled: boolean) => void;
   children?: (props: EQRenderProps) => ReactNode;
 }
 
@@ -58,6 +63,8 @@ export const EQ = React.forwardRef<EQHandle, EQProps>(({
   onLowFreqChange,
   highFreq: controlledHighFreq,
   onHighFreqChange,
+  enabled: controlledEnabled,
+  onEnabledChange,
   children,
 }, ref) => {
   const audioContext = useAudioContext();
@@ -66,11 +73,13 @@ export const EQ = React.forwardRef<EQHandle, EQProps>(({
   const [highGain, setHighGain] = useControlledState(controlledHighGain, 0, onHighGainChange);
   const [lowFreq, setLowFreq] = useControlledState(controlledLowFreq, 250, onLowFreqChange);
   const [highFreq, setHighFreq] = useControlledState(controlledHighFreq, 4000, onHighFreqChange);
+  const [enabled, setEnabled] = useControlledState(controlledEnabled, true, onEnabledChange);
 
   const lowShelfRef = useRef<BiquadFilterNode | null>(null);
   const midPeakRef = useRef<BiquadFilterNode | null>(null);
   const highShelfRef = useRef<BiquadFilterNode | null>(null);
   const outputGainRef = useRef<GainNode | null>(null);
+  const bypassConnectionRef = useRef<boolean>(false);
 
   // Create filter nodes once
   useEffect(() => {
@@ -131,22 +140,48 @@ export const EQ = React.forwardRef<EQHandle, EQProps>(({
     };
   }, [audioContext, label]);
 
-  // Handle input connection
+  // Handle input connection and bypass routing
   useEffect(() => {
-    if (!input.current || !lowShelfRef.current) return;
+    if (!input.current || !lowShelfRef.current || !outputGainRef.current) return;
 
-    input.current.gain.connect(lowShelfRef.current);
+    const inputGain = input.current.gain;
+    const lowShelf = lowShelfRef.current;
+    const outputGain = outputGainRef.current;
 
-    return () => {
-      if (input.current && lowShelfRef.current) {
+    if (enabled) {
+      // Normal mode: input → lowShelf (→ midPeak → highShelf) → output
+      if (bypassConnectionRef.current) {
         try {
-          input.current.gain.disconnect(lowShelfRef.current);
+          inputGain.disconnect(outputGain);
         } catch (e) {
           // Already disconnected
         }
+        bypassConnectionRef.current = false;
+      }
+      inputGain.connect(lowShelf);
+    } else {
+      // Bypass mode: input → output (skip EQ)
+      try {
+        inputGain.disconnect(lowShelf);
+      } catch (e) {
+        // Already disconnected
+      }
+      inputGain.connect(outputGain);
+      bypassConnectionRef.current = true;
+    }
+
+    return () => {
+      try {
+        if (bypassConnectionRef.current) {
+          inputGain.disconnect(outputGain);
+        } else {
+          inputGain.disconnect(lowShelf);
+        }
+      } catch (e) {
+        // Already disconnected
       }
     };
-  }, [input.current?.audioNode ? String(input.current.audioNode) : 'null']);
+  }, [input.current?.audioNode ? String(input.current.audioNode) : 'null', enabled]);
 
   // Update low shelf parameters
   useEffect(() => {
@@ -176,8 +211,8 @@ export const EQ = React.forwardRef<EQHandle, EQProps>(({
 
   // Expose imperative handle
   useImperativeHandle(ref, () => ({
-    getState: () => ({ lowGain, midGain, highGain, lowFreq, highFreq }),
-  }), [lowGain, midGain, highGain, lowFreq, highFreq]);
+    getState: () => ({ lowGain, midGain, highGain, lowFreq, highFreq, enabled }),
+  }), [lowGain, midGain, highGain, lowFreq, highFreq, enabled]);
 
   // Render children with state
   if (children) {
@@ -192,6 +227,8 @@ export const EQ = React.forwardRef<EQHandle, EQProps>(({
       setLowFreq,
       highFreq,
       setHighFreq,
+      enabled,
+      setEnabled,
       isActive: !!output.current,
     })}</>;
   }

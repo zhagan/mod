@@ -13,6 +13,8 @@ The `VCA` component controls the amplitude (volume) of an audio signal using a c
 | `onGainChange` | `(gain: number) => void` | - | Callback when gain changes |
 | `cv` | `ModStreamRef` | - | Optional CV input for gain modulation |
 | `cvAmount` | `number` | `1.0` | Amount of CV modulation to apply |
+| `enabled` | `boolean` | `true` | Enables/bypasses processing (true bypass) |
+| `onEnabledChange` | `(enabled: boolean) => void` | `-` | Callback when enabled state changes |
 | `children` | `function` | - | Render prop function receiving control props |
 
 ## Render Props
@@ -23,6 +25,8 @@ When using the `children` render prop, the following controls are provided:
 |----------|------|-------------|
 | `gain` | `number` | Current gain value (0-2+) |
 | `setGain` | `(value: number) => void` | Update the gain value |
+| `enabled` | `boolean` | Whether processing is enabled or bypassed |
+| `setEnabled` | `(value: boolean) => void` | Toggle enabled/bypass state |
 | `isActive` | `boolean` | Whether the VCA is active |
 
 ## Usage

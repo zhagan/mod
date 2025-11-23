@@ -7,6 +7,7 @@ export interface RingModulatorHandle {
   getState: () => {
     frequency: number;
     wet: number;
+    enabled: boolean;
   };
 }
 
@@ -15,6 +16,8 @@ export interface RingModulatorRenderProps {
   setFrequency: (value: number) => void;
   wet: number;
   setWet: (value: number) => void;
+  enabled: boolean;
+  setEnabled: (value: boolean) => void;
   isActive: boolean;
 }
 
@@ -26,6 +29,8 @@ export interface RingModulatorProps {
   onFrequencyChange?: (value: number) => void;
   wet?: number;
   onWetChange?: (value: number) => void;
+  enabled?: boolean;
+  onEnabledChange?: (enabled: boolean) => void;
   children?: (props: RingModulatorRenderProps) => ReactNode;
 }
 
@@ -37,17 +42,21 @@ export const RingModulator = React.forwardRef<RingModulatorHandle, RingModulator
   onFrequencyChange,
   wet: controlledWet,
   onWetChange,
+  enabled: controlledEnabled,
+  onEnabledChange,
   children,
 }, ref) => {
   const audioContext = useAudioContext();
   const [frequency, setFrequency] = useControlledState(controlledFrequency, 440, onFrequencyChange);
   const [wet, setWet] = useControlledState(controlledWet, 0.5, onWetChange);
+  const [enabled, setEnabled] = useControlledState(controlledEnabled, true, onEnabledChange);
 
   const dryGainRef = useRef<GainNode | null>(null);
   const wetGainRef = useRef<GainNode | null>(null);
   const carrierRef = useRef<OscillatorNode | null>(null);
   const modulatorGainRef = useRef<GainNode | null>(null);
   const outputGainRef = useRef<GainNode | null>(null);
+  const bypassConnectionRef = useRef<boolean>(false);
 
   // Create ring modulator nodes once
   useEffect(() => {
@@ -125,25 +134,52 @@ export const RingModulator = React.forwardRef<RingModulatorHandle, RingModulator
     };
   }, [audioContext, label]);
 
-  // Handle input connection
+  // Handle input connection and bypass routing
   useEffect(() => {
-    if (!input.current || !dryGainRef.current || !wetGainRef.current) return;
+    if (!input.current || !dryGainRef.current || !wetGainRef.current || !outputGainRef.current) return;
 
-    // Connect input to both dry and wet paths
-    input.current.gain.connect(dryGainRef.current);
-    input.current.gain.connect(wetGainRef.current);
+    const inputGain = input.current.gain;
+    const dryGain = dryGainRef.current;
+    const wetGain = wetGainRef.current;
+    const outputGain = outputGainRef.current;
 
-    return () => {
-      if (input.current && dryGainRef.current && wetGainRef.current) {
+    if (enabled) {
+      // Normal mode: input → dry + wet → output
+      if (bypassConnectionRef.current) {
         try {
-          input.current.gain.disconnect(dryGainRef.current);
-          input.current.gain.disconnect(wetGainRef.current);
+          inputGain.disconnect(outputGain);
         } catch (e) {
           // Already disconnected
         }
+        bypassConnectionRef.current = false;
+      }
+      inputGain.connect(dryGain);
+      inputGain.connect(wetGain);
+    } else {
+      // Bypass mode: input → output (skip ring modulation)
+      try {
+        inputGain.disconnect(dryGain);
+        inputGain.disconnect(wetGain);
+      } catch (e) {
+        // Already disconnected
+      }
+      inputGain.connect(outputGain);
+      bypassConnectionRef.current = true;
+    }
+
+    return () => {
+      try {
+        if (bypassConnectionRef.current) {
+          inputGain.disconnect(outputGain);
+        } else {
+          inputGain.disconnect(dryGain);
+          inputGain.disconnect(wetGain);
+        }
+      } catch (e) {
+        // Already disconnected
       }
     };
-  }, [input.current?.audioNode ? String(input.current.audioNode) : 'null']);
+  }, [input.current?.audioNode ? String(input.current.audioNode) : 'null', enabled]);
 
   // Update carrier frequency
   useEffect(() => {
@@ -164,8 +200,8 @@ export const RingModulator = React.forwardRef<RingModulatorHandle, RingModulator
 
   // Expose imperative handle
   useImperativeHandle(ref, () => ({
-    getState: () => ({ frequency, wet }),
-  }), [frequency, wet]);
+    getState: () => ({ frequency, wet, enabled }),
+  }), [frequency, wet, enabled]);
 
   // Render children with state
   if (children) {
@@ -174,6 +210,8 @@ export const RingModulator = React.forwardRef<RingModulatorHandle, RingModulator
       setFrequency,
       wet,
       setWet,
+      enabled,
+      setEnabled,
       isActive: !!output.current,
     })}</>;
   }

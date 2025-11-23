@@ -11,6 +11,8 @@ The `Distortion` component adds harmonic distortion and overdrive to audio signa
 | `label` | `string` | `'distortion'` | Label for the component in metadata |
 | `amount` | `number` | `50` | Distortion amount (controlled or initial value) |
 | `onAmountChange` | `(amount: number) => void` | `-` | Callback when amount changes |
+| `enabled` | `boolean` | `true` | Whether the component is enabled or bypassed |
+| `onEnabledChange` | `(enabled: boolean) => void` | `-` | Callback when enabled state changes |
 | `children` | `function` | - | Render prop function receiving control props |
 
 ## Render Props
@@ -21,6 +23,8 @@ When using the `children` render prop, the following controls are provided:
 |----------|------|-------------|
 | `amount` | `number` | Distortion amount (0-200) |
 | `setAmount` | `(value: number) => void` | Update the distortion amount |
+| `enabled` | `boolean` | Whether the component is enabled |
+| `setEnabled` | `(value: boolean) => void` | Toggle enabled/bypass state |
 | `isActive` | `boolean` | Whether the distortion is active |
 
 ## Usage
@@ -323,6 +327,46 @@ function App() {
 ```
 
 **Note:** The imperative handle provides read-only access via `getState()`. To control the component programmatically, use the controlled props pattern shown above.
+
+## Bypass/Enable
+
+The `enabled` prop allows you to bypass the component's processing. When `enabled` is `false`, the audio passes through directly without any processing, saving CPU resources. This implements a true bypass.
+
+### Usage
+
+```tsx
+import { Distortion } from '@mode-7/mod';
+import { useState } from 'react';
+
+function App() {
+  const [enabled, setEnabled] = useState(true);
+
+  return (
+    <Distortion
+      input={input}
+      output={output}
+      enabled={enabled}
+      onEnabledChange={setEnabled}
+    />
+  );
+}
+```
+
+### With Render Props
+
+```tsx
+<Distortion input={input} output={output}>
+  {({ enabled, setEnabled, amount, setAmount }) => (
+    <div>
+      <button onClick={() => setEnabled(!enabled)}>
+        {enabled ? 'Bypass' : 'Enable'}
+      </button>
+      {/* Other controls */}
+    </div>
+  )}
+</Distortion>
+```
+
 ## Important Notes
 
 ### Distortion Amount

@@ -9,6 +9,7 @@ export interface AutoWahHandle {
     baseFreq: number;
     maxFreq: number;
     Q: number;
+    enabled: boolean;
   };
 }
 
@@ -21,6 +22,8 @@ export interface AutoWahRenderProps {
   setMaxFreq: (value: number) => void;
   Q: number;
   setQ: (value: number) => void;
+  enabled: boolean;
+  setEnabled: (value: boolean) => void;
   isActive: boolean;
 }
 
@@ -36,6 +39,8 @@ export interface AutoWahProps {
   onMaxFreqChange?: (value: number) => void;
   Q?: number;
   onQChange?: (value: number) => void;
+  enabled?: boolean;
+  onEnabledChange?: (enabled: boolean) => void;
   children?: (props: AutoWahRenderProps) => ReactNode;
 }
 
@@ -51,6 +56,8 @@ export const AutoWah = React.forwardRef<AutoWahHandle, AutoWahProps>(({
   onMaxFreqChange,
   Q: controlledQ,
   onQChange,
+  enabled: controlledEnabled,
+  onEnabledChange,
   children,
 }, ref) => {
   const audioContext = useAudioContext();
@@ -58,11 +65,13 @@ export const AutoWah = React.forwardRef<AutoWahHandle, AutoWahProps>(({
   const [baseFreq, setBaseFreq] = useControlledState(controlledBaseFreq, 200, onBaseFreqChange);
   const [maxFreq, setMaxFreq] = useControlledState(controlledMaxFreq, 2000, onMaxFreqChange);
   const [Q, setQ] = useControlledState(controlledQ, 5, onQChange);
+  const [enabled, setEnabled] = useControlledState(controlledEnabled, true, onEnabledChange);
 
   const filterRef = useRef<BiquadFilterNode | null>(null);
   const scriptNodeRef = useRef<ScriptProcessorNode | null>(null);
   const outputGainRef = useRef<GainNode | null>(null);
   const envelopeRef = useRef<number>(0);
+  const bypassConnectionRef = useRef<boolean>(false);
 
   // Store current parameter values in refs so audio callback can access them
   const sensitivityRef = useRef<number>(sensitivity);
@@ -168,22 +177,48 @@ export const AutoWah = React.forwardRef<AutoWahHandle, AutoWahProps>(({
     };
   }, [audioContext, label]);
 
-  // Handle input connection
+  // Handle input connection and bypass routing
   useEffect(() => {
-    if (!input.current || !scriptNodeRef.current) return;
+    if (!input.current || !scriptNodeRef.current || !outputGainRef.current) return;
 
-    input.current.gain.connect(scriptNodeRef.current);
+    const inputGain = input.current.gain;
+    const scriptNode = scriptNodeRef.current;
+    const outputGain = outputGainRef.current;
 
-    return () => {
-      if (input.current && scriptNodeRef.current) {
+    if (enabled) {
+      // Normal mode: input → autowah → output
+      if (bypassConnectionRef.current) {
         try {
-          input.current.gain.disconnect(scriptNodeRef.current);
+          inputGain.disconnect(outputGain);
         } catch (e) {
           // Already disconnected
         }
+        bypassConnectionRef.current = false;
+      }
+      inputGain.connect(scriptNode);
+    } else {
+      // Bypass mode: input → output (skip autowah)
+      try {
+        inputGain.disconnect(scriptNode);
+      } catch (e) {
+        // Already disconnected
+      }
+      inputGain.connect(outputGain);
+      bypassConnectionRef.current = true;
+    }
+
+    return () => {
+      try {
+        if (bypassConnectionRef.current) {
+          inputGain.disconnect(outputGain);
+        } else {
+          inputGain.disconnect(scriptNode);
+        }
+      } catch (e) {
+        // Already disconnected
       }
     };
-  }, [input.current?.audioNode ? String(input.current.audioNode) : 'null']);
+  }, [input.current?.audioNode ? String(input.current.audioNode) : 'null', enabled]);
 
   // Update filter Q when it changes
   useEffect(() => {
@@ -194,8 +229,8 @@ export const AutoWah = React.forwardRef<AutoWahHandle, AutoWahProps>(({
 
   // Expose imperative handle
   useImperativeHandle(ref, () => ({
-    getState: () => ({ sensitivity, baseFreq, maxFreq, Q }),
-  }), [sensitivity, baseFreq, maxFreq, Q]);
+    getState: () => ({ sensitivity, baseFreq, maxFreq, Q, enabled }),
+  }), [sensitivity, baseFreq, maxFreq, Q, enabled]);
 
   // Render children with state
   if (children) {
@@ -208,6 +243,8 @@ export const AutoWah = React.forwardRef<AutoWahHandle, AutoWahProps>(({
       setMaxFreq,
       Q,
       setQ,
+      enabled,
+      setEnabled,
       isActive: !!output.current,
     })}</>;
   }

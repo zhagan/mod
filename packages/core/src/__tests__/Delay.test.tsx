@@ -669,4 +669,172 @@ describe('Delay', () => {
       expect(getByText('Feedback: 1.2')).toBeInTheDocument();
     });
   });
+
+  describe('Enabled/Bypass Functionality', () => {
+    it('should default to enabled=true', () => {
+      const input = createMockStreamRef();
+      const output = createMockStreamRef();
+      const { getByText } = render(
+        <Delay input={input} output={output}>
+          {({ enabled }) => <span>Enabled: {enabled ? 'yes' : 'no'}</span>}
+        </Delay>
+      );
+
+      expect(getByText('Enabled: yes')).toBeInTheDocument();
+    });
+
+    it('should accept controlled enabled prop', () => {
+      const input = createMockStreamRef();
+      const output = createMockStreamRef();
+      const { getByText } = render(
+        <Delay input={input} output={output} enabled={false}>
+          {({ enabled }) => <span>Enabled: {enabled ? 'yes' : 'no'}</span>}
+        </Delay>
+      );
+
+      expect(getByText('Enabled: no')).toBeInTheDocument();
+    });
+
+    it('should allow toggling enabled through render props', async () => {
+      const input = createMockStreamRef();
+      const output = createMockStreamRef();
+      const { getByText, getByRole } = render(
+        <Delay input={input} output={output}>
+          {({ enabled, setEnabled }) => (
+            <div>
+              <span>Enabled: {enabled ? 'yes' : 'no'}</span>
+              <button onClick={() => setEnabled(!enabled)}>Toggle</button>
+            </div>
+          )}
+        </Delay>
+      );
+
+      expect(getByText('Enabled: yes')).toBeInTheDocument();
+
+      const button = getByRole('button', { name: /toggle/i });
+
+      act(() => {
+        button.click();
+      });
+
+      await waitFor(() => {
+        expect(getByText('Enabled: no')).toBeInTheDocument();
+      });
+
+      act(() => {
+        button.click();
+      });
+
+      await waitFor(() => {
+        expect(getByText('Enabled: yes')).toBeInTheDocument();
+      });
+    });
+
+    it('should call onEnabledChange when enabled changes', async () => {
+      const input = createMockStreamRef();
+      const output = createMockStreamRef();
+      const onEnabledChange = jest.fn();
+
+      const { getByRole } = render(
+        <Delay
+          input={input}
+          output={output}
+          enabled={true}
+          onEnabledChange={onEnabledChange}
+        >
+          {({ setEnabled }) => (
+            <button onClick={() => setEnabled(false)}>Disable</button>
+          )}
+        </Delay>
+      );
+
+      act(() => {
+        getByRole('button').click();
+      });
+
+      await waitFor(() => {
+        expect(onEnabledChange).toHaveBeenCalledWith(false);
+      });
+    });
+
+    it('should expose enabled in getState', () => {
+      const TestComponent = () => {
+        const input = createMockStreamRef();
+        const output = createMockStreamRef();
+        const ref = useRef<DelayHandle>(null);
+
+        const handleClick = () => {
+          const state = ref.current?.getState();
+          expect(state?.enabled).toBe(true);
+        };
+
+        return (
+          <>
+            <Delay ref={ref} input={input} output={output} />
+            <button onClick={handleClick}>Get State</button>
+          </>
+        );
+      };
+
+      const { getByRole } = render(<TestComponent />);
+
+      act(() => {
+        getByRole('button').click();
+      });
+    });
+
+    it('should expose enabled=false in getState when disabled', () => {
+      const TestComponent = () => {
+        const input = createMockStreamRef();
+        const output = createMockStreamRef();
+        const ref = useRef<DelayHandle>(null);
+
+        const handleClick = () => {
+          const state = ref.current?.getState();
+          expect(state?.enabled).toBe(false);
+        };
+
+        return (
+          <>
+            <Delay ref={ref} input={input} output={output} enabled={false} />
+            <button onClick={handleClick}>Get State</button>
+          </>
+        );
+      };
+
+      const { getByRole } = render(<TestComponent />);
+
+      act(() => {
+        getByRole('button').click();
+      });
+    });
+
+    it('should maintain audio graph structure when toggling enabled', async () => {
+      const input = createMockStreamRef();
+      const output = createMockStreamRef();
+      const { getByRole } = render(
+        <Delay input={input} output={output}>
+          {({ setEnabled }) => (
+            <button onClick={() => setEnabled(false)}>Disable</button>
+          )}
+        </Delay>
+      );
+
+      // Output should be set regardless of enabled state
+      expect(output.current).toBeDefined();
+      expect(output.current?.audioNode).toBeDefined();
+      expect(output.current?.gain).toBeDefined();
+
+      act(() => {
+        getByRole('button').click();
+      });
+
+      await waitFor(() => {
+        // Output should still be valid after disabling
+        expect(output.current).toBeDefined();
+        expect(output.current?.audioNode).toBeDefined();
+        expect(output.current?.gain).toBeDefined();
+      });
+    });
+  });
 });

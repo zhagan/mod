@@ -9,6 +9,7 @@ export interface CrossFadeHandle {
   getState: () => {
     mix: number;
     mode: CrossFadeMode;
+    enabled: boolean;
   };
 }
 
@@ -17,6 +18,8 @@ export interface CrossFadeRenderProps {
   setMix: (value: number) => void;
   mode: CrossFadeMode;
   setMode: (mode: CrossFadeMode) => void;
+  enabled: boolean;
+  setEnabled: (value: boolean) => void;
   isActive: boolean;
 }
 
@@ -29,6 +32,8 @@ export interface CrossFadeProps {
   onMixChange?: (mix: number) => void;
   mode?: CrossFadeMode;
   onModeChange?: (mode: CrossFadeMode) => void;
+  enabled?: boolean;
+  onEnabledChange?: (enabled: boolean) => void;
   // Render props
   children?: (props: CrossFadeRenderProps) => ReactNode;
 }
@@ -82,11 +87,14 @@ export const CrossFade = React.forwardRef<CrossFadeHandle, CrossFadeProps>(({
   onMixChange,
   mode: controlledMode,
   onModeChange,
+  enabled: controlledEnabled,
+  onEnabledChange,
   children,
 }, ref) => {
   const audioContext = useAudioContext();
   const [mix, setMix] = useControlledState(controlledMix, 0.5, onMixChange);
   const [mode, setMode] = useControlledState<CrossFadeMode>(controlledMode, 'equal-power', onModeChange);
+  const [enabled, setEnabled] = useControlledState(controlledEnabled, true, onEnabledChange);
 
   const [inputA, inputB] = inputs;
 
@@ -94,6 +102,8 @@ export const CrossFade = React.forwardRef<CrossFadeHandle, CrossFadeProps>(({
   const gainARef = useRef<GainNode | null>(null);
   const gainBRef = useRef<GainNode | null>(null);
   const outputGainRef = useRef<GainNode | null>(null);
+  const bypassConnectionARef = useRef<boolean>(false);
+  const bypassConnectionBRef = useRef<boolean>(false);
 
   // Create keys that change when input streams change (like processors do)
   const inputAKey = inputA.current?.audioNode ? String(inputA.current.audioNode) : 'null';
@@ -148,39 +158,95 @@ export const CrossFade = React.forwardRef<CrossFadeHandle, CrossFadeProps>(({
     };
   }, [audioContext, label]);
 
-  // Handle input connections separately
-  // Use inputKeys that change when the actual audio nodes change (like processors do)
+  // Handle input connections and bypass routing
   useEffect(() => {
-    if (!gainARef.current || !gainBRef.current) return;
+    if (!gainARef.current || !gainBRef.current || !outputGainRef.current) return;
 
-    // Connect input A to its gain
-    if (inputA.current?.gain) {
-      inputA.current.gain.connect(gainARef.current);
-    }
+    const gainA = gainARef.current;
+    const gainB = gainBRef.current;
+    const outputGain = outputGainRef.current;
 
-    // Connect input B to its gain
-    if (inputB.current?.gain) {
-      inputB.current.gain.connect(gainBRef.current);
+    if (enabled) {
+      // Normal mode: inputs → gains → output
+      // Clean up any bypass connections first
+      if (bypassConnectionARef.current && inputA.current?.gain) {
+        try {
+          inputA.current.gain.disconnect(outputGain);
+        } catch (e) {
+          // Already disconnected
+        }
+        bypassConnectionARef.current = false;
+      }
+      if (bypassConnectionBRef.current && inputB.current?.gain) {
+        try {
+          inputB.current.gain.disconnect(outputGain);
+        } catch (e) {
+          // Already disconnected
+        }
+        bypassConnectionBRef.current = false;
+      }
+
+      // Connect inputs to their respective gains
+      if (inputA.current?.gain) {
+        inputA.current.gain.connect(gainA);
+      }
+      if (inputB.current?.gain) {
+        inputB.current.gain.connect(gainB);
+      }
+    } else {
+      // Bypass mode: connect both inputs directly to output
+      // Disconnect from gain nodes
+      if (inputA.current?.gain) {
+        try {
+          inputA.current.gain.disconnect(gainA);
+        } catch (e) {
+          // Already disconnected
+        }
+        inputA.current.gain.connect(outputGain);
+        bypassConnectionARef.current = true;
+      }
+      if (inputB.current?.gain) {
+        try {
+          inputB.current.gain.disconnect(gainB);
+        } catch (e) {
+          // Already disconnected
+        }
+        inputB.current.gain.connect(outputGain);
+        bypassConnectionBRef.current = true;
+      }
     }
 
     return () => {
-      // Disconnect when inputs change
-      if (inputA.current?.gain && gainARef.current) {
+      // Cleanup based on current state
+      if (bypassConnectionARef.current && inputA.current?.gain) {
         try {
-          inputA.current.gain.disconnect(gainARef.current);
+          inputA.current.gain.disconnect(outputGain);
+        } catch (e) {
+          // Already disconnected
+        }
+      } else if (inputA.current?.gain && gainA) {
+        try {
+          inputA.current.gain.disconnect(gainA);
         } catch (e) {
           // Already disconnected
         }
       }
-      if (inputB.current?.gain && gainBRef.current) {
+
+      if (bypassConnectionBRef.current && inputB.current?.gain) {
         try {
-          inputB.current.gain.disconnect(gainBRef.current);
+          inputB.current.gain.disconnect(outputGain);
+        } catch (e) {
+          // Already disconnected
+        }
+      } else if (inputB.current?.gain && gainB) {
+        try {
+          inputB.current.gain.disconnect(gainB);
         } catch (e) {
           // Already disconnected
         }
       }
     };
-  }, [inputAKey, inputBKey]); // Depend on keys that change when audioNodes change!
+  }, [inputAKey, inputBKey, enabled]);
 
   // Update mix and mode when they change
   useEffect(() => {
@@ -194,8 +260,8 @@ export const CrossFade = React.forwardRef<CrossFadeHandle, CrossFadeProps>(({
 
   // Expose imperative handle
   useImperativeHandle(ref, () => ({
-    getState: () => ({ mix, mode }),
-  }), [mix, mode]);
+    getState: () => ({ mix, mode, enabled }),
+  }), [mix, mode, enabled]);
 
   // Render children with state
   if (children) {
@@ -204,6 +270,8 @@ export const CrossFade = React.forwardRef<CrossFadeHandle, CrossFadeProps>(({
       setMix,
       mode,
       setMode,
+      enabled,
+      setEnabled,
       isActive: !!output.current,
     })}</>;
   }

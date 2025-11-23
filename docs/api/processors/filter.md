@@ -25,6 +25,8 @@ The `Filter` component applies frequency-based filtering to audio signals. It su
 | `onGainChange` | `(gain: number) => void` | `-` | Callback when gain changes |
 | `cv` | `ModStreamRef` | `-` | Optional CV input for frequency modulation |
 | `cvAmount` | `number` | `1000` | Amount of CV modulation to apply |
+| `enabled` | `boolean` | `true` | Enables/bypasses processing (true bypass) |
+| `onEnabledChange` | `(enabled: boolean) => void` | `-` | Callback when enabled state changes |
 | `children` | `function` | - | Render prop function receiving control props |
 
 ### Filter Types
@@ -52,6 +54,8 @@ When using the `children` render prop, the following controls are provided:
 | `setType` | `(value: BiquadFilterType) => void` | Update the filter type |
 | `gain` | `number` | Current gain in dB |
 | `setGain` | `(value: number) => void` | Update the gain |
+| `enabled` | `boolean` | Whether processing is enabled or bypassed |
+| `setEnabled` | `(value: boolean) => void` | Toggle enabled/bypass state |
 | `isActive` | `boolean` | Whether the filter is active |
 
 ## Usage

@@ -60,6 +60,7 @@ interface ModuleRendererProps {
   inputStreams: (React.RefObject<any> | null)[];
   outputStreams: React.RefObject<any>[];
   cvInputStreams: { [key: string]: React.RefObject<any> | null };
+  enabled?: boolean;
 }
 
 export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
@@ -67,6 +68,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
   inputStreams,
   outputStreams,
   cvInputStreams,
+  enabled = true,
 }) => {
   const input = inputStreams[0];
   const input2 = inputStreams[1];
@@ -238,7 +240,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Filter':
       return output ? (
-        <Filter input={input || { current: null }} output={output} cv={cv}>
+        <Filter input={input || { current: null }} output={output} cv={cv} enabled={enabled}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
               <XYPad
@@ -280,7 +282,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Delay':
       return output ? (
-        <Delay input={input || { current: null }} output={output}>
+        <Delay input={input || { current: null }} output={output} enabled={enabled}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <ModUISlider
@@ -317,7 +319,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Reverb':
       return output ? (
-        <Reverb input={input || { current: null }} output={output}>
+        <Reverb input={input || { current: null }} output={output} enabled={enabled}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <ModUISlider
@@ -354,7 +356,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Compressor':
       return output ? (
-        <Compressor input={input || { current: null }} output={output}>
+        <Compressor input={input || { current: null }} output={output} enabled={enabled}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <ModUISlider
@@ -382,7 +384,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Distortion':
       return output ? (
-        <Distortion input={input || { current: null }} output={output}>
+        <Distortion input={input || { current: null }} output={output} enabled={enabled}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <ModUISlider
@@ -401,7 +403,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Panner':
       return output ? (
-        <Panner input={input || { current: null }} output={output} cv={cv}>
+        <Panner input={input || { current: null }} output={output} cv={cv} enabled={enabled}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <ModUISlider
@@ -420,7 +422,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'CrossFade':
       return output ? (
-        <CrossFade inputs={[input || { current: null }, input2 || { current: null }]} output={output}>
+        <CrossFade inputs={[input || { current: null }, input2 || { current: null }]} output={output} enabled={enabled}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <ModUISlider
@@ -457,7 +459,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
           inputStreams[1] || { current: null },
           inputStreams[2] || { current: null },
           inputStreams[3] || { current: null }
-        ]} output={output}>
+        ]} output={output} enabled={enabled}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {controls.levels.map((level, i) => (
@@ -479,7 +481,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'EQ':
       return output ? (
-        <EQ input={input || { current: null }} output={output}>
+        <EQ input={input || { current: null }} output={output} enabled={enabled}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <ModUISlider
@@ -516,7 +518,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Chorus':
       return output ? (
-        <Chorus input={input || { current: null }} output={output}>
+        <Chorus input={input || { current: null }} output={output} enabled={enabled}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
               <XYPad
@@ -552,7 +554,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Phaser':
       return output ? (
-        <Phaser input={input || { current: null }} output={output}>
+        <Phaser input={input || { current: null }} output={output} enabled={enabled}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
               <XYPad
@@ -588,7 +590,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Flanger':
       return output ? (
-        <Flanger input={input || { current: null }} output={output}>
+        <Flanger input={input || { current: null }} output={output} enabled={enabled}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
               <XYPad
@@ -624,7 +626,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Tremolo':
       return output ? (
-        <Tremolo input={input || { current: null }} output={output}>
+        <Tremolo input={input || { current: null }} output={output} enabled={enabled}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
               <XYPad
@@ -651,7 +653,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'BitCrusher':
       return output ? (
-        <BitCrusher input={input || { current: null }} output={output}>
+        <BitCrusher input={input || { current: null }} output={output} enabled={enabled}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <ModUISlider
@@ -679,7 +681,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Limiter':
       return output ? (
-        <Limiter input={input || { current: null }} output={output}>
+        <Limiter input={input || { current: null }} output={output} enabled={enabled}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <ModUISlider
@@ -707,7 +709,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Gate':
       return output ? (
-        <Gate input={input || { current: null }} output={output}>
+        <Gate input={input || { current: null }} output={output} enabled={enabled}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <ModUISlider
@@ -744,7 +746,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'AutoWah':
       return output ? (
-        <AutoWah input={input || { current: null }} output={output}>
+        <AutoWah input={input || { current: null }} output={output} enabled={enabled}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <ModUISlider
@@ -781,7 +783,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'RingModulator':
       return output ? (
-        <RingModulator input={input || { current: null }} output={output}>
+        <RingModulator input={input || { current: null }} output={output} enabled={enabled}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <ModUISlider
@@ -809,7 +811,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'VCA':
       return output ? (
-        <VCA input={input || { current: null }} output={output} cv={cv}>
+        <VCA input={input || { current: null }} output={output} cv={cv} enabled={enabled}>
           {(controls) => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <ModUISlider

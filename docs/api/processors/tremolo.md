@@ -13,6 +13,8 @@ Amplitude modulation effect that creates rhythmic volume variations in the audio
 | `onRateChange` | `(value: number) => void` | - | Callback when rate changes |
 | `depth` | `number` | `0.5` | Depth of the amplitude modulation (0-1) (controlled or initial value) |
 | `onDepthChange` | `(value: number) => void` | - | Callback when depth changes |
+| `enabled` | `boolean` | `true` | Enables/bypasses processing (true bypass) |
+| `onEnabledChange` | `(enabled: boolean) => void` | `-` | Callback when enabled state changes |
 | `children` | `function` | - | Render prop function |
 
 ## Render Props
@@ -25,6 +27,8 @@ When using the `children` render prop, the following controls are provided:
 | `setRate` | `(value: number) => void` | Update the rate |
 | `depth` | `number` | Current depth (0-1) |
 | `setDepth` | `(value: number) => void` | Update the depth |
+| `enabled` | `boolean` | Whether processing is enabled or bypassed |
+| `setEnabled` | `(value: boolean) => void` | Toggle enabled/bypass state |
 | `isActive` | `boolean` | Whether the processor is active |
 
 ## Usage

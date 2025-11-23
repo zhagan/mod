@@ -13,6 +13,8 @@ Ring modulation effect that multiplies the input signal with a sine wave oscilla
 | `onFrequencyChange` | `(value: number) => void` | - | Callback when frequency changes |
 | `wet` | `number` | `0.5` | Wet/dry mix (0-1) (controlled or initial value) |
 | `onWetChange` | `(value: number) => void` | - | Callback when wet changes |
+| `enabled` | `boolean` | `true` | Enables/bypasses processing (true bypass) |
+| `onEnabledChange` | `(enabled: boolean) => void` | `-` | Callback when enabled state changes |
 | `children` | `function` | - | Render prop function |
 
 ## Render Props
@@ -25,6 +27,8 @@ When using the `children` render prop, the following controls are provided:
 | `setFrequency` | `(value: number) => void` | Update the frequency |
 | `wet` | `number` | Current wet/dry mix (0-1) |
 | `setWet` | `(value: number) => void` | Update the wet mix |
+| `enabled` | `boolean` | Whether processing is enabled or bypassed |
+| `setEnabled` | `(value: boolean) => void` | Toggle enabled/bypass state |
 | `isActive` | `boolean` | Whether the processor is active |
 
 ## Usage

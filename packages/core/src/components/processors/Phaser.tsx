@@ -9,6 +9,7 @@ export interface PhaserHandle {
     depth: number;
     feedback: number;
     baseFreq: number;
+    enabled: boolean;
   };
 }
 
@@ -21,6 +22,8 @@ export interface PhaserRenderProps {
   setFeedback: (value: number) => void;
   baseFreq: number;
   setBaseFreq: (value: number) => void;
+  enabled: boolean;
+  setEnabled: (value: boolean) => void;
   isActive: boolean;
 }
 
@@ -36,6 +39,8 @@ export interface PhaserProps {
   onFeedbackChange?: (value: number) => void;
   baseFreq?: number;
   onBaseFreqChange?: (value: number) => void;
+  enabled?: boolean;
+  onEnabledChange?: (enabled: boolean) => void;
   children?: (props: PhaserRenderProps) => ReactNode;
 }
 
@@ -51,6 +56,8 @@ export const Phaser = React.forwardRef<PhaserHandle, PhaserProps>(({
   onFeedbackChange,
   baseFreq: controlledBaseFreq,
   onBaseFreqChange,
+  enabled: controlledEnabled,
+  onEnabledChange,
   children,
 }, ref) => {
   const audioContext = useAudioContext();
@@ -58,12 +65,14 @@ export const Phaser = React.forwardRef<PhaserHandle, PhaserProps>(({
   const [depth, setDepth] = useControlledState(controlledDepth, 500, onDepthChange);
   const [feedback, setFeedback] = useControlledState(controlledFeedback, 0.5, onFeedbackChange);
   const [baseFreq, setBaseFreq] = useControlledState(controlledBaseFreq, 800, onBaseFreqChange);
+  const [enabled, setEnabled] = useControlledState(controlledEnabled, true, onEnabledChange);
 
   const filtersRef = useRef<BiquadFilterNode[]>([]);
   const feedbackGainRef = useRef<GainNode | null>(null);
   const lfoRef = useRef<OscillatorNode | null>(null);
   const lfoGainRef = useRef<GainNode | null>(null);
   const outputGainRef = useRef<GainNode | null>(null);
+  const bypassConnectionRef = useRef<boolean>(false);
 
   // Create phaser nodes once
   useEffect(() => {
@@ -152,23 +161,48 @@ export const Phaser = React.forwardRef<PhaserHandle, PhaserProps>(({
     };
   }, [audioContext, label]);
 
-  // Handle input connection
+  // Handle input connection and bypass routing
   useEffect(() => {
-    if (!input.current || filtersRef.current.length === 0) return;
+    if (!input.current || filtersRef.current.length === 0 || !outputGainRef.current) return;
 
+    const inputGain = input.current.gain;
     const firstFilter = filtersRef.current[0];
-    input.current.gain.connect(firstFilter);
+    const outputGain = outputGainRef.current;
 
-    return () => {
-      if (input.current && firstFilter) {
+    if (enabled) {
+      // Normal mode: input → phaser → output
+      if (bypassConnectionRef.current) {
         try {
-          input.current.gain.disconnect(firstFilter);
+          inputGain.disconnect(outputGain);
         } catch (e) {
           // Already disconnected
         }
+        bypassConnectionRef.current = false;
+      }
+      inputGain.connect(firstFilter);
+    } else {
+      // Bypass mode: input → output (skip phaser)
+      try {
+        inputGain.disconnect(firstFilter);
+      } catch (e) {
+        // Already disconnected
+      }
+      inputGain.connect(outputGain);
+      bypassConnectionRef.current = true;
+    }
+
+    return () => {
+      try {
+        if (bypassConnectionRef.current) {
+          inputGain.disconnect(outputGain);
+        } else {
+          inputGain.disconnect(firstFilter);
+        }
+      } catch (e) {
+        // Already disconnected
       }
     };
-  }, [input.current?.audioNode ? String(input.current.audioNode) : 'null']);
+  }, [input.current?.audioNode ? String(input.current.audioNode) : 'null', enabled]);
 
   // Update LFO rate
   useEffect(() => {
@@ -200,8 +234,8 @@ export const Phaser = React.forwardRef<PhaserHandle, PhaserProps>(({
 
   // Expose imperative handle
   useImperativeHandle(ref, () => ({
-    getState: () => ({ rate, depth, feedback, baseFreq }),
-  }), [rate, depth, feedback, baseFreq]);
+    getState: () => ({ rate, depth, feedback, baseFreq, enabled }),
+  }), [rate, depth, feedback, baseFreq, enabled]);
 
   // Render children with state
   if (children) {
@@ -214,6 +248,8 @@ export const Phaser = React.forwardRef<PhaserHandle, PhaserProps>(({
       setFeedback,
       baseFreq,
       setBaseFreq,
+      enabled,
+      setEnabled,
       isActive: !!output.current,
     })}</>;
   }

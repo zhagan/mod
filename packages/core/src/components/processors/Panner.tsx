@@ -6,12 +6,15 @@ import { useControlledState } from '../../hooks/useControlledState';
 export interface PannerHandle {
   getState: () => {
     pan: number;
+    enabled: boolean;
   };
 }
 
 export interface PannerRenderProps {
   pan: number;
   setPan: (value: number) => void;
+  enabled: boolean;
+  setEnabled: (value: boolean) => void;
   isActive: boolean;
 }
 
@@ -21,6 +24,8 @@ export interface PannerProps {
   label?: string;
   pan?: number;
   onPanChange?: (pan: number) => void;
+  enabled?: boolean;
+  onEnabledChange?: (enabled: boolean) => void;
   // CV inputs
   cv?: ModStreamRef;
   cvAmount?: number;
@@ -33,16 +38,20 @@ export const Panner = React.forwardRef<PannerHandle, PannerProps>(({
   label = 'panner',
   pan: controlledPan,
   onPanChange,
+  enabled: controlledEnabled,
+  onEnabledChange,
   cv,
   cvAmount = 0.5,
   children,
 }, ref) => {
   const audioContext = useAudioContext();
   const [pan, setPan] = useControlledState(controlledPan, 0, onPanChange);
+  const [enabled, setEnabled] = useControlledState(controlledEnabled, true, onEnabledChange);
 
   const pannerNodeRef = useRef<StereoPannerNode | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
   const cvGainRef = useRef<GainNode | null>(null);
+  const bypassConnectionRef = useRef<boolean>(false);
 
   // Only recreate when specific input stream changes, not refs
   const inputKey = input.current?.audioNode ? String(input.current.audioNode) : 'null';
@@ -90,22 +99,48 @@ export const Panner = React.forwardRef<PannerHandle, PannerProps>(({
     };
   }, [audioContext, label]);
 
-  // Handle input connection
+  // Handle input connection and bypass routing
   useEffect(() => {
-    if (!input.current || !pannerNodeRef.current) return;
+    if (!input.current || !pannerNodeRef.current || !gainNodeRef.current) return;
 
-    input.current.gain.connect(pannerNodeRef.current);
+    const inputGain = input.current.gain;
+    const pannerNode = pannerNodeRef.current;
+    const outputGain = gainNodeRef.current;
 
-    return () => {
-      if (input.current && pannerNodeRef.current) {
+    if (enabled) {
+      // Normal mode: input → panner → output
+      if (bypassConnectionRef.current) {
         try {
-          input.current.gain.disconnect(pannerNodeRef.current);
+          inputGain.disconnect(outputGain);
         } catch (e) {
           // Already disconnected
         }
+        bypassConnectionRef.current = false;
+      }
+      inputGain.connect(pannerNode);
+    } else {
+      // Bypass mode: input → output (skip panner)
+      try {
+        inputGain.disconnect(pannerNode);
+      } catch (e) {
+        // Already disconnected
+      }
+      inputGain.connect(outputGain);
+      bypassConnectionRef.current = true;
+    }
+
+    return () => {
+      try {
+        if (bypassConnectionRef.current) {
+          inputGain.disconnect(outputGain);
+        } else {
+          inputGain.disconnect(pannerNode);
+        }
+      } catch (e) {
+        // Already disconnected
       }
     };
-  }, [inputKey]);
+  }, [inputKey, enabled]);
 
   // Handle CV input connection for pan modulation
   useEffect(() => {
@@ -148,14 +183,16 @@ export const Panner = React.forwardRef<PannerHandle, PannerProps>(({
 
   // Expose imperative handle
   useImperativeHandle(ref, () => ({
-    getState: () => ({ pan }),
-  }), [pan]);
+    getState: () => ({ pan, enabled }),
+  }), [pan, enabled]);
 
   // Render children with state
   if (children) {
     return <>{children({
       pan,
       setPan,
+      enabled,
+      setEnabled,
       isActive: !!output.current,
     })}</>;
   }

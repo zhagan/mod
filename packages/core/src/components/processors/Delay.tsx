@@ -8,6 +8,7 @@ export interface DelayHandle {
     time: number;
     feedback: number;
     wet: number;
+    enabled: boolean;
   };
 }
 
@@ -18,6 +19,8 @@ export interface DelayRenderProps {
   setFeedback: (value: number) => void;
   wet: number;
   setWet: (value: number) => void;
+  enabled: boolean;
+  setEnabled: (value: boolean) => void;
   isActive: boolean;
 }
 
@@ -31,6 +34,8 @@ export interface DelayProps {
   onFeedbackChange?: (feedback: number) => void;
   wet?: number;
   onWetChange?: (wet: number) => void;
+  enabled?: boolean;
+  onEnabledChange?: (enabled: boolean) => void;
   children?: (props: DelayRenderProps) => ReactNode;
 }
 
@@ -44,12 +49,15 @@ export const Delay = React.forwardRef<DelayHandle, DelayProps>(({
   onFeedbackChange,
   wet: controlledWet,
   onWetChange,
+  enabled: controlledEnabled,
+  onEnabledChange,
   children,
 }, ref) => {
   const audioContext = useAudioContext();
   const [time, setTime] = useControlledState(controlledTime, 0.5, onTimeChange);
   const [feedback, setFeedback] = useControlledState(controlledFeedback, 0.3, onFeedbackChange);
   const [wet, setWet] = useControlledState(controlledWet, 0.5, onWetChange);
+  const [enabled, setEnabled] = useControlledState(controlledEnabled, true, onEnabledChange);
 
   // Track input changes
   const inputKey = input.current?.audioNode ? String(input.current.audioNode) : 'null';
@@ -58,6 +66,8 @@ export const Delay = React.forwardRef<DelayHandle, DelayProps>(({
   const feedbackGainRef = useRef<GainNode | null>(null);
   const wetGainRef = useRef<GainNode | null>(null);
   const dryGainRef = useRef<GainNode | null>(null);
+  const outputGainRef = useRef<GainNode | null>(null);
+  const bypassConnectionRef = useRef<boolean>(false);
 
   // Create nodes once
   useEffect(() => {
@@ -85,6 +95,7 @@ export const Delay = React.forwardRef<DelayHandle, DelayProps>(({
     // Create output gain
     const outputGain = audioContext.createGain();
     outputGain.gain.value = 1.0;
+    outputGainRef.current = outputGain;
 
     // Connect delay feedback loop
     delayNode.connect(feedbackGain);
@@ -124,32 +135,56 @@ export const Delay = React.forwardRef<DelayHandle, DelayProps>(({
       feedbackGainRef.current = null;
       wetGainRef.current = null;
       dryGainRef.current = null;
+      outputGainRef.current = null;
     };
   }, [audioContext, label]);
 
-  // Handle input connection
+  // Handle input connection and bypass routing
   useEffect(() => {
-    if (!input.current || !delayNodeRef.current || !dryGainRef.current) return;
+    if (!input.current || !delayNodeRef.current || !dryGainRef.current || !outputGainRef.current) return;
 
-    const currentInput = input.current;
+    const inputGain = input.current.gain;
     const delayNode = delayNodeRef.current;
     const dryGain = dryGainRef.current;
+    const outputGain = outputGainRef.current;
 
-    // Connect input to both dry and delay
-    currentInput.gain.connect(dryGain);
-    currentInput.gain.connect(delayNode);
-
-    return () => {
-      if (currentInput && dryGain && delayNode) {
+    if (enabled) {
+      // Normal mode: input → dry + delay → output
+      if (bypassConnectionRef.current) {
         try {
-          currentInput.gain.disconnect(dryGain);
-          currentInput.gain.disconnect(delayNode);
+          inputGain.disconnect(outputGain);
         } catch (e) {
           // Already disconnected
         }
+        bypassConnectionRef.current = false;
+      }
+      inputGain.connect(dryGain);
+      inputGain.connect(delayNode);
+    } else {
+      // Bypass mode: input → output (skip delay processing)
+      try {
+        inputGain.disconnect(dryGain);
+        inputGain.disconnect(delayNode);
+      } catch (e) {
+        // Already disconnected
+      }
+      inputGain.connect(outputGain);
+      bypassConnectionRef.current = true;
+    }
+
+    return () => {
+      try {
+        if (bypassConnectionRef.current) {
+          inputGain.disconnect(outputGain);
+        } else {
+          inputGain.disconnect(dryGain);
+          inputGain.disconnect(delayNode);
+        }
+      } catch (e) {
+        // Already disconnected
       }
     };
-  }, [inputKey]);
+  }, [inputKey, enabled]);
 
   // Update time when it changes
   useEffect(() => {
@@ -178,8 +213,8 @@ export const Delay = React.forwardRef<DelayHandle, DelayProps>(({
 
   // Expose imperative handle
   useImperativeHandle(ref, () => ({
-    getState: () => ({ time, feedback, wet }),
-  }), [time, feedback, wet]);
+    getState: () => ({ time, feedback, wet, enabled }),
+  }), [time, feedback, wet, enabled]);
 
   // Render children with state
   if (children) {
@@ -190,6 +225,8 @@ export const Delay = React.forwardRef<DelayHandle, DelayProps>(({
       setFeedback,
       wet,
       setWet,
+      enabled,
+      setEnabled,
       isActive: !!output.current,
     })}</>;
   }

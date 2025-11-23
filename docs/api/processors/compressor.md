@@ -19,6 +19,8 @@ The `Compressor` component controls the dynamic range of audio signals, reducing
 | `onAttackChange` | `(attack: number) => void` | `-` | Callback when attack changes |
 | `release` | `number` | `0.25` | Release time in seconds (controlled or initial value) |
 | `onReleaseChange` | `(release: number) => void` | `-` | Callback when release changes |
+| `enabled` | `boolean` | `true` | Whether the component is enabled or bypassed |
+| `onEnabledChange` | `(enabled: boolean) => void` | `-` | Callback when enabled state changes |
 | `children` | `function` | - | Render prop function receiving control props |
 
 ## Render Props
@@ -37,6 +39,8 @@ When using the `children` render prop, the following controls are provided:
 | `setAttack` | `(value: number) => void` | Update the attack time |
 | `release` | `number` | Release time in seconds (0 to 1) |
 | `setRelease` | `(value: number) => void` | Update the release time |
+| `enabled` | `boolean` | Whether the component is enabled |
+| `setEnabled` | `(value: boolean) => void` | Toggle enabled/bypass state |
 | `isActive` | `boolean` | Whether the compressor is active |
 
 ## Usage
@@ -374,6 +378,46 @@ function App() {
 ```
 
 **Note:** The imperative handle provides read-only access via `getState()`. To control the component programmatically, use the controlled props pattern shown above.
+
+## Bypass/Enable
+
+The `enabled` prop allows you to bypass the component's processing. When `enabled` is `false`, the audio passes through directly without any processing, saving CPU resources. This implements a true bypass.
+
+### Usage
+
+```tsx
+import { Compressor } from '@mode-7/mod';
+import { useState } from 'react';
+
+function App() {
+  const [enabled, setEnabled] = useState(true);
+
+  return (
+    <Compressor
+      input={input}
+      output={output}
+      enabled={enabled}
+      onEnabledChange={setEnabled}
+    />
+  );
+}
+```
+
+### With Render Props
+
+```tsx
+<Compressor input={input} output={output}>
+  {({ enabled, setEnabled, threshold, setThreshold, ratio, setRatio, attack, setAttack, release, setRelease }) => (
+    <div>
+      <button onClick={() => setEnabled(!enabled)}>
+        {enabled ? 'Bypass' : 'Enable'}
+      </button>
+      {/* Other controls */}
+    </div>
+  )}
+</Compressor>
+```
+
 ## Important Notes
 
 ### Threshold

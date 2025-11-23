@@ -11,6 +11,8 @@ The `Mixer` component combines multiple audio signals into a single output, with
 | `label` | `string` | `'mixer'` | Label for the component in metadata |
 | `levels` | `number[]` | - | Controlled levels array (0-1+) for each input |
 | `onLevelsChange` | `(levels: number[]) => void` | - | Callback when levels change (for controlled mode) |
+| `enabled` | `boolean` | `true` | Enables/bypasses processing (true bypass) |
+| `onEnabledChange` | `(enabled: boolean) => void` | `-` | Callback when enabled state changes |
 | `children` | `function` | - | Render prop function receiving control props |
 
 ## Render Props
@@ -22,6 +24,8 @@ When using the `children` render prop, the following controls are provided:
 | `levels` | `number[]` | Array of level values (0-1+) for each input |
 | `setLevels` | `(levels: number[]) => void` | Update all levels at once |
 | `setLevel` | `(index: number, value: number) => void` | Update a single level |
+| `enabled` | `boolean` | Whether processing is enabled or bypassed |
+| `setEnabled` | `(value: boolean) => void` | Toggle enabled/bypass state |
 | `isActive` | `boolean` | Whether the mixer is active |
 
 ## Usage

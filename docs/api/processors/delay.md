@@ -15,6 +15,8 @@ The `Delay` component creates echo effects by delaying the input signal and feed
 | `onFeedbackChange` | `(feedback: number) => void` | - | Callback when feedback changes |
 | `wet` | `number` | `0.5` | Wet/dry mix 0-1 (controlled or initial value) |
 | `onWetChange` | `(wet: number) => void` | - | Callback when wet/dry mix changes |
+| `enabled` | `boolean` | `true` | Whether the component is enabled or bypassed |
+| `onEnabledChange` | `(enabled: boolean) => void` | `-` | Callback when enabled state changes |
 | `children` | `function` | - | Render prop function receiving control props |
 
 ## Render Props
@@ -29,6 +31,8 @@ When using the `children` render prop, the following controls are provided:
 | `setFeedback` | `(value: number) => void` | Update the feedback |
 | `wet` | `number` | Wet/dry mix (0-1) |
 | `setWet` | `(value: number) => void` | Update the wet/dry mix |
+| `enabled` | `boolean` | Whether the component is enabled |
+| `setEnabled` | `(value: boolean) => void` | Toggle enabled/bypass state |
 | `isActive` | `boolean` | Whether the delay is active |
 
 ## Usage
@@ -303,6 +307,45 @@ function App() {
 ```
 
 **Note:** The imperative handle provides read-only access via `getState()`. To control the component programmatically, use the controlled props pattern shown above.
+
+## Bypass/Enable
+
+The `enabled` prop allows you to bypass the component's processing. When `enabled` is `false`, the audio passes through directly without any processing, saving CPU resources. This implements a true bypass.
+
+### Usage
+
+```tsx
+import { Delay } from '@mode-7/mod';
+import { useState } from 'react';
+
+function App() {
+  const [enabled, setEnabled] = useState(true);
+
+  return (
+    <Delay
+      input={input}
+      output={output}
+      enabled={enabled}
+      onEnabledChange={setEnabled}
+    />
+  );
+}
+```
+
+### With Render Props
+
+```tsx
+<Delay input={input} output={output}>
+  {({ enabled, setEnabled, time, setTime, feedback, setFeedback, wet, setWet }) => (
+    <div>
+      <button onClick={() => setEnabled(!enabled)}>
+        {enabled ? 'Bypass' : 'Enable'}
+      </button>
+      {/* Other controls */}
+    </div>
+  )}
+</Delay>
+```
 
 ## Important Notes
 

@@ -16,6 +16,8 @@ The `Panner` component controls the stereo position of an audio signal, allowing
 | `onPanChange` | `(pan: number) => void` | `-` | Callback when pan changes |
 | `cv` | `ModStreamRef` | `-` | Optional CV input for pan modulation |
 | `cvAmount` | `number` | `0.5` | Amount of CV modulation to apply |
+| `enabled` | `boolean` | `true` | Whether the component is enabled or bypassed |
+| `onEnabledChange` | `(enabled: boolean) => void` | `-` | Callback when enabled state changes |
 | `children` | `function` | - | Render prop function receiving control props |
 
 ## Render Props
@@ -26,6 +28,8 @@ When using the `children` render prop, the following controls are provided:
 |----------|------|-------------|
 | `pan` | `number` | Current pan position (-1 to 1) |
 | `setPan` | `(value: number) => void` | Update the pan position |
+| `enabled` | `boolean` | Whether the component is enabled |
+| `setEnabled` | `(value: boolean) => void` | Toggle enabled/bypass state |
 | `isActive` | `boolean` | Whether the panner is active |
 
 ## Usage

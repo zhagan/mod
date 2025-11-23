@@ -8,6 +8,7 @@ export interface GateHandle {
     threshold: number;
     attack: number;
     release: number;
+    enabled: boolean;
   };
 }
 
@@ -18,6 +19,8 @@ export interface GateRenderProps {
   setAttack: (value: number) => void;
   release: number;
   setRelease: (value: number) => void;
+  enabled: boolean;
+  setEnabled: (value: boolean) => void;
   isActive: boolean;
 }
 
@@ -31,6 +34,8 @@ export interface GateProps {
   onAttackChange?: (value: number) => void;
   release?: number;
   onReleaseChange?: (value: number) => void;
+  enabled?: boolean;
+  onEnabledChange?: (enabled: boolean) => void;
   children?: (props: GateRenderProps) => ReactNode;
 }
 
@@ -44,16 +49,20 @@ export const Gate = React.forwardRef<GateHandle, GateProps>(({
   onAttackChange,
   release: controlledRelease,
   onReleaseChange,
+  enabled: controlledEnabled,
+  onEnabledChange,
   children,
 }, ref) => {
   const audioContext = useAudioContext();
   const [threshold, setThreshold] = useControlledState(controlledThreshold, -40, onThresholdChange);
   const [attack, setAttack] = useControlledState(controlledAttack, 0.01, onAttackChange);
   const [release, setRelease] = useControlledState(controlledRelease, 0.1, onReleaseChange);
+  const [enabled, setEnabled] = useControlledState(controlledEnabled, true, onEnabledChange);
 
   const scriptNodeRef = useRef<ScriptProcessorNode | null>(null);
   const outputGainRef = useRef<GainNode | null>(null);
   const envelopeRef = useRef<number>(0);
+  const bypassConnectionRef = useRef<boolean>(false);
 
   // Store current parameter values in refs so audio callback can access them
   const thresholdRef = useRef<number>(threshold);
@@ -146,27 +155,53 @@ export const Gate = React.forwardRef<GateHandle, GateProps>(({
     };
   }, [audioContext, label]);
 
-  // Handle input connection
+  // Handle input connection and bypass routing
   useEffect(() => {
-    if (!input.current || !scriptNodeRef.current) return;
+    if (!input.current || !scriptNodeRef.current || !outputGainRef.current) return;
 
-    input.current.gain.connect(scriptNodeRef.current);
+    const inputGain = input.current.gain;
+    const scriptNode = scriptNodeRef.current;
+    const outputGain = outputGainRef.current;
 
-    return () => {
-      if (input.current && scriptNodeRef.current) {
+    if (enabled) {
+      // Normal mode: input → gate → output
+      if (bypassConnectionRef.current) {
         try {
-          input.current.gain.disconnect(scriptNodeRef.current);
+          inputGain.disconnect(outputGain);
         } catch (e) {
           // Already disconnected
         }
+        bypassConnectionRef.current = false;
+      }
+      inputGain.connect(scriptNode);
+    } else {
+      // Bypass mode: input → output (skip gate)
+      try {
+        inputGain.disconnect(scriptNode);
+      } catch (e) {
+        // Already disconnected
+      }
+      inputGain.connect(outputGain);
+      bypassConnectionRef.current = true;
+    }
+
+    return () => {
+      try {
+        if (bypassConnectionRef.current) {
+          inputGain.disconnect(outputGain);
+        } else {
+          inputGain.disconnect(scriptNode);
+        }
+      } catch (e) {
+        // Already disconnected
       }
     };
-  }, [input.current?.audioNode ? String(input.current.audioNode) : 'null']);
+  }, [input.current?.audioNode ? String(input.current.audioNode) : 'null', enabled]);
 
   // Expose imperative handle
   useImperativeHandle(ref, () => ({
-    getState: () => ({ threshold, attack, release }),
-  }), [threshold, attack, release]);
+    getState: () => ({ threshold, attack, release, enabled }),
+  }), [threshold, attack, release, enabled]);
 
   // Render children with state
   if (children) {
@@ -177,6 +212,8 @@ export const Gate = React.forwardRef<GateHandle, GateProps>(({
       setAttack,
       release,
       setRelease,
+      enabled,
+      setEnabled,
       isActive: !!output.current,
     })}</>;
   }

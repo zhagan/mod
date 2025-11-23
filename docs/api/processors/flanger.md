@@ -17,6 +17,8 @@ A flanger effect using modulated delay to create a sweeping, jet-like sound char
 | `onFeedbackChange` | `(value: number) => void` | - | Callback when feedback changes |
 | `delay` | `number` | `0.005` | Base delay time in seconds (controlled or initial value) |
 | `onDelayChange` | `(value: number) => void` | - | Callback when delay changes |
+| `enabled` | `boolean` | `true` | Whether the component is enabled or bypassed |
+| `onEnabledChange` | `(enabled: boolean) => void` | `-` | Callback when enabled state changes |
 | `children` | `function` | - | Render prop function |
 
 ## Render Props
@@ -33,6 +35,8 @@ When using the `children` render prop, the following controls are provided:
 | `setFeedback` | `(value: number) => void` | Update the feedback |
 | `delay` | `number` | Current base delay time in seconds |
 | `setDelay` | `(value: number) => void` | Update the delay |
+| `enabled` | `boolean` | Whether the component is enabled |
+| `setEnabled` | `(value: boolean) => void` | Toggle enabled/bypass state |
 | `isActive` | `boolean` | Whether the processor is active |
 
 ## Usage
@@ -191,6 +195,45 @@ function MyComponent() {
 ```
 
 **Note:** The imperative handle provides read-only access via `getState()`. To control the component programmatically, use the controlled props pattern shown above.
+
+## Bypass/Enable
+
+The `enabled` prop allows you to bypass the component's processing. When `enabled` is `false`, the audio passes through directly without any processing, saving CPU resources. This implements a true bypass.
+
+### Usage
+
+```tsx
+import { Flanger } from '@mode-7/mod';
+import { useState } from 'react';
+
+function App() {
+  const [enabled, setEnabled] = useState(true);
+
+  return (
+    <Flanger
+      input={input}
+      output={output}
+      enabled={enabled}
+      onEnabledChange={setEnabled}
+    />
+  );
+}
+```
+
+### With Render Props
+
+```tsx
+<Flanger input={input} output={output}>
+  {({ enabled, setEnabled, rate, setRate, depth, setDepth, feedback, setFeedback, delay, setDelay }) => (
+    <div>
+      <button onClick={() => setEnabled(!enabled)}>
+        {enabled ? 'Bypass' : 'Enable'}
+      </button>
+      {/* Other controls */}
+    </div>
+  )}
+</Flanger>
+```
 
 ## Important Notes
 

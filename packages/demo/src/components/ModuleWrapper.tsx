@@ -25,6 +25,9 @@ interface ModuleWrapperProps {
   onPortMouseLeave?: () => void;
   isPortConnected?: (portId: string) => boolean;
   hoveredPortId?: string;
+  enabled?: boolean;
+  onEnabledToggle?: (id: string) => void;
+  supportsEnabled?: boolean;
   children: React.ReactNode;
 }
 
@@ -57,6 +60,9 @@ export const ModuleWrapper = React.memo<ModuleWrapperProps>(({
   onPortMouseLeave,
   isPortConnected,
   hoveredPortId,
+  enabled = true,
+  onEnabledToggle,
+  supportsEnabled = false,
   children,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
@@ -124,16 +130,36 @@ export const ModuleWrapper = React.memo<ModuleWrapperProps>(({
     >
       <div className="module-wrapper-header" style={{ backgroundColor: color, color: textColor }}>
         <span className="module-wrapper-title">{type}</span>
-        <button
-          className="module-wrapper-delete"
-          style={{ color: textColor }}
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete(id);
-          }}
-        >
-          ×
-        </button>
+        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+          {supportsEnabled && onEnabledToggle && (
+            <button
+              className="module-wrapper-enabled-toggle"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEnabledToggle(id);
+              }}
+              title={enabled ? 'Bypass (disable)' : 'Enable'}
+            >
+              <span
+                className="enabled-toggle-dot"
+                style={{
+                  backgroundColor: enabled ? '#00ff88' : '#ff4444',
+                  boxShadow: enabled ? '0 0 6px rgba(0, 255, 136, 0.6)' : '0 0 6px rgba(255, 68, 68, 0.6)',
+                }}
+              />
+            </button>
+          )}
+          <button
+            className="module-wrapper-delete"
+            style={{ color: textColor }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(id);
+            }}
+          >
+            ×
+          </button>
+        </div>
       </div>
 
       <div className="module-wrapper-body">

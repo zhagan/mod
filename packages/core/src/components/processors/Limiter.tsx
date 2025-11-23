@@ -7,6 +7,7 @@ export interface LimiterHandle {
   getState: () => {
     threshold: number;
     release: number;
+    enabled: boolean;
   };
 }
 
@@ -15,6 +16,8 @@ export interface LimiterRenderProps {
   setThreshold: (value: number) => void;
   release: number;
   setRelease: (value: number) => void;
+  enabled: boolean;
+  setEnabled: (value: boolean) => void;
   isActive: boolean;
 }
 
@@ -26,6 +29,8 @@ export interface LimiterProps {
   onThresholdChange?: (value: number) => void;
   release?: number;
   onReleaseChange?: (value: number) => void;
+  enabled?: boolean;
+  onEnabledChange?: (enabled: boolean) => void;
   children?: (props: LimiterRenderProps) => ReactNode;
 }
 
@@ -37,14 +42,18 @@ export const Limiter = React.forwardRef<LimiterHandle, LimiterProps>(({
   onThresholdChange,
   release: controlledRelease,
   onReleaseChange,
+  enabled: controlledEnabled,
+  onEnabledChange,
   children,
 }, ref) => {
   const audioContext = useAudioContext();
   const [threshold, setThreshold] = useControlledState(controlledThreshold, -1, onThresholdChange);
   const [release, setRelease] = useControlledState(controlledRelease, 0.05, onReleaseChange);
+  const [enabled, setEnabled] = useControlledState(controlledEnabled, true, onEnabledChange);
 
   const compressorRef = useRef<DynamicsCompressorNode | null>(null);
   const outputGainRef = useRef<GainNode | null>(null);
+  const bypassConnectionRef = useRef<boolean>(false);
 
   // Create limiter nodes once
   useEffect(() => {
@@ -91,22 +100,48 @@ export const Limiter = React.forwardRef<LimiterHandle, LimiterProps>(({
     };
   }, [audioContext, label]);
 
-  // Handle input connection
+  // Handle input connection and bypass routing
   useEffect(() => {
-    if (!input.current || !compressorRef.current) return;
+    if (!input.current || !compressorRef.current || !outputGainRef.current) return;
 
-    input.current.gain.connect(compressorRef.current);
+    const inputGain = input.current.gain;
+    const compressor = compressorRef.current;
+    const outputGain = outputGainRef.current;
 
-    return () => {
-      if (input.current && compressorRef.current) {
+    if (enabled) {
+      // Normal mode: input → limiter → output
+      if (bypassConnectionRef.current) {
         try {
-          input.current.gain.disconnect(compressorRef.current);
+          inputGain.disconnect(outputGain);
         } catch (e) {
           // Already disconnected
         }
+        bypassConnectionRef.current = false;
+      }
+      inputGain.connect(compressor);
+    } else {
+      // Bypass mode: input → output (skip limiter)
+      try {
+        inputGain.disconnect(compressor);
+      } catch (e) {
+        // Already disconnected
+      }
+      inputGain.connect(outputGain);
+      bypassConnectionRef.current = true;
+    }
+
+    return () => {
+      try {
+        if (bypassConnectionRef.current) {
+          inputGain.disconnect(outputGain);
+        } else {
+          inputGain.disconnect(compressor);
+        }
+      } catch (e) {
+        // Already disconnected
       }
     };
-  }, [input.current?.audioNode ? String(input.current.audioNode) : 'null']);
+  }, [input.current?.audioNode ? String(input.current.audioNode) : 'null', enabled]);
 
   // Update threshold
   useEffect(() => {
@@ -124,8 +159,8 @@ export const Limiter = React.forwardRef<LimiterHandle, LimiterProps>(({
 
   // Expose imperative handle
   useImperativeHandle(ref, () => ({
-    getState: () => ({ threshold, release }),
-  }), [threshold, release]);
+    getState: () => ({ threshold, release, enabled }),
+  }), [threshold, release, enabled]);
 
   // Render children with state
   if (children) {
@@ -134,6 +169,8 @@ export const Limiter = React.forwardRef<LimiterHandle, LimiterProps>(({
       setThreshold,
       release,
       setRelease,
+      enabled,
+      setEnabled,
       isActive: !!output.current,
     })}</>;
   }

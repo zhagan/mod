@@ -8,6 +8,7 @@ export interface ReverbHandle {
     wet: number;
     duration: number;
     decay: number;
+    enabled: boolean;
   };
 }
 
@@ -18,6 +19,8 @@ export interface ReverbRenderProps {
   setDuration: (value: number) => void;
   decay: number;
   setDecay: (value: number) => void;
+  enabled: boolean;
+  setEnabled: (value: boolean) => void;
   isActive: boolean;
 }
 
@@ -31,6 +34,8 @@ export interface ReverbProps {
   onDurationChange?: (duration: number) => void;
   decay?: number;
   onDecayChange?: (decay: number) => void;
+  enabled?: boolean;
+  onEnabledChange?: (enabled: boolean) => void;
   children?: (props: ReverbRenderProps) => ReactNode;
 }
 
@@ -44,12 +49,15 @@ export const Reverb = React.forwardRef<ReverbHandle, ReverbProps>(({
   onDurationChange,
   decay: controlledDecay,
   onDecayChange,
+  enabled: controlledEnabled,
+  onEnabledChange,
   children,
 }, ref) => {
   const audioContext = useAudioContext();
   const [wet, setWet] = useControlledState(controlledWet, 0.3, onWetChange);
   const [duration, setDuration] = useControlledState(controlledDuration, 2.0, onDurationChange);
   const [decay, setDecay] = useControlledState(controlledDecay, 2.0, onDecayChange);
+  const [enabled, setEnabled] = useControlledState(controlledEnabled, true, onEnabledChange);
 
   // Track input changes
   const inputKey = input.current?.audioNode ? String(input.current.audioNode) : 'null';
@@ -57,6 +65,8 @@ export const Reverb = React.forwardRef<ReverbHandle, ReverbProps>(({
   const convolverRef = useRef<ConvolverNode | null>(null);
   const wetGainRef = useRef<GainNode | null>(null);
   const dryGainRef = useRef<GainNode | null>(null);
+  const outputGainRef = useRef<GainNode | null>(null);
+  const bypassConnectionRef = useRef<boolean>(false);
 
   // Create nodes once
   useEffect(() => {
@@ -92,6 +102,7 @@ export const Reverb = React.forwardRef<ReverbHandle, ReverbProps>(({
     // Create output gain
     const outputGain = audioContext.createGain();
     outputGain.gain.value = 1.0;
+    outputGainRef.current = outputGain;
 
     // Connect convolver to wet gain
     convolver.connect(wetGain);
@@ -126,32 +137,56 @@ export const Reverb = React.forwardRef<ReverbHandle, ReverbProps>(({
       convolverRef.current = null;
       wetGainRef.current = null;
       dryGainRef.current = null;
+      outputGainRef.current = null;
     };
   }, [audioContext, label]);
 
-  // Handle input connection
+  // Handle input connection and bypass routing
   useEffect(() => {
-    if (!input.current || !convolverRef.current || !dryGainRef.current) return;
+    if (!input.current || !convolverRef.current || !dryGainRef.current || !outputGainRef.current) return;
 
-    const currentInput = input.current;
+    const inputGain = input.current.gain;
     const convolver = convolverRef.current;
     const dryGain = dryGainRef.current;
+    const outputGain = outputGainRef.current;
 
-    // Connect input to both dry and convolver
-    currentInput.gain.connect(dryGain);
-    currentInput.gain.connect(convolver);
-
-    return () => {
-      if (currentInput && dryGain && convolver) {
+    if (enabled) {
+      // Normal mode: input → dry + convolver → output
+      if (bypassConnectionRef.current) {
         try {
-          currentInput.gain.disconnect(dryGain);
-          currentInput.gain.disconnect(convolver);
+          inputGain.disconnect(outputGain);
         } catch (e) {
           // Already disconnected
         }
+        bypassConnectionRef.current = false;
+      }
+      inputGain.connect(dryGain);
+      inputGain.connect(convolver);
+    } else {
+      // Bypass mode: input → output (skip reverb processing)
+      try {
+        inputGain.disconnect(dryGain);
+        inputGain.disconnect(convolver);
+      } catch (e) {
+        // Already disconnected
+      }
+      inputGain.connect(outputGain);
+      bypassConnectionRef.current = true;
+    }
+
+    return () => {
+      try {
+        if (bypassConnectionRef.current) {
+          inputGain.disconnect(outputGain);
+        } else {
+          inputGain.disconnect(dryGain);
+          inputGain.disconnect(convolver);
+        }
+      } catch (e) {
+        // Already disconnected
       }
     };
-  }, [inputKey]);
+  }, [inputKey, enabled]);
 
   // Update wet/dry mix when it changes
   useEffect(() => {
@@ -183,8 +218,8 @@ export const Reverb = React.forwardRef<ReverbHandle, ReverbProps>(({
 
   // Expose imperative handle
   useImperativeHandle(ref, () => ({
-    getState: () => ({ wet, duration, decay }),
-  }), [wet, duration, decay]);
+    getState: () => ({ wet, duration, decay, enabled }),
+  }), [wet, duration, decay, enabled]);
 
   // Render children with state
   if (children) {
@@ -195,6 +230,8 @@ export const Reverb = React.forwardRef<ReverbHandle, ReverbProps>(({
       setDuration,
       decay,
       setDecay,
+      enabled,
+      setEnabled,
       isActive: !!output.current,
     })}</>;
   }

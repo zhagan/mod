@@ -10,6 +10,7 @@ export interface CompressorHandle {
     ratio: number;
     attack: number;
     release: number;
+    enabled: boolean;
   };
 }
 
@@ -24,6 +25,8 @@ export interface CompressorRenderProps {
   setAttack: (value: number) => void;
   release: number;
   setRelease: (value: number) => void;
+  enabled: boolean;
+  setEnabled: (value: boolean) => void;
   isActive: boolean;
 }
 
@@ -41,6 +44,8 @@ export interface CompressorProps {
   onAttackChange?: (attack: number) => void;
   release?: number;
   onReleaseChange?: (release: number) => void;
+  enabled?: boolean;
+  onEnabledChange?: (enabled: boolean) => void;
   children?: (props: CompressorRenderProps) => ReactNode;
 }
 
@@ -58,6 +63,8 @@ export const Compressor = React.forwardRef<CompressorHandle, CompressorProps>(({
   onAttackChange,
   release: controlledRelease,
   onReleaseChange,
+  enabled: controlledEnabled,
+  onEnabledChange,
   children,
 }, ref) => {
   const audioContext = useAudioContext();
@@ -66,9 +73,11 @@ export const Compressor = React.forwardRef<CompressorHandle, CompressorProps>(({
   const [ratio, setRatio] = useControlledState(controlledRatio, 12, onRatioChange);
   const [attack, setAttack] = useControlledState(controlledAttack, 0.003, onAttackChange);
   const [release, setRelease] = useControlledState(controlledRelease, 0.25, onReleaseChange);
+  const [enabled, setEnabled] = useControlledState(controlledEnabled, true, onEnabledChange);
 
   const compressorNodeRef = useRef<DynamicsCompressorNode | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
+  const bypassConnectionRef = useRef<boolean>(false);
 
   // Only recreate when specific input stream changes, not refs
   const inputKey = input.current?.audioNode ? String(input.current.audioNode) : 'null';
@@ -116,22 +125,48 @@ export const Compressor = React.forwardRef<CompressorHandle, CompressorProps>(({
     };
   }, [audioContext, label]);
 
-  // Handle input connection
+  // Handle input connection and bypass routing
   useEffect(() => {
-    if (!input.current || !compressorNodeRef.current) return;
+    if (!input.current || !compressorNodeRef.current || !gainNodeRef.current) return;
 
-    input.current.gain.connect(compressorNodeRef.current);
+    const inputGain = input.current.gain;
+    const compressorNode = compressorNodeRef.current;
+    const outputGain = gainNodeRef.current;
 
-    return () => {
-      if (input.current && compressorNodeRef.current) {
+    if (enabled) {
+      // Normal mode: input → compressor → output
+      if (bypassConnectionRef.current) {
         try {
-          input.current.gain.disconnect(compressorNodeRef.current);
+          inputGain.disconnect(outputGain);
         } catch (e) {
           // Already disconnected
         }
+        bypassConnectionRef.current = false;
+      }
+      inputGain.connect(compressorNode);
+    } else {
+      // Bypass mode: input → output (skip compressor)
+      try {
+        inputGain.disconnect(compressorNode);
+      } catch (e) {
+        // Already disconnected
+      }
+      inputGain.connect(outputGain);
+      bypassConnectionRef.current = true;
+    }
+
+    return () => {
+      try {
+        if (bypassConnectionRef.current) {
+          inputGain.disconnect(outputGain);
+        } else {
+          inputGain.disconnect(compressorNode);
+        }
+      } catch (e) {
+        // Already disconnected
       }
     };
-  }, [inputKey]);
+  }, [inputKey, enabled]);
 
   // Update threshold when it changes
   useEffect(() => {
@@ -170,8 +205,8 @@ export const Compressor = React.forwardRef<CompressorHandle, CompressorProps>(({
 
   // Expose imperative handle
   useImperativeHandle(ref, () => ({
-    getState: () => ({ threshold, knee, ratio, attack, release }),
-  }), [threshold, knee, ratio, attack, release]);
+    getState: () => ({ threshold, knee, ratio, attack, release, enabled }),
+  }), [threshold, knee, ratio, attack, release, enabled]);
 
   // Render children with state
   if (children) {
@@ -186,6 +221,8 @@ export const Compressor = React.forwardRef<CompressorHandle, CompressorProps>(({
       setAttack,
       release,
       setRelease,
+      enabled,
+      setEnabled,
       isActive: !!output.current,
     })}</>;
   }

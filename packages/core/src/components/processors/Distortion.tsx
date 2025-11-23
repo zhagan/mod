@@ -6,12 +6,15 @@ import { useControlledState } from '../../hooks/useControlledState';
 export interface DistortionHandle {
   getState: () => {
     amount: number;
+    enabled: boolean;
   };
 }
 
 export interface DistortionRenderProps {
   amount: number;
   setAmount: (value: number) => void;
+  enabled: boolean;
+  setEnabled: (value: boolean) => void;
   isActive: boolean;
 }
 
@@ -21,6 +24,8 @@ export interface DistortionProps {
   label?: string;
   amount?: number;
   onAmountChange?: (amount: number) => void;
+  enabled?: boolean;
+  onEnabledChange?: (enabled: boolean) => void;
   children?: (props: DistortionRenderProps) => ReactNode;
 }
 
@@ -30,13 +35,17 @@ export const Distortion = React.forwardRef<DistortionHandle, DistortionProps>(({
   label = 'distortion',
   amount: controlledAmount,
   onAmountChange,
+  enabled: controlledEnabled,
+  onEnabledChange,
   children,
 }, ref) => {
   const audioContext = useAudioContext();
   const [amount, setAmount] = useControlledState(controlledAmount, 50, onAmountChange);
+  const [enabled, setEnabled] = useControlledState(controlledEnabled, true, onEnabledChange);
 
   const waveShaperNodeRef = useRef<WaveShaperNode | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
+  const bypassConnectionRef = useRef<boolean>(false);
 
   // Only recreate when specific input stream changes, not refs
   const inputKey = input.current?.audioNode ? String(input.current.audioNode) : 'null';
@@ -95,22 +104,48 @@ export const Distortion = React.forwardRef<DistortionHandle, DistortionProps>(({
     };
   }, [audioContext, label]);
 
-  // Handle input connection
+  // Handle input connection and bypass routing
   useEffect(() => {
-    if (!input.current || !waveShaperNodeRef.current) return;
+    if (!input.current || !waveShaperNodeRef.current || !gainNodeRef.current) return;
 
-    input.current.gain.connect(waveShaperNodeRef.current);
+    const inputGain = input.current.gain;
+    const waveShaperNode = waveShaperNodeRef.current;
+    const outputGain = gainNodeRef.current;
 
-    return () => {
-      if (input.current && waveShaperNodeRef.current) {
+    if (enabled) {
+      // Normal mode: input → waveshaper → output
+      if (bypassConnectionRef.current) {
         try {
-          input.current.gain.disconnect(waveShaperNodeRef.current);
+          inputGain.disconnect(outputGain);
         } catch (e) {
           // Already disconnected
         }
+        bypassConnectionRef.current = false;
+      }
+      inputGain.connect(waveShaperNode);
+    } else {
+      // Bypass mode: input → output (skip waveshaper)
+      try {
+        inputGain.disconnect(waveShaperNode);
+      } catch (e) {
+        // Already disconnected
+      }
+      inputGain.connect(outputGain);
+      bypassConnectionRef.current = true;
+    }
+
+    return () => {
+      try {
+        if (bypassConnectionRef.current) {
+          inputGain.disconnect(outputGain);
+        } else {
+          inputGain.disconnect(waveShaperNode);
+        }
+      } catch (e) {
+        // Already disconnected
       }
     };
-  }, [inputKey]);
+  }, [inputKey, enabled]);
 
   // Update distortion amount when it changes
   useEffect(() => {
@@ -121,14 +156,16 @@ export const Distortion = React.forwardRef<DistortionHandle, DistortionProps>(({
 
   // Expose imperative handle
   useImperativeHandle(ref, () => ({
-    getState: () => ({ amount }),
-  }), [amount]);
+    getState: () => ({ amount, enabled }),
+  }), [amount, enabled]);
 
   // Render children with state
   if (children) {
     return <>{children({
       amount,
       setAmount,
+      enabled,
+      setEnabled,
       isActive: !!output.current,
     })}</>;
   }

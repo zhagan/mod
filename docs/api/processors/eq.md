@@ -19,6 +19,8 @@ The `EQ` (Equalizer) component provides three-band frequency control for shaping
 | `onLowFreqChange` | `(value: number) => void` | `-` | Callback when low frequency changes |
 | `highFreq` | `number` | `4000` | High shelf frequency in Hz (controlled or initial value) |
 | `onHighFreqChange` | `(value: number) => void` | `-` | Callback when high frequency changes |
+| `enabled` | `boolean` | `true` | Whether the component is enabled or bypassed |
+| `onEnabledChange` | `(enabled: boolean) => void` | `-` | Callback when enabled state changes |
 | `children` | `function` | - | Render prop function receiving control props |
 
 ## Render Props
@@ -37,6 +39,8 @@ When using the `children` render prop, the following controls are provided:
 | `setLowFreq` | `(value: number) => void` | Update the low frequency |
 | `highFreq` | `number` | High shelf frequency in Hz |
 | `setHighFreq` | `(value: number) => void` | Update the high frequency |
+| `enabled` | `boolean` | Whether the component is enabled |
+| `setEnabled` | `(value: boolean) => void` | Toggle enabled/bypass state |
 | `isActive` | `boolean` | Whether the EQ is active |
 
 ## Usage
@@ -356,6 +360,46 @@ function App() {
 ```
 
 **Note:** The imperative handle provides read-only access via `getState()`. To control the component programmatically, use the controlled props pattern shown above.
+
+## Bypass/Enable
+
+The `enabled` prop allows you to bypass the component's processing. When `enabled` is `false`, the audio passes through directly without any processing, saving CPU resources. This implements a true bypass.
+
+### Usage
+
+```tsx
+import { EQ } from '@mode-7/mod';
+import { useState } from 'react';
+
+function App() {
+  const [enabled, setEnabled] = useState(true);
+
+  return (
+    <EQ
+      input={input}
+      output={output}
+      enabled={enabled}
+      onEnabledChange={setEnabled}
+    />
+  );
+}
+```
+
+### With Render Props
+
+```tsx
+<EQ input={input} output={output}>
+  {({ enabled, setEnabled, lowGain, setLowGain, midGain, setMidGain, highGain, setHighGain }) => (
+    <div>
+      <button onClick={() => setEnabled(!enabled)}>
+        {enabled ? 'Bypass' : 'Enable'}
+      </button>
+      {/* Other controls */}
+    </div>
+  )}
+</EQ>
+```
+
 ## Important Notes
 
 ### Frequency Bands

@@ -17,6 +17,8 @@ Envelope-following wah filter that creates dynamic filter sweeps based on the in
 | `onMaxFreqChange` | `(value: number) => void` | - | Callback when maxFreq changes |
 | `Q` | `number` | `5` | Filter resonance/Q factor (controlled or initial value) |
 | `onQChange` | `(value: number) => void` | - | Callback when Q changes |
+| `enabled` | `boolean` | `true` | Whether the component is enabled or bypassed |
+| `onEnabledChange` | `(enabled: boolean) => void` | `-` | Callback when enabled state changes |
 | `children` | `function` | - | Render prop function |
 
 ## Render Props
@@ -33,6 +35,8 @@ When using the `children` render prop, the following controls are provided:
 | `setMaxFreq` | `(value: number) => void` | Update the maximum frequency |
 | `Q` | `number` | Current Q factor |
 | `setQ` | `(value: number) => void` | Update the Q factor |
+| `enabled` | `boolean` | Whether the component is enabled |
+| `setEnabled` | `(value: boolean) => void` | Toggle enabled/bypass state |
 | `isActive` | `boolean` | Whether the processor is active |
 
 ## Usage
@@ -191,6 +195,45 @@ function MyComponent() {
 ```
 
 **Note:** The imperative handle provides read-only access via `getState()`. To control the component programmatically, use the controlled props pattern shown above.
+
+## Bypass/Enable
+
+The `enabled` prop allows you to bypass the component's processing. When `enabled` is `false`, the audio passes through directly without any processing, saving CPU resources. This implements a true bypass.
+
+### Usage
+
+```tsx
+import { AutoWah } from '@mode-7/mod';
+import { useState } from 'react';
+
+function App() {
+  const [enabled, setEnabled] = useState(true);
+
+  return (
+    <AutoWah
+      input={input}
+      output={output}
+      enabled={enabled}
+      onEnabledChange={setEnabled}
+    />
+  );
+}
+```
+
+### With Render Props
+
+```tsx
+<AutoWah input={input} output={output}>
+  {({ enabled, setEnabled, sensitivity, setSensitivity, baseFreq, setBaseFreq, maxFreq, setMaxFreq, Q, setQ }) => (
+    <div>
+      <button onClick={() => setEnabled(!enabled)}>
+        {enabled ? 'Bypass' : 'Enable'}
+      </button>
+      {/* Other controls */}
+    </div>
+  )}
+</AutoWah>
+```
 
 ## Important Notes
 

@@ -22,6 +22,8 @@ The `Reverb` component adds spatial depth and ambience to audio signals using co
 | `onDurationChange` | `(duration: number) => void` | - | Callback when duration changes |
 | `decay` | `number` | `2.0` | Decay rate (controlled or initial value) |
 | `onDecayChange` | `(decay: number) => void` | - | Callback when decay changes |
+| `enabled` | `boolean` | `true` | Enables/bypasses processing (true bypass) |
+| `onEnabledChange` | `(enabled: boolean) => void` | `-` | Callback when enabled state changes |
 
 ## Render Props
 
@@ -35,6 +37,8 @@ When using the `children` render prop, the following controls are provided:
 | `setDuration` | `(value: number) => void` | Update the duration |
 | `decay` | `number` | Decay rate (1-10) |
 | `setDecay` | `(value: number) => void` | Update the decay rate |
+| `enabled` | `boolean` | Whether processing is enabled or bypassed |
+| `setEnabled` | `(value: boolean) => void` | Toggle enabled/bypass state |
 | `isActive` | `boolean` | Whether the reverb is active |
 
 ## Usage
