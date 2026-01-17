@@ -4,7 +4,7 @@ import { ModStreamRef } from '../../types/ModStream';
 import { useControlledState } from '../../hooks/useControlledState';
 
 export interface DiodeFilterHandle {
-  getState: () => { cutoff: number; resonance: number; drive: number; enabled: boolean };
+  getState: () => { cutoff: number; resonance: number; drive: number; cvAmount: number; enabled: boolean };
 }
 
 export interface DiodeFilterRenderProps {
@@ -14,6 +14,8 @@ export interface DiodeFilterRenderProps {
   setResonance: (v: number) => void;
   drive: number;
   setDrive: (v: number) => void;
+  cvAmount: number;
+  setCvAmount: (v: number) => void;
   enabled: boolean;
   setEnabled: (v: boolean) => void;
   isActive: boolean;
@@ -30,10 +32,11 @@ export interface DiodeFilterProps {
   drive?: number;
   onDriveChange?: (v: number) => void;
   enabled?: boolean;
-  onEnabledChange?: (v: boolean) => void;
+  onEnabledChange?: (enabled: boolean) => void;
   // CV input to modulate cutoff
   cv?: ModStreamRef;
   cvAmount?: number;
+  onCvAmountChange?: (v: number) => void;
   children?: (props: DiodeFilterRenderProps) => ReactNode;
 }
 
@@ -93,6 +96,35 @@ class DiodeFilterProcessor extends AudioWorkletProcessor {
 registerProcessor('diode-filter-processor', DiodeFilterProcessor);
 `;
 
+const workletLoaders = new WeakMap<AudioContext, Promise<void>>();
+const workletUrls = new WeakMap<AudioContext, string>();
+
+const loadDiodeFilterWorklet = (audioContext: AudioContext) => {
+  let loader = workletLoaders.get(audioContext);
+  if (!loader) {
+    const blob = new Blob([WORKLET_SOURCE], { type: 'application/javascript' });
+    const url = URL.createObjectURL(blob);
+    workletUrls.set(audioContext, url);
+    loader = audioContext.audioWorklet.addModule(url).then(() => {
+      const loadedUrl = workletUrls.get(audioContext);
+      if (loadedUrl) {
+        URL.revokeObjectURL(loadedUrl);
+        workletUrls.delete(audioContext);
+      }
+    }).catch((err) => {
+      const loadedUrl = workletUrls.get(audioContext);
+      if (loadedUrl) {
+        URL.revokeObjectURL(loadedUrl);
+        workletUrls.delete(audioContext);
+      }
+      workletLoaders.delete(audioContext);
+      throw err;
+    });
+    workletLoaders.set(audioContext, loader);
+  }
+  return loader;
+};
+
 export const DiodeFilter = React.forwardRef<DiodeFilterHandle, DiodeFilterProps>(({
   input,
   output,
@@ -106,19 +138,20 @@ export const DiodeFilter = React.forwardRef<DiodeFilterHandle, DiodeFilterProps>
   enabled: controlledEnabled,
   onEnabledChange,
   cv,
-  cvAmount = 1000,
+  cvAmount: controlledCvAmount = 1000,
+  onCvAmountChange,
   children,
 }, ref) => {
   const audioContext = useAudioContext();
   const [cutoff, setCutoff] = useControlledState(controlledCutoff, 1000, onCutoffChange);
   const [resonance, setResonance] = useControlledState(controlledResonance, 0.1, onResonanceChange);
   const [drive, setDrive] = useControlledState(controlledDrive, 0.0, onDriveChange);
+  const [cvAmount, setCvAmount] = useControlledState(controlledCvAmount, 1000, onCvAmountChange);
   const [enabled, setEnabled] = useControlledState(controlledEnabled, true, onEnabledChange);
 
   const nodeRef = useRef<AudioWorkletNode | null>(null);
   const outputGainRef = useRef<GainNode | null>(null);
   const bypassRef = useRef<boolean>(false);
-  const blobUrlRef = useRef<string | null>(null);
 
   // Create worklet node once
   useEffect(() => {
@@ -126,12 +159,7 @@ export const DiodeFilter = React.forwardRef<DiodeFilterHandle, DiodeFilterProps>
 
     let cancelled = false;
 
-    // Create blob URL from source
-    const blob = new Blob([WORKLET_SOURCE], { type: 'application/javascript' });
-    const url = URL.createObjectURL(blob);
-    blobUrlRef.current = url;
-
-    audioContext.audioWorklet.addModule(url).then(() => {
+    loadDiodeFilterWorklet(audioContext).then(() => {
       if (cancelled) return;
       const node = new AudioWorkletNode(audioContext, 'diode-filter-processor', {
         numberOfInputs: 1,
@@ -154,6 +182,8 @@ export const DiodeFilter = React.forwardRef<DiodeFilterHandle, DiodeFilterProps>
         metadata: { label, sourceType: 'processor' },
       } as any;
     }).catch((e) => {
+      if (cancelled) return;
+      if (e?.name === 'AbortError') return;
       // If addModule fails, leave output null
       console.error('Failed to load diode filter worklet', e);
     });
@@ -167,10 +197,6 @@ export const DiodeFilter = React.forwardRef<DiodeFilterHandle, DiodeFilterProps>
       if (outputGainRef.current) {
         try { outputGainRef.current.disconnect(); } catch (e) {}
         outputGainRef.current = null;
-      }
-      if (blobUrlRef.current) {
-        URL.revokeObjectURL(blobUrlRef.current);
-        blobUrlRef.current = null;
       }
       output.current = null;
     };
@@ -231,10 +257,10 @@ export const DiodeFilter = React.forwardRef<DiodeFilterHandle, DiodeFilterProps>
     if (nodeRef.current) nodeRef.current.parameters.get('drive')?.setValueAtTime(drive, audioContext!.currentTime);
   }, [drive]);
 
-  useImperativeHandle(ref, () => ({ getState: () => ({ cutoff, resonance, drive, enabled }) }), [cutoff, resonance, drive, enabled]);
+  useImperativeHandle(ref, () => ({ getState: () => ({ cutoff, resonance, drive, cvAmount, enabled }) }), [cutoff, resonance, drive, cvAmount, enabled]);
 
   if (children) {
-    return <>{children({ cutoff, setCutoff: setCutoff as any, resonance, setResonance: setResonance as any, drive, setDrive: setDrive as any, enabled, setEnabled: setEnabled as any, isActive: !!output.current })}</>;
+    return <>{children({ cutoff, setCutoff: setCutoff as any, resonance, setResonance: setResonance as any, drive, setDrive: setDrive as any, cvAmount, setCvAmount: setCvAmount as any, enabled, setEnabled: setEnabled as any, isActive: !!output.current })}</>;
   }
 
   return null;

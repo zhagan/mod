@@ -124,7 +124,32 @@ textarea,
   text-align: left;
 }
 
+.module-category .file-button {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid #2e2e32;
+  border-radius: 6px;
+  color: rgba(255, 255, 245, 0.86);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+}
+
+.module-category .file-button input {
+  display: none;
+}
+
 .module-category button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: #3451b2;
+  transform: translateX(2px);
+}
+
+.module-category .file-button:hover {
   background: rgba(255, 255, 255, 0.1);
   border-color: #3451b2;
   transform: translateX(2px);
@@ -132,6 +157,12 @@ textarea,
 
 .module-category button:active {
   transform: translateX(0);
+}
+
+.module-category button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
 }
 
 /* Canvas */
