@@ -148,10 +148,12 @@ export const DiodeFilter = React.forwardRef<DiodeFilterHandle, DiodeFilterProps>
   const [drive, setDrive] = useControlledState(controlledDrive, 0.0, onDriveChange);
   const [cvAmount, setCvAmount] = useControlledState(controlledCvAmount, 1000, onCvAmountChange);
   const [enabled, setEnabled] = useControlledState(controlledEnabled, true, onEnabledChange);
+  const [isReady, setIsReady] = React.useState(false);
 
   const nodeRef = useRef<AudioWorkletNode | null>(null);
   const outputGainRef = useRef<GainNode | null>(null);
   const bypassRef = useRef<boolean>(false);
+  const cvGainRef = useRef<GainNode | null>(null);
 
   // Create worklet node once
   useEffect(() => {
@@ -181,6 +183,7 @@ export const DiodeFilter = React.forwardRef<DiodeFilterHandle, DiodeFilterProps>
         context: audioContext,
         metadata: { label, sourceType: 'processor' },
       } as any;
+      setIsReady(true);
     }).catch((e) => {
       if (cancelled) return;
       if (e?.name === 'AbortError') return;
@@ -190,9 +193,14 @@ export const DiodeFilter = React.forwardRef<DiodeFilterHandle, DiodeFilterProps>
 
     return () => {
       cancelled = true;
+      setIsReady(false);
       if (nodeRef.current) {
         try { nodeRef.current.disconnect(); } catch (e) {}
         nodeRef.current = null;
+      }
+      if (cvGainRef.current) {
+        try { cvGainRef.current.disconnect(); } catch (e) {}
+        cvGainRef.current = null;
       }
       if (outputGainRef.current) {
         try { outputGainRef.current.disconnect(); } catch (e) {}
@@ -202,38 +210,62 @@ export const DiodeFilter = React.forwardRef<DiodeFilterHandle, DiodeFilterProps>
     };
   }, [audioContext]);
 
-  // Handle input routing / bypass
-  useEffect(() => {
-    if (!input.current || !nodeRef.current || !outputGainRef.current) return;
+  const reconnectInput = () => {
+    if (!input.current || !nodeRef.current || !outputGainRef.current) return false;
     const inGain = input.current.gain;
     const node = nodeRef.current;
     const outGain = outputGainRef.current;
 
+    try { inGain.disconnect(node); } catch (e) {}
+    try { inGain.disconnect(outGain); } catch (e) {}
+
     if (enabled) {
-      if (bypassRef.current) {
-        try { inGain.disconnect(outGain); } catch (e) {}
-        bypassRef.current = false;
-      }
       inGain.connect(node);
+      bypassRef.current = false;
     } else {
-      try { inGain.disconnect(node); } catch (e) {}
       inGain.connect(outGain);
       bypassRef.current = true;
     }
+    return true;
+  };
+
+  // Handle input routing / bypass
+  useEffect(() => {
+    if (!isReady) return;
+    let rafId: number | null = null;
+    let attempts = 0;
+
+    const tryConnect = () => {
+      if (reconnectInput()) return;
+      attempts += 1;
+      if (attempts < 12) {
+        rafId = requestAnimationFrame(tryConnect);
+      }
+    };
+
+    tryConnect();
 
     return () => {
-      try {
-        if (bypassRef.current) inGain.disconnect(outGain);
-        else inGain.disconnect(node);
-      } catch (e) {}
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      if (!input.current || !nodeRef.current || !outputGainRef.current) return;
+      const inGain = input.current.gain;
+      const node = nodeRef.current;
+      const outGain = outputGainRef.current;
+      try { inGain.disconnect(node); } catch (e) {}
+      try { inGain.disconnect(outGain); } catch (e) {}
     };
-  }, [input.current?.audioNode ? String(input.current.audioNode) : 'null', enabled]);
+  }, [enabled, isReady, input]);
 
   // CV connection for cutoff (connect CV gain node to parameter)
   useEffect(() => {
-    if (!cv?.current || !nodeRef.current || !audioContext) return;
+    if (!cv?.current || !nodeRef.current || !audioContext || !isReady) return;
+    if (cvGainRef.current) {
+      try { cvGainRef.current.disconnect(); } catch (e) {}
+      cvGainRef.current = null;
+    }
     const cvGain = audioContext.createGain();
     cvGain.gain.value = cvAmount;
+    cvGainRef.current = cvGain;
     cv.current.gain.connect(cvGain);
     const param = nodeRef.current.parameters.get('cutoff');
     if (param) cvGain.connect(param);
@@ -241,8 +273,11 @@ export const DiodeFilter = React.forwardRef<DiodeFilterHandle, DiodeFilterProps>
     return () => {
       try { cv.current?.gain.disconnect(cvGain); } catch (e) {}
       try { cvGain.disconnect(); } catch (e) {}
+      if (cvGainRef.current === cvGain) {
+        cvGainRef.current = null;
+      }
     };
-  }, [cv?.current?.audioNode ? String(cv.current.audioNode) : 'null', cvAmount]);
+  }, [cv?.current?.audioNode ? String(cv.current.audioNode) : 'null', cvAmount, isReady]);
 
   // Update parameters when props/state changes
   useEffect(() => {
