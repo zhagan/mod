@@ -120,7 +120,7 @@ export const ToneGenerator = React.forwardRef<ToneGeneratorHandle, ToneGenerator
 
     // Connect CV to frequency parameter via gain
     cv.current.gain.connect(cvGain);
-    cvGain.connect(oscillatorRef.current.frequency);
+    cvGain.connect(oscillatorRef.current.detune);
 
     return () => {
       if (cvGain && cv.current) {

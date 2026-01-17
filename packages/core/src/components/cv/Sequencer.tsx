@@ -3,12 +3,17 @@ import { useAudioContext } from '../../context/AudioContext';
 import { ModStreamRef } from '../../types/ModStream';
 import { useControlledState } from '../../hooks/useControlledState';
 
+export interface step {
+  active: boolean;
+  value: number;
+}
+
 export interface SequencerHandle {
   play: () => void;
   pause: () => void;
   reset: () => void;
   getState: () => {
-    steps: number[];
+    steps: step[];
     currentStep: number;
     bpm: number;
     isPlaying: boolean;
@@ -16,11 +21,13 @@ export interface SequencerHandle {
 }
 
 export interface SequencerRenderProps {
-  steps: number[];
-  setSteps: (steps: number[]) => void;
+  steps: step[];
+  setSteps: (steps: step[]) => void;
   currentStep: number;
   bpm: number;
   setBpm: (value: number) => void;
+  division: number;
+  setDivision: (value: number) => void;
   isPlaying: boolean;
   play: () => void;
   pause: () => void;
@@ -33,10 +40,12 @@ export interface SequencerProps {
   label?: string;
   numSteps?: number;
   // Controlled props
-  steps?: number[];
-  onStepsChange?: (steps: number[]) => void;
+  steps?: step[];
+  onStepsChange?: (steps: step[]) => void;
   bpm?: number;
   onBpmChange?: (bpm: number) => void;
+  division?: number;
+  onDivisionChange?: (division: number) => void;
   // Event callbacks
   onCurrentStepChange?: (currentStep: number) => void;
   onPlayingChange?: (isPlaying: boolean) => void;
@@ -53,14 +62,21 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
   onStepsChange,
   bpm: controlledBpm,
   onBpmChange,
+  division: controlledDivision,
+  onDivisionChange,
   onCurrentStepChange,
   onPlayingChange,
   children,
 }, ref) => {
   const audioContext = useAudioContext();
-  const [steps, setSteps] = useControlledState(controlledSteps, Array(numSteps).fill(0.5), onStepsChange);
+  const initialSteps: step[] = []
+  for (let i = 0; i < numSteps ; i++) {
+    initialSteps.push({active: false, value: 0.5})
+  }
+  const [steps, setSteps] = useControlledState(controlledSteps, initialSteps, onStepsChange);
   const [currentStep, setCurrentStep] = useState(0);
   const [bpm, setBpm] = useControlledState(controlledBpm, 120, onBpmChange);
+  const [division, setDivision] = useControlledState(controlledDivision, 4, onDivisionChange);
   const [isPlaying, setIsPlaying] = useState(false);
 
   const constantSourceRef = useRef<ConstantSourceNode | null>(null);
@@ -68,15 +84,19 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
   const gateSourceRef = useRef<ConstantSourceNode | null>(null);
   const gateGainRef = useRef<GainNode | null>(null);
   const intervalRef = useRef<number | null>(null);
-
+  const schedulerRef = useRef<number | null>(null);
+  const nextStepTimeRef = useRef<number>(0);
   // Store refs for current state
   const stepsRef = useRef(steps);
   const currentStepRef = useRef(currentStep);
   const bpmRef = useRef(bpm);
+  const divisionRef = useRef(division);
+
 
   useEffect(() => { stepsRef.current = steps; }, [steps]);
   useEffect(() => { currentStepRef.current = currentStep; }, [currentStep]);
   useEffect(() => { bpmRef.current = bpm; }, [bpm]);
+  useEffect(() => { divisionRef.current = division; }, [division]);
 
   // Create sequencer nodes once
   useEffect(() => {
@@ -84,7 +104,7 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
 
     // Use ConstantSourceNode to output CV values
     const constantSource = audioContext.createConstantSource();
-    constantSource.offset.value = steps[0] || 0.5;
+    constantSource.offset.value = steps[0].value || 0.5;
     constantSourceRef.current = constantSource;
 
     // Create gain node for output
@@ -164,43 +184,47 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
   const play = () => {
     if (isPlaying || !audioContext) return;
     setIsPlaying(true);
-
-    const stepDuration = (60 / bpmRef.current) * 1000; // milliseconds per step
-
-    intervalRef.current = window.setInterval(() => {
-      setCurrentStep((prev) => {
-        const nextStep = (prev + 1) % stepsRef.current.length;
-
-        // Update the constant source value
-        if (constantSourceRef.current) {
-          const now = audioContext.currentTime;
-          constantSourceRef.current.offset.setValueAtTime(stepsRef.current[nextStep], now);
-        }
-
-        // Trigger gate pulse
-        if (gateSourceRef.current) {
-          const now = audioContext.currentTime;
-          const gateDuration = stepDuration * 0.8; // Gate held for 80% of step duration
-
-          // Pulse high then low
-          gateSourceRef.current.offset.setValueAtTime(1, now);
-          gateSourceRef.current.offset.setValueAtTime(0, now + gateDuration);
-        }
-
-        return nextStep;
-      });
-    }, stepDuration);
+    nextStepTimeRef.current = audioContext.currentTime;
+    scheduleSteps();
   };
 
   // Pause function
   const pause = () => {
     if (!isPlaying) return;
     setIsPlaying(false);
-
-    if (intervalRef.current !== null) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
+    if (schedulerRef.current !== null) {
+      clearTimeout(schedulerRef.current);
+      schedulerRef.current = null;
     }
+  };
+
+  const scheduleSteps = () => {
+    if (!audioContext) return;
+
+    const stepDuration = (60 / bpmRef.current) / divisionRef.current; // seconds per step
+    const lookahead = 0.1; // seconds to look ahead
+    const scheduleAheadTime = 0.05; // seconds
+
+    while (nextStepTimeRef.current < audioContext.currentTime + lookahead) {
+      // Schedule step at nextStepTimeRef.current
+      const stepIdx = (currentStepRef.current + 1) % stepsRef.current.length;
+
+      // Set CV/gate at scheduled time
+      if (constantSourceRef.current) {
+        constantSourceRef.current.offset.setValueAtTime(stepsRef.current[stepIdx].value, nextStepTimeRef.current);
+      }
+      if (gateSourceRef.current && stepsRef.current[stepIdx].active) {
+        gateSourceRef.current.offset.setValueAtTime(1, nextStepTimeRef.current);
+        gateSourceRef.current.offset.setValueAtTime(0, nextStepTimeRef.current + stepDuration * 0.8);
+      }
+
+      // Update for next step
+      nextStepTimeRef.current += stepDuration;
+      setCurrentStep(stepIdx);
+    }
+
+    // Schedule next scheduler tick
+    schedulerRef.current = window.setTimeout(scheduleSteps, scheduleAheadTime * 1000);
   };
 
   // Reset function
@@ -209,47 +233,22 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
     setCurrentStep(0);
     if (constantSourceRef.current && audioContext) {
       const now = audioContext.currentTime;
-      constantSourceRef.current.offset.setValueAtTime(stepsRef.current[0], now);
+      constantSourceRef.current.offset.setValueAtTime(stepsRef.current[0].value, now);
     }
   };
 
   // Update interval when BPM changes
   useEffect(() => {
     if (isPlaying && audioContext) {
-      // Clear existing interval
-      if (intervalRef.current !== null) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
+      // Clear existing scheduler
+      if (schedulerRef.current !== null) {
+        clearTimeout(schedulerRef.current);
+        schedulerRef.current = null;
       }
 
-      // Restart with new BPM
-      const stepDuration = (60 / bpmRef.current) * 1000; // milliseconds per step
-
-      intervalRef.current = window.setInterval(() => {
-        setCurrentStep((prev) => {
-          const nextStep = (prev + 1) % stepsRef.current.length;
-
-          // Update the constant source value
-          if (constantSourceRef.current) {
-            const now = audioContext.currentTime;
-            constantSourceRef.current.offset.setValueAtTime(stepsRef.current[nextStep], now);
-          }
-
-          // Trigger gate pulse
-          if (gateSourceRef.current) {
-            const now = audioContext.currentTime;
-            const gateDuration = 0.01; // 10ms gate pulse
-
-            // Pulse high then low
-            gateSourceRef.current.offset.setValueAtTime(1, now);
-            gateSourceRef.current.offset.setValueAtTime(0, now + gateDuration);
-          }
-
-          return nextStep;
-        });
-      }, stepDuration);
+      scheduleSteps();
     }
-  }, [bpm]);
+  }, [bpm, division]);
 
   // Expose imperative handle
   useImperativeHandle(ref, () => ({
@@ -276,6 +275,8 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
       currentStep,
       bpm,
       setBpm,
+      division,
+      setDivision,
       isPlaying,
       play,
       pause,
