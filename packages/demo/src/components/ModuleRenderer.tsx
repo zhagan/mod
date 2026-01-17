@@ -45,7 +45,21 @@ import {
   Select as ModUISelect,
   Button as ModUIButton,
 } from '@mode-7/mod';
-import { Volume2, VolumeX, Play, Pause, RefreshCw, Mic, MicOff, Square, Upload, Repeat, Zap, X, RotateCcw } from 'lucide-react';
+import {
+  Volume2,
+  VolumeX,
+  Play,
+  Pause,
+  RefreshCw,
+  Mic,
+  MicOff,
+  Square,
+  Upload,
+  Repeat,
+  Zap,
+  X,
+  RotateCcw
+} from 'lucide-react';
 import {
   OscilloscopeCanvas,
   SpectrumAnalyzerCanvas,
@@ -64,12 +78,12 @@ interface ModuleRendererProps {
 }
 
 export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
-  moduleType,
-  inputStreams,
-  outputStreams,
-  cvInputStreams,
-  enabled = true,
-}) => {
+                                                                moduleType,
+                                                                inputStreams,
+                                                                outputStreams,
+                                                                cvInputStreams,
+                                                                enabled = true,
+                                                              }) => {
   const input = inputStreams[0];
   const input2 = inputStreams[1];
   const output = outputStreams[0];
@@ -82,7 +96,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
       return output ? (
         <ToneGenerator output={output} cv={cv}>
           {(controls) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <ModUISlider
                 label="Frequency"
                 value={controls.frequency}
@@ -106,10 +120,10 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 value={controls.waveform}
                 onChange={(v) => controls.setWaveform(v as any)}
                 options={[
-                  { value: 'sine', label: 'Sine' },
-                  { value: 'square', label: 'Square' },
-                  { value: 'sawtooth', label: 'Sawtooth' },
-                  { value: 'triangle', label: 'Triangle' },
+                  {value: 'sine', label: 'Sine'},
+                  {value: 'square', label: 'Square'},
+                  {value: 'sawtooth', label: 'Sawtooth'},
+                  {value: 'triangle', label: 'Triangle'},
                 ]}
               />
             </div>
@@ -121,7 +135,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
       return output ? (
         <NoiseGenerator output={output} cv={cv}>
           {(controls) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <ModUISlider
                 label="Gain"
                 value={controls.gain}
@@ -135,8 +149,8 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 value={controls.type}
                 onChange={(v) => controls.setType(v as any)}
                 options={[
-                  { value: 'white', label: 'White' },
-                  { value: 'pink', label: 'Pink' },
+                  {value: 'white', label: 'White'},
+                  {value: 'pink', label: 'Pink'},
                 ]}
               />
             </div>
@@ -148,7 +162,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
       return output ? (
         <Microphone output={output}>
           {(controls) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <ModUISlider
                 label="Gain"
                 value={controls.gain}
@@ -162,7 +176,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 value={controls.selectedDeviceId || '__default__'}
                 onChange={(deviceId) => controls.selectDevice(deviceId === '__default__' ? '' : deviceId)}
                 options={[
-                  { value: '__default__', label: 'Default Device' },
+                  {value: '__default__', label: 'Default Device'},
                   ...controls.devices
                     .filter(device => device.deviceId) // Filter out devices with empty deviceId
                     .map(device => ({
@@ -172,16 +186,16 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 ]}
                 placeholder="Select Input Device"
               />
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div style={{display: 'flex', gap: '8px'}}>
                 <ModUIButton
-                  icon={controls.isMuted ? <MicOff size={16} /> : <Mic size={16} />}
+                  icon={controls.isMuted ? <MicOff size={16}/> : <Mic size={16}/>}
                   active={controls.isMuted}
                   onClick={() => controls.setMuted(!controls.isMuted)}
                   variant="danger"
                   title={controls.isMuted ? 'Unmute' : 'Mute'}
                 />
                 <ModUIButton
-                  icon={<RefreshCw size={16} />}
+                  icon={<RefreshCw size={16}/>}
                   onClick={() => controls.refreshDevices()}
                   title="Refresh Input Devices"
                 />
@@ -193,9 +207,9 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Monitor':
       return (
-        <Monitor input={input || { current: null }}>
+        <Monitor input={input || {current: null}}>
           {(controls) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <ModUISlider
                 label="Volume"
                 value={controls.gain}
@@ -209,7 +223,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 value={controls.selectedDeviceId || '__default__'}
                 onChange={(deviceId) => controls.selectDevice(deviceId === '__default__' ? '' : deviceId)}
                 options={[
-                  { value: '__default__', label: 'Default Device' },
+                  {value: '__default__', label: 'Default Device'},
                   ...controls.devices
                     .filter(device => device.deviceId) // Filter out devices with empty deviceId
                     .map(device => ({
@@ -219,16 +233,16 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 ]}
                 placeholder="Select Output Device"
               />
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div style={{display: 'flex', gap: '8px'}}>
                 <ModUIButton
-                  icon={controls.isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                  icon={controls.isMuted ? <VolumeX size={16}/> : <Volume2 size={16}/>}
                   active={controls.isMuted}
                   onClick={() => controls.setMuted(!controls.isMuted)}
                   variant="danger"
                   title={controls.isMuted ? 'Unmute' : 'Mute'}
                 />
                 <ModUIButton
-                  icon={<RefreshCw size={16} />}
+                  icon={<RefreshCw size={16}/>}
                   onClick={() => controls.refreshDevices()}
                   title="Refresh Output Devices"
                 />
@@ -240,9 +254,9 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Filter':
       return output ? (
-        <Filter input={input || { current: null }} output={output} cv={cv} enabled={enabled}>
+        <Filter input={input || {current: null}} output={output} cv={cv} enabled={enabled}>
           {(controls) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center'}}>
               <XYPad
                 valueX={controls.frequency}
                 valueY={controls.Q}
@@ -264,14 +278,14 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 value={controls.type}
                 onChange={(v) => controls.setType(v as any)}
                 options={[
-                  { value: 'lowpass', label: 'Low Pass' },
-                  { value: 'highpass', label: 'High Pass' },
-                  { value: 'bandpass', label: 'Band Pass' },
-                  { value: 'lowshelf', label: 'Low Shelf' },
-                  { value: 'highshelf', label: 'High Shelf' },
-                  { value: 'peaking', label: 'Peaking' },
-                  { value: 'notch', label: 'Notch' },
-                  { value: 'allpass', label: 'All Pass' },
+                  {value: 'lowpass', label: 'Low Pass'},
+                  {value: 'highpass', label: 'High Pass'},
+                  {value: 'bandpass', label: 'Band Pass'},
+                  {value: 'lowshelf', label: 'Low Shelf'},
+                  {value: 'highshelf', label: 'High Shelf'},
+                  {value: 'peaking', label: 'Peaking'},
+                  {value: 'notch', label: 'Notch'},
+                  {value: 'allpass', label: 'All Pass'},
                 ]}
                 placeholder="Filter Type"
               />
@@ -282,9 +296,9 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Delay':
       return output ? (
-        <Delay input={input || { current: null }} output={output} enabled={enabled}>
+        <Delay input={input || {current: null}} output={output} enabled={enabled}>
           {(controls) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <ModUISlider
                 label="Time"
                 value={controls.time}
@@ -319,9 +333,9 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Reverb':
       return output ? (
-        <Reverb input={input || { current: null }} output={output} enabled={enabled}>
+        <Reverb input={input || {current: null}} output={output} enabled={enabled}>
           {(controls) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <ModUISlider
                 label="Wet"
                 value={controls.wet}
@@ -356,9 +370,9 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Compressor':
       return output ? (
-        <Compressor input={input || { current: null }} output={output} enabled={enabled}>
+        <Compressor input={input || {current: null}} output={output} enabled={enabled}>
           {(controls) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <ModUISlider
                 label="Threshold"
                 value={controls.threshold}
@@ -384,9 +398,9 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Distortion':
       return output ? (
-        <Distortion input={input || { current: null }} output={output} enabled={enabled}>
+        <Distortion input={input || {current: null}} output={output} enabled={enabled}>
           {(controls) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <ModUISlider
                 label="Amount"
                 value={controls.amount}
@@ -403,9 +417,9 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Panner':
       return output ? (
-        <Panner input={input || { current: null }} output={output} cv={cv} enabled={enabled}>
+        <Panner input={input || {current: null}} output={output} cv={cv} enabled={enabled}>
           {(controls) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <ModUISlider
                 label="Pan"
                 value={controls.pan}
@@ -422,9 +436,9 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'CrossFade':
       return output ? (
-        <CrossFade inputs={[input || { current: null }, input2 || { current: null }]} output={output} enabled={enabled}>
+        <CrossFade inputs={[input || {current: null}, input2 || {current: null}]} output={output} enabled={enabled}>
           {(controls) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <ModUISlider
                 label="Mix"
                 value={controls.mix}
@@ -438,12 +452,12 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 value={controls.mode}
                 onChange={(v) => controls.setMode(v as any)}
                 options={[
-                  { value: 'linear', label: 'Linear' },
-                  { value: 'equal-power', label: 'Equal Power' },
-                  { value: 'equal-gain', label: 'Equal Gain' },
-                  { value: 'exponential', label: 'Exponential' },
-                  { value: 'dj-cut', label: 'DJ Cut' },
-                  { value: 'smooth-step', label: 'Smooth Step' },
+                  {value: 'linear', label: 'Linear'},
+                  {value: 'equal-power', label: 'Equal Power'},
+                  {value: 'equal-gain', label: 'Equal Gain'},
+                  {value: 'exponential', label: 'Exponential'},
+                  {value: 'dj-cut', label: 'DJ Cut'},
+                  {value: 'smooth-step', label: 'Smooth Step'},
                 ]}
                 placeholder="Crossfade Mode"
               />
@@ -455,13 +469,13 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
     case 'Mixer':
       return output ? (
         <Mixer inputs={[
-          inputStreams[0] || { current: null },
-          inputStreams[1] || { current: null },
-          inputStreams[2] || { current: null },
-          inputStreams[3] || { current: null }
+          inputStreams[0] || {current: null},
+          inputStreams[1] || {current: null},
+          inputStreams[2] || {current: null},
+          inputStreams[3] || {current: null}
         ]} output={output} enabled={enabled}>
           {(controls) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>
               {controls.levels.map((level, i) => (
                 <ModUISlider
                   key={i}
@@ -481,9 +495,9 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'EQ':
       return output ? (
-        <EQ input={input || { current: null }} output={output} enabled={enabled}>
+        <EQ input={input || {current: null}} output={output} enabled={enabled}>
           {(controls) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>
               <ModUISlider
                 label="Low"
                 value={controls.lowGain}
@@ -518,9 +532,9 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Chorus':
       return output ? (
-        <Chorus input={input || { current: null }} output={output} enabled={enabled}>
+        <Chorus input={input || {current: null}} output={output} enabled={enabled}>
           {(controls) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center'}}>
               <XYPad
                 valueX={controls.rate}
                 valueY={controls.depth}
@@ -554,9 +568,9 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Phaser':
       return output ? (
-        <Phaser input={input || { current: null }} output={output} enabled={enabled}>
+        <Phaser input={input || {current: null}} output={output} enabled={enabled}>
           {(controls) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center'}}>
               <XYPad
                 valueX={controls.rate}
                 valueY={controls.depth}
@@ -590,9 +604,9 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Flanger':
       return output ? (
-        <Flanger input={input || { current: null }} output={output} enabled={enabled}>
+        <Flanger input={input || {current: null}} output={output} enabled={enabled}>
           {(controls) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center'}}>
               <XYPad
                 valueX={controls.rate}
                 valueY={controls.depth}
@@ -626,9 +640,9 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Tremolo':
       return output ? (
-        <Tremolo input={input || { current: null }} output={output} enabled={enabled}>
+        <Tremolo input={input || {current: null}} output={output} enabled={enabled}>
           {(controls) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center'}}>
               <XYPad
                 valueX={controls.rate}
                 valueY={controls.depth}
@@ -653,9 +667,9 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'BitCrusher':
       return output ? (
-        <BitCrusher input={input || { current: null }} output={output} enabled={enabled}>
+        <BitCrusher input={input || {current: null}} output={output} enabled={enabled}>
           {(controls) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <ModUISlider
                 label="Bit Depth"
                 value={controls.bitDepth}
@@ -681,9 +695,9 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Limiter':
       return output ? (
-        <Limiter input={input || { current: null }} output={output} enabled={enabled}>
+        <Limiter input={input || {current: null}} output={output} enabled={enabled}>
           {(controls) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <ModUISlider
                 label="Threshold"
                 value={controls.threshold}
@@ -709,9 +723,9 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Gate':
       return output ? (
-        <Gate input={input || { current: null }} output={output} enabled={enabled}>
+        <Gate input={input || {current: null}} output={output} enabled={enabled}>
           {(controls) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <ModUISlider
                 label="Threshold"
                 value={controls.threshold}
@@ -746,9 +760,9 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'AutoWah':
       return output ? (
-        <AutoWah input={input || { current: null }} output={output} enabled={enabled}>
+        <AutoWah input={input || {current: null}} output={output} enabled={enabled}>
           {(controls) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <ModUISlider
                 label="Sensitivity"
                 value={controls.sensitivity}
@@ -783,9 +797,9 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'RingModulator':
       return output ? (
-        <RingModulator input={input || { current: null }} output={output} enabled={enabled}>
+        <RingModulator input={input || {current: null}} output={output} enabled={enabled}>
           {(controls) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <ModUISlider
                 label="Frequency"
                 value={controls.frequency}
@@ -811,9 +825,9 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'VCA':
       return output ? (
-        <VCA input={input || { current: null }} output={output} cv={cv} enabled={enabled}>
+        <VCA input={input || {current: null}} output={output} cv={cv} enabled={enabled}>
           {(controls) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <ModUISlider
                 label="Gain"
                 value={controls.gain}
@@ -832,7 +846,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
       return output ? (
         <LFO output={output}>
           {(controls) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <ModUISlider
                 label="Frequency"
                 value={controls.frequency}
@@ -855,10 +869,12 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 value={controls.waveform}
                 onChange={(v) => controls.setWaveform(v as any)}
                 options={[
-                  { value: 'sine', label: 'Sine' },
-                  { value: 'square', label: 'Square' },
-                  { value: 'sawtooth', label: 'Sawtooth' },
-                  { value: 'triangle', label: 'Triangle' },
+                  {value: 'sine', label: 'Sine'},
+                  {value: 'square', label: 'Square'},
+                  {value: 'saw down', label: 'SawDown'},
+                  {value: 'saw up', label: 'SawUp'},
+                  {value: 'triangle', label: 'Triangle'},
+                  {value: 'sampleHold', label: 'S&H'},
                 ]}
               />
             </div>
@@ -870,7 +886,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
       return output ? (
         <ADSR gate={cv} output={output}>
           {(controls) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>
               <ModUISlider
                 label="Attack"
                 value={controls.attack}
@@ -907,15 +923,15 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 step={0.001}
                 formatValue={(v) => `${v.toFixed(3)}s`}
               />
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div style={{display: 'flex', gap: '8px'}}>
                 <ModUIButton
-                  icon={<Zap size={16} />}
+                  icon={<Zap size={16}/>}
                   onClick={controls.trigger}
                   variant="success"
                   title="Trigger"
                 />
                 <ModUIButton
-                  icon={<X size={16} />}
+                  icon={<X size={16}/>}
                   onClick={controls.releaseGate}
                   variant="danger"
                   title="Release"
@@ -931,7 +947,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
       return output ? (
         <Sequencer output={output} gateOutput={gateOutput}>
           {(controls) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <ModUISlider
                 label="BPM"
                 value={controls.bpm}
@@ -941,34 +957,65 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 step={1}
                 formatValue={(v) => v.toFixed(0)}
               />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <ModUISelect
+                value={controls.division.toString()}
+                onChange={ (value) => {
+                  controls.setDivision(parseInt(value as string, 10));
+                }}
+                options={[
+                  {value: '1', label: '1/4'},
+                  {value: '2', label: '1/8'},
+                  {value: '3', label: '.1/16'},
+                  {value: '4', label: '1/16'},
+                  {value: '6', label: '.1/32'},
+                  {value: '8', label: '1/32'},
+                  {value: '12', label: '.1/64'},
+                  {value: '16', label: '1/64'},
+                ]}/>
+              <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
                 {controls.steps.map((step, i) => (
-                  <ModUISlider
-                    key={i}
-                    label={`Step ${i + 1}`}
-                    value={step}
-                    onChange={(value) => {
-                      const newSteps = [...controls.steps];
-                      newSteps[i] = value;
-                      controls.setSteps(newSteps);
-                    }}
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    formatValue={(v) => v.toFixed(2)}
-                  />
+                  <div key={`seq-div-${i}`} style={{display: 'flex', alignItems: 'center', flexDirection: 'row', gap: '12px'}}>
+                    <div className="enabled-toggle-dot"
+                         key={`step-indicator-${i}`}
+                         style={{backgroundColor: i === controls.currentStep && controls.isPlaying ? 'red' : 'lightblue'}}>
+                    </div>
+                    <ModUIButton
+                      key={`step-button-${i}`}
+                      active={step.active}
+                      onClick={() => {
+                        const newSteps = [...controls.steps]
+                        newSteps[i].active = !newSteps[i].active;
+                        controls.setSteps(newSteps);
+                      }}
+                    >
+                    </ModUIButton>
+                    <ModUISlider
+                      key={i}
+                      label={`Step ${i + 1}`}
+                      value={step.value}
+                      onChange={(value) => {
+                        const newSteps = [...controls.steps];
+                        newSteps[i].value = value;
+                        controls.setSteps(newSteps);
+                      }}
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      formatValue={(v) => v.toFixed(2)}
+                    />
+                  </div>
                 ))}
               </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div style={{display: 'flex', gap: '8px'}}>
                 <ModUIButton
-                  icon={controls.isPlaying ? <Pause size={16} /> : <Play size={16} />}
+                  icon={controls.isPlaying ? <Pause size={16}/> : <Play size={16}/>}
                   active={controls.isPlaying}
                   onClick={controls.isPlaying ? controls.pause : controls.play}
                   variant="success"
                   title={controls.isPlaying ? 'Pause' : 'Play'}
                 />
                 <ModUIButton
-                  icon={<RotateCcw size={16} />}
+                  icon={<RotateCcw size={16}/>}
                   onClick={controls.reset}
                   title="Reset"
                 />
@@ -982,7 +1029,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
       return output ? (
         <Clock output={output}>
           {(controls) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center'}}>
               <Knob
                 label="BPM"
                 value={controls.bpm}
@@ -994,16 +1041,16 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 formatValue={(v) => v.toFixed(0)}
                 className="clock-knob"
               />
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div style={{display: 'flex', gap: '8px'}}>
                 <ModUIButton
-                  icon={controls.isRunning ? <Pause size={16} /> : <Play size={16} />}
+                  icon={controls.isRunning ? <Pause size={16}/> : <Play size={16}/>}
                   active={controls.isRunning}
                   onClick={controls.isRunning ? controls.stop : controls.start}
                   variant="success"
                   title={controls.isRunning ? 'Stop' : 'Start'}
                 />
                 <ModUIButton
-                  icon={<RotateCcw size={16} />}
+                  icon={<RotateCcw size={16}/>}
                   onClick={controls.reset}
                   title="Reset"
                 />
@@ -1035,12 +1082,12 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
             const hasAudio = controls.duration > 0;
 
             return (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
                 <ModUIFilePicker
                   onFileSelect={(file) => controls.loadFile(file)}
                   accept="audio/*"
                   label="Load Audio"
-                  icon={<Upload size={14} />}
+                  icon={<Upload size={14}/>}
                 />
                 <ModUISlider
                   label="Gain"
@@ -1051,9 +1098,9 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                   step={0.01}
                   formatValue={(v) => v.toFixed(2)}
                 />
-                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                <div style={{display: 'flex', gap: '8px', justifyContent: 'center'}}>
                   <ModUIButton
-                    icon={controls.isPlaying ? <Pause size={16} /> : <Play size={16} />}
+                    icon={controls.isPlaying ? <Pause size={16}/> : <Play size={16}/>}
                     active={controls.isPlaying}
                     onClick={controls.isPlaying ? controls.pause : controls.play}
                     variant="success"
@@ -1061,13 +1108,13 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                     disabled={!hasAudio}
                   />
                   <ModUIButton
-                    icon={<Square size={16} />}
+                    icon={<Square size={16}/>}
                     onClick={controls.stop}
                     title="Stop"
                     disabled={!hasAudio}
                   />
                   <ModUIButton
-                    icon={<Repeat size={16} />}
+                    icon={<Repeat size={16}/>}
                     active={controls.loop}
                     onClick={() => controls.setLoop(!controls.loop)}
                     title="Loop"
@@ -1104,7 +1151,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
             const hasAudio = controls.duration > 0;
 
             return (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
                 <ModUITextInput
                   value={controls.url}
                   onChange={controls.setUrl}
@@ -1121,9 +1168,9 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                   step={0.01}
                   formatValue={(v) => v.toFixed(2)}
                 />
-                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                <div style={{display: 'flex', gap: '8px', justifyContent: 'center'}}>
                   <ModUIButton
-                    icon={controls.isPlaying ? <Pause size={16} /> : <Play size={16} />}
+                    icon={controls.isPlaying ? <Pause size={16}/> : <Play size={16}/>}
                     active={controls.isPlaying}
                     onClick={controls.isPlaying ? controls.pause : controls.play}
                     variant="success"
@@ -1131,13 +1178,13 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                     disabled={!hasAudio}
                   />
                   <ModUIButton
-                    icon={<Square size={16} />}
+                    icon={<Square size={16}/>}
                     onClick={controls.stop}
                     title="Stop"
                     disabled={!hasAudio}
                   />
                   <ModUIButton
-                    icon={<Repeat size={16} />}
+                    icon={<Repeat size={16}/>}
                     active={controls.loop}
                     onClick={() => controls.setLoop(!controls.loop)}
                     title="Loop"
@@ -1163,7 +1210,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
     case 'Oscilloscope':
       return input ? (
         <Oscilloscope input={input}>
-          {({ dataArray, bufferLength, isActive }) => (
+          {({dataArray, bufferLength, isActive}) => (
             isActive ? (
               <OscilloscopeCanvas
                 dataArray={dataArray}
@@ -1173,18 +1220,40 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 lineWidth={2}
               />
             ) : (
-              <div style={{ width: '100%', height: '150px', backgroundColor: '#0a0a0a', borderRadius: '4px', border: '1px solid #1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666', fontSize: '12px' }}>
+              <div style={{
+                width: '100%',
+                height: '150px',
+                backgroundColor: '#0a0a0a',
+                borderRadius: '4px',
+                border: '1px solid #1a1a1a',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#666',
+                fontSize: '12px'
+              }}>
                 No Signal
               </div>
             )
           )}
         </Oscilloscope>
       ) : (
-        <div style={{ width: '100%', height: '150px', backgroundColor: '#0a0a0a', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666', fontSize: '12px', border: '1px solid #1a1a1a' }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ marginBottom: '4px', opacity: 0.5 }}>───────</div>
+        <div style={{
+          width: '100%',
+          height: '150px',
+          backgroundColor: '#0a0a0a',
+          borderRadius: '4px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#666',
+          fontSize: '12px',
+          border: '1px solid #1a1a1a'
+        }}>
+          <div style={{textAlign: 'center'}}>
+            <div style={{marginBottom: '4px', opacity: 0.5}}>───────</div>
             <div>No Signal</div>
-            <div style={{ fontSize: '10px', opacity: 0.5, marginTop: '4px' }}>Connect Input</div>
+            <div style={{fontSize: '10px', opacity: 0.5, marginTop: '4px'}}>Connect Input</div>
           </div>
         </div>
       );
@@ -1192,7 +1261,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
     case 'SpectrumAnalyzer':
       return input ? (
         <SpectrumAnalyzer input={input}>
-          {({ dataArray, bufferLength, isActive }) => (
+          {({dataArray, bufferLength, isActive}) => (
             isActive ? (
               <SpectrumAnalyzerCanvas
                 dataArray={dataArray}
@@ -1200,18 +1269,40 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 height={150}
               />
             ) : (
-              <div style={{ width: '100%', height: '150px', backgroundColor: '#0a0a0a', borderRadius: '4px', border: '1px solid #1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666', fontSize: '12px' }}>
+              <div style={{
+                width: '100%',
+                height: '150px',
+                backgroundColor: '#0a0a0a',
+                borderRadius: '4px',
+                border: '1px solid #1a1a1a',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#666',
+                fontSize: '12px'
+              }}>
                 No Signal
               </div>
             )
           )}
         </SpectrumAnalyzer>
       ) : (
-        <div style={{ width: '100%', height: '150px', backgroundColor: '#0a0a0a', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666', fontSize: '12px', border: '1px solid #1a1a1a' }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ marginBottom: '4px', opacity: 0.5 }}>▂▃▅▇█▇▅▃▂</div>
+        <div style={{
+          width: '100%',
+          height: '150px',
+          backgroundColor: '#0a0a0a',
+          borderRadius: '4px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#666',
+          fontSize: '12px',
+          border: '1px solid #1a1a1a'
+        }}>
+          <div style={{textAlign: 'center'}}>
+            <div style={{marginBottom: '4px', opacity: 0.5}}>▂▃▅▇█▇▅▃▂</div>
             <div>No Signal</div>
-            <div style={{ fontSize: '10px', opacity: 0.5, marginTop: '4px' }}>Connect Input</div>
+            <div style={{fontSize: '10px', opacity: 0.5, marginTop: '4px'}}>Connect Input</div>
           </div>
         </div>
       );
@@ -1219,7 +1310,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
     case 'LevelMeter':
       return input ? (
         <LevelMeter input={input}>
-          {({ level, peak, isClipping, isActive }) => (
+          {({level, peak, isClipping, isActive}) => (
             isActive ? (
               <LevelMeterCanvas
                 level={level}
@@ -1229,23 +1320,45 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 orientation="horizontal"
               />
             ) : (
-              <div style={{ width: '100%', height: '60px', backgroundColor: '#0a0a0a', borderRadius: '4px', border: '1px solid #1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666', fontSize: '12px' }}>
+              <div style={{
+                width: '100%',
+                height: '60px',
+                backgroundColor: '#0a0a0a',
+                borderRadius: '4px',
+                border: '1px solid #1a1a1a',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#666',
+                fontSize: '12px'
+              }}>
                 No Signal
               </div>
             )
           )}
         </LevelMeter>
       ) : (
-        <div style={{ width: '100%', height: '60px', backgroundColor: '#0a0a0a', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666', fontSize: '12px', border: '1px solid #1a1a1a' }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ marginBottom: '4px', opacity: 0.5 }}>━━━━━━━━━━</div>
+        <div style={{
+          width: '100%',
+          height: '60px',
+          backgroundColor: '#0a0a0a',
+          borderRadius: '4px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#666',
+          fontSize: '12px',
+          border: '1px solid #1a1a1a'
+        }}>
+          <div style={{textAlign: 'center'}}>
+            <div style={{marginBottom: '4px', opacity: 0.5}}>━━━━━━━━━━</div>
             <div>No Signal</div>
-            <div style={{ fontSize: '10px', opacity: 0.5, marginTop: '4px' }}>Connect Input</div>
+            <div style={{fontSize: '10px', opacity: 0.5, marginTop: '4px'}}>Connect Input</div>
           </div>
         </div>
       );
 
     default:
-      return <div style={{ fontSize: '10px', color: '#999' }}>No UI</div>;
+      return <div style={{fontSize: '10px', color: '#999'}}>No UI</div>;
   }
 };

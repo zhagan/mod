@@ -3,7 +3,7 @@ import { useAudioContext } from '../../context/AudioContext';
 import { ModStreamRef } from '../../types/ModStream';
 import { useControlledState } from '../../hooks/useControlledState';
 
-export type LFOWaveform = 'sine' | 'square' | 'sawtooth' | 'triangle';
+export type LFOWaveform = 'sine' | 'square' | 'saw up' | 'saw down' | 'triangle' | 'sampleHold';
 
 export interface LFOHandle {
   getState: () => {
@@ -49,76 +49,152 @@ export const LFO = React.forwardRef<LFOHandle, LFOProps>(({
   children,
 }, ref) => {
   const audioContext = useAudioContext();
+
   const [frequency, setFrequency] = useControlledState(controlledFrequency, 1, onFrequencyChange);
   const [amplitude, setAmplitude] = useControlledState(controlledAmplitude, 1, onAmplitudeChange);
   const [waveform, setWaveform] = useControlledState<LFOWaveform>(controlledWaveform, 'sine', onWaveformChange);
 
+  // Regular LFO nodes
   const oscillatorRef = useRef<OscillatorNode | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
 
-  // Create LFO nodes once
+  // Sample & Hold nodes/timer
+  const constantRef = useRef<ConstantSourceNode | null>(null);
+  const shTimerRef = useRef<number | null>(null);
+
+  // Helper: stop interval safely
+  const stopSHTimer = () => {
+    if (shTimerRef.current != null) {
+      window.clearInterval(shTimerRef.current);
+      shTimerRef.current = null;
+    }
+  };
+
+  // Helper: (re)start sample & hold ticking at current frequency
+  const startSHTimer = (ctx: AudioContext, cv: ConstantSourceNode, hz: number) => {
+    stopSHTimer();
+
+    const safeHz = Math.max(0.001, hz);
+    const intervalMs = Math.max(5, Math.round(1000 / safeHz)); // clamp so we don't try 0ms
+
+    shTimerRef.current = window.setInterval(() => {
+      // random in [-1, 1]
+      const v = Math.random() * 2 - 1;
+
+      // schedule slightly ahead to reduce jitter
+      const t = ctx.currentTime + 0.01;
+      cv.offset.setValueAtTime(v, t);
+    }, intervalMs);
+  };
+
+  // Create nodes (and rebuild graph when waveform mode changes)
   useEffect(() => {
     if (!audioContext) return;
 
-    // Create oscillator for LFO
-    const oscillator = audioContext.createOscillator();
-    oscillator.type = waveform;
-    oscillator.frequency.value = frequency;
-    oscillatorRef.current = oscillator;
+      // --- Standard oscillator LFO ---
+      const oscillator = audioContext.createOscillator();
+      if (waveform === 'sine' || waveform === 'square' || waveform === 'triangle') oscillator.type = waveform;
+      else if (waveform === 'saw up' || waveform === 'saw down') oscillator.type = 'sawtooth';
 
-    // Create gain node to control amplitude
-    const gainNode = audioContext.createGain();
-    gainNode.gain.value = amplitude;
-    gainNodeRef.current = gainNode;
+      oscillator.frequency.value = frequency;
+      oscillatorRef.current = oscillator;
 
-    // Connect oscillator to gain
-    oscillator.connect(gainNode);
+      // Gain node (amplitude control) shared by both modes
+      const gainNode = audioContext.createGain();
+      gainNode.gain.value = amplitude;
+      gainNodeRef.current = gainNode;
 
-    // Start oscillator
-    oscillator.start(0);
 
-    // Set output ref
-    output.current = {
-      audioNode: oscillator,
-      gain: gainNode,
-      context: audioContext,
-      metadata: {
-        label,
-        sourceType: 'cv',
-      },
-    };
+      oscillator.connect(gainNode);
+      oscillator.start(0);
 
-    // Cleanup
-    return () => {
-      oscillator.stop();
-      oscillator.disconnect();
-      gainNode.disconnect();
-      output.current = null;
-      oscillatorRef.current = null;
-      gainNodeRef.current = null;
-    };
-  }, [audioContext, label]);
+      // --- Sample & Hold LFO (control-rate) ---
+      const cv = audioContext.createConstantSource();
+      cv.offset.value = 0;
+      constantRef.current = cv;
+
+      cv.start(0);
+
+      // start ticking
+      startSHTimer(audioContext, cv, frequency);
+
+      output.current = {
+        audioNode: waveform !== 'sampleHold' ? oscillator : cv,
+        gain: gainNode,
+        context: audioContext,
+        metadata: {
+          label,
+          sourceType: 'cv',
+        },
+      };
+
+      return () => {
+        oscillator.stop();
+        oscillator.disconnect();
+        oscillatorRef.current = null;
+        cv.stop();
+        cv.disconnect();
+        gainNode.disconnect();
+        output.current = null;
+        constantRef.current = null;
+        gainNodeRef.current = null;
+      };
+  }, [audioContext, label]); // rebuild on waveform change
 
   // Update frequency when it changes
   useEffect(() => {
+    if (!audioContext) return;
+
+    // Standard oscillator
     if (oscillatorRef.current) {
-      oscillatorRef.current.frequency.value = frequency;
+      oscillatorRef.current.frequency.setValueAtTime(frequency, audioContext.currentTime);
     }
-  }, [frequency]);
+
+    // SampleHold: restart interval at new rate
+    if (waveform === 'sampleHold' && constantRef.current) {
+      startSHTimer(audioContext, constantRef.current, frequency);
+    }
+  }, [frequency, audioContext, waveform]);
 
   // Update amplitude when it changes
   useEffect(() => {
-    if (gainNodeRef.current) {
+    if (gainNodeRef.current && waveform !== 'saw down') {
       gainNodeRef.current.gain.value = amplitude;
+    } else if (gainNodeRef.current && waveform === 'saw down') {
+      gainNodeRef.current.gain.value = -amplitude;
     }
-  }, [amplitude]);
+  }, [amplitude, waveform]);
 
   // Update waveform when it changes
   useEffect(() => {
-    if (oscillatorRef.current) {
-      oscillatorRef.current.type = waveform;
+    if (!audioContext || !gainNodeRef.current) return;
+
+    if (waveform === 'sampleHold' && constantRef.current) {
+      // Disconnect oscillator, connect constant source
+      oscillatorRef.current?.disconnect();
+      constantRef.current.connect(gainNodeRef.current);
+      output.current = {
+        audioNode: constantRef.current,
+        gain: gainNodeRef.current,
+        context: audioContext,
+        metadata: { label, sourceType: 'cv' },
+      };
+      startSHTimer(audioContext, constantRef.current, frequency);
+    } else if (oscillatorRef.current) {
+      // Disconnect constant source, connect oscillator
+      constantRef.current?.disconnect();
+      oscillatorRef.current.connect(gainNodeRef.current);
+      if (waveform === 'saw up' || waveform === 'saw down') oscillatorRef.current.type = 'sawtooth';
+      else oscillatorRef.current.type = waveform as OscillatorType;
+      output.current = {
+        audioNode: oscillatorRef.current,
+        gain: gainNodeRef.current,
+        context: audioContext,
+        metadata: { label, sourceType: 'cv' },
+      };
+      stopSHTimer();
     }
-  }, [waveform]);
+  }, [waveform, audioContext, frequency]);
 
   // Expose imperative handle
   useImperativeHandle(ref, () => ({
