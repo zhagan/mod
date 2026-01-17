@@ -425,8 +425,8 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 label="Cutoff"
                 value={controls.cutoff}
                 onChange={controls.setCutoff}
-                min={0.1}
-                max={20000}
+                min={20}
+                max={1000}
                 step={1}
                 formatValue={(v) => `${v.toFixed(0)} Hz`}
               />
