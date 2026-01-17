@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useLayoutEffect } from 'react';
 import { flushSync } from 'react-dom';
 import '@mode-7/mod/dist/index.css';
 import {
@@ -19,6 +19,7 @@ import {
   Reverb,
   Compressor,
   Distortion,
+  DiodeFilter,
   Panner,
   EQ,
   Chorus,
@@ -72,9 +73,31 @@ interface Connection {
   to: { moduleId: string; portId: string };
 }
 
+interface SketchModule {
+  id: string;
+  type: string;
+  position: Position;
+  enabled?: boolean;
+  params?: Record<string, any>;
+}
+
+interface SketchConnection {
+  id: string;
+  from: { moduleId: string; portId: string };
+  to: { moduleId: string; portId: string };
+}
+
+interface SketchData {
+  version: 1;
+  modules: SketchModule[];
+  connections: SketchConnection[];
+}
+
 function ModularSynth() {
   const [modules, setModules] = useState<ModuleData[]>([]);
   const [connections, setConnections] = useState<Connection[]>([]);
+  const [moduleParams, setModuleParams] = useState<Record<string, Record<string, any>>>({});
+  const [layoutVersion, setLayoutVersion] = useState(0);
   const [draggingConnection, setDraggingConnection] = useState<{
     from: { moduleId: string; portId: string };
     mousePos: Position;
@@ -96,10 +119,25 @@ function ModularSynth() {
     return streamRefs.current.get(portId);
   };
 
-  const addModule = (type: string, position?: Position) => {
-    const id = `module-${Date.now()}`;
-    const ports: Port[] = [];
+  const cloneParams = (params: Record<string, any>) => {
+    try {
+      return JSON.parse(JSON.stringify(params));
+    } catch {
+      return { ...params };
+    }
+  };
+
+  const getDefaultParams = (type: string) => {
     const definition = MODULE_DEFINITIONS[type];
+    return cloneParams(definition?.defaultParams ?? {});
+  };
+
+  const createModuleData = (type: string, position: Position, overrides?: { id?: string; enabled?: boolean }) => {
+    const definition = MODULE_DEFINITIONS[type];
+    if (!definition) return null;
+
+    const id = overrides?.id || `module-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const ports: Port[] = [];
 
     // Create input ports based on definition
     for (let i = 0; i < definition.inputs; i++) {
@@ -118,6 +156,8 @@ function ModularSynth() {
       ports.push({ id: `${id}-cv-freq`, type: 'input', label: 'CV' });
     } else if (type === 'NoiseGenerator') {
       ports.push({ id: `${id}-cv-gain`, type: 'input', label: 'CV' });
+    } else if (type === 'DiodeFilter') {
+      ports.push({ id: `${id}-cv-cutoff`, type: 'input', label: 'CV' });
     } else if (type === 'Panner') {
       ports.push({ id: `${id}-cv-pan`, type: 'input', label: 'CV' });
     } else if (type === 'VCA') {
@@ -139,12 +179,23 @@ function ModularSynth() {
     const newModule: ModuleData = {
       id,
       type,
-      position: position || { x: 100 + modules.length * 20, y: 100 + modules.length * 20 },
+      position,
       ports,
       color: definition.color,
-      enabled: true,
+      enabled: overrides?.enabled ?? true,
     };
+    return newModule;
+  };
+
+  const addModule = (type: string, position?: Position) => {
+    const defaultPosition = position || { x: 100 + modules.length * 20, y: 100 + modules.length * 20 };
+    const newModule = createModuleData(type, defaultPosition);
+    if (!newModule) return;
     setModules([...modules, newModule]);
+    setModuleParams(prev => ({
+      ...prev,
+      [newModule.id]: getDefaultParams(type),
+    }));
   };
 
   const moveModule = (id: string, position: Position) => {
@@ -158,6 +209,11 @@ function ModularSynth() {
     setConnections(prev => prev.filter(c =>
       c.from.moduleId !== id && c.to.moduleId !== id
     ));
+    setModuleParams(prev => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
   };
 
   const toggleModuleEnabled = (id: string) => {
@@ -176,6 +232,11 @@ function ModularSynth() {
   const clearPortPositionCache = () => {
     portPositionCacheRef.current.clear();
   };
+
+  useLayoutEffect(() => {
+    clearPortPositionCache();
+    setLayoutVersion((prev) => prev + 1);
+  }, [modules]);
 
   // Get position of a port element with caching
   const getPortPosition = (moduleId: string, portId: string): Position | null => {
@@ -342,6 +403,105 @@ function ModularSynth() {
     </button>
   );
 
+  const updateModuleParam = (moduleId: string, key: string, value: any) => {
+    setModuleParams(prev => ({
+      ...prev,
+      [moduleId]: {
+        ...(prev[moduleId] || {}),
+        [key]: value,
+      },
+    }));
+  };
+
+  const handleSaveSketch = () => {
+    const sketch: SketchData = {
+      version: 1,
+      modules: modules.map(module => ({
+        id: module.id,
+        type: module.type,
+        position: module.position,
+        enabled: module.enabled ?? true,
+        params: (() => {
+          const params = moduleParams[module.id] ? cloneParams(moduleParams[module.id]) : getDefaultParams(module.type);
+          if (module.type === 'MP3Deck' && typeof params.src === 'string' && params.src.startsWith('blob:')) {
+            delete params.src;
+          }
+          return params;
+        })(),
+      })),
+      connections: connections.map(connection => ({
+        id: connection.id,
+        from: connection.from,
+        to: connection.to,
+      })),
+    };
+
+    const blob = new Blob([JSON.stringify(sketch, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    link.href = url;
+    link.download = `mod-sketch-${timestamp}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleLoadSketch = async (file: File) => {
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text) as SketchData;
+      if (!parsed || parsed.version !== 1 || !Array.isArray(parsed.modules) || !Array.isArray(parsed.connections)) {
+        throw new Error('Unsupported sketch format.');
+      }
+
+      const nextModules = parsed.modules
+        .map(module => createModuleData(module.type, module.position, { id: module.id, enabled: module.enabled }))
+        .filter((module): module is ModuleData => module !== null);
+
+      const nextModuleParams: Record<string, Record<string, any>> = {};
+      parsed.modules.forEach(module => {
+        if (!MODULE_DEFINITIONS[module.type]) return;
+        const defaults = getDefaultParams(module.type);
+        nextModuleParams[module.id] = {
+          ...defaults,
+          ...(module.params ? cloneParams(module.params) : {}),
+        };
+      });
+
+      const moduleIdSet = new Set(nextModules.map(module => module.id));
+      const portIdSet = new Set(nextModules.flatMap(module => module.ports.map(port => port.id)));
+
+      const nextConnections = parsed.connections
+        .filter(connection => moduleIdSet.has(connection.from.moduleId)
+          && moduleIdSet.has(connection.to.moduleId)
+          && portIdSet.has(connection.from.portId)
+          && portIdSet.has(connection.to.portId))
+        .map(connection => ({
+          id: connection.id || `conn-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          from: connection.from,
+          to: connection.to,
+        }));
+
+      streamRefs.current = new Map();
+      clearPortPositionCache();
+      setModules(nextModules);
+      setConnections(nextConnections);
+      setModuleParams(nextModuleParams);
+    } catch (error) {
+      console.error('Failed to load sketch.', error);
+      alert('Failed to load sketch. Please check the file and try again.');
+    }
+  };
+
+  const handleSketchFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    handleLoadSketch(file);
+    event.target.value = '';
+  };
+
   return (
     <div className="app">
       {/* Sidebar */}
@@ -350,6 +510,17 @@ function ModularSynth() {
           <img src={logo} alt="MOD Logo" className="sidebar-logo" />
           <h1 className="sidebar-title">MOD</h1>
         </a>
+
+        <div className="module-category sketch-controls">
+          <h3>Sketches</h3>
+          <button onClick={handleSaveSketch} disabled={modules.length === 0 && connections.length === 0}>
+            Save Sketch
+          </button>
+          <label className="file-button">
+            Load Sketch
+            <input type="file" accept="application/json" onChange={handleSketchFileChange} />
+          </label>
+        </div>
 
         <div className="module-category">
           <h3>Sources</h3>
@@ -375,6 +546,7 @@ function ModularSynth() {
           {renderModuleButton('Reverb')}
           {renderModuleButton('Compressor')}
           {renderModuleButton('Distortion')}
+          {renderModuleButton('DiodeFilter')}
           {renderModuleButton('Panner')}
           {renderModuleButton('EQ')}
           {renderModuleButton('Chorus')}
@@ -456,7 +628,7 @@ function ModularSynth() {
                 />
               </g>
             );
-          }), [connections, modules])}
+          }), [connections, modules, layoutVersion])}
 
           {/* Render dragging connection */}
           {draggingConnection && (() => {
@@ -523,11 +695,14 @@ function ModularSynth() {
               supportsEnabled={supportsEnabled(module.type)}
             >
               <ModuleRenderer
+                moduleId={module.id}
                 moduleType={module.type}
                 inputStreams={inputStreams}
                 outputStreams={outputStreams}
                 cvInputStreams={cvInputStreams}
                 enabled={module.enabled}
+                params={moduleParams[module.id] || getDefaultParams(module.type)}
+                onParamChange={updateModuleParam}
               />
             </ModuleWrapper>
           );

@@ -17,6 +17,7 @@ import {
   Reverb,
   Compressor,
   Distortion,
+  DiodeFilter,
   Panner,
   EQ,
   Chorus,
@@ -70,23 +71,30 @@ import {
 } from '@mode-7/mod';
 
 interface ModuleRendererProps {
+  moduleId: string;
   moduleType: string;
   inputStreams: (React.RefObject<any> | null)[];
   outputStreams: React.RefObject<any>[];
   cvInputStreams: { [key: string]: React.RefObject<any> | null };
   enabled?: boolean;
+  params: Record<string, any>;
+  onParamChange: (moduleId: string, key: string, value: any) => void;
 }
 
 export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
+                                                                moduleId,
                                                                 moduleType,
                                                                 inputStreams,
                                                                 outputStreams,
                                                                 cvInputStreams,
                                                                 enabled = true,
+                                                                params,
+                                                                onParamChange,
                                                               }) => {
   const input = inputStreams[0];
   const input2 = inputStreams[1];
   const output = outputStreams[0];
+  const setParam = (key: string, value: any) => onParamChange(moduleId, key, value);
 
   // Get CV input (just get the first one since each component only has one CV port)
   const cv = Object.values(cvInputStreams).find(stream => stream !== null) || undefined;
@@ -94,7 +102,16 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
   switch (moduleType) {
     case 'ToneGenerator':
       return output ? (
-        <ToneGenerator output={output} cv={cv}>
+        <ToneGenerator
+          output={output}
+          cv={cv}
+          frequency={params.frequency}
+          onFrequencyChange={(value) => setParam('frequency', value)}
+          gain={params.gain}
+          onGainChange={(value) => setParam('gain', value)}
+          waveform={params.waveform}
+          onWaveformChange={(value) => setParam('waveform', value)}
+        >
           {(controls) => (
             <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <ModUISlider
@@ -133,7 +150,14 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'NoiseGenerator':
       return output ? (
-        <NoiseGenerator output={output} cv={cv}>
+        <NoiseGenerator
+          output={output}
+          cv={cv}
+          gain={params.gain}
+          onGainChange={(value) => setParam('gain', value)}
+          type={params.type}
+          onTypeChange={(value) => setParam('type', value)}
+        >
           {(controls) => (
             <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <ModUISlider
@@ -160,7 +184,15 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Microphone':
       return output ? (
-        <Microphone output={output}>
+        <Microphone
+          output={output}
+          gain={params.gain}
+          onGainChange={(value) => setParam('gain', value)}
+          isMuted={params.isMuted}
+          onMutedChange={(value) => setParam('isMuted', value)}
+          selectedDeviceId={params.selectedDeviceId}
+          onSelectedDeviceIdChange={(value) => setParam('selectedDeviceId', value)}
+        >
           {(controls) => (
             <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <ModUISlider
@@ -254,7 +286,20 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Filter':
       return output ? (
-        <Filter input={input || {current: null}} output={output} cv={cv} enabled={enabled}>
+        <Filter
+          input={input || {current: null}}
+          output={output}
+          cv={cv}
+          enabled={enabled}
+          frequency={params.frequency}
+          onFrequencyChange={(value) => setParam('frequency', value)}
+          Q={params.Q}
+          onQChange={(value) => setParam('Q', value)}
+          type={params.type}
+          onTypeChange={(value) => setParam('type', value)}
+          gain={params.gain}
+          onGainChange={(value) => setParam('gain', value)}
+        >
           {(controls) => (
             <div style={{display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center'}}>
               <XYPad
@@ -296,7 +341,17 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Delay':
       return output ? (
-        <Delay input={input || {current: null}} output={output} enabled={enabled}>
+        <Delay
+          input={input || {current: null}}
+          output={output}
+          enabled={enabled}
+          time={params.time}
+          onTimeChange={(value) => setParam('time', value)}
+          feedback={params.feedback}
+          onFeedbackChange={(value) => setParam('feedback', value)}
+          wet={params.wet}
+          onWetChange={(value) => setParam('wet', value)}
+        >
           {(controls) => (
             <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <ModUISlider
@@ -333,7 +388,17 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Reverb':
       return output ? (
-        <Reverb input={input || {current: null}} output={output} enabled={enabled}>
+        <Reverb
+          input={input || {current: null}}
+          output={output}
+          enabled={enabled}
+          wet={params.wet}
+          onWetChange={(value) => setParam('wet', value)}
+          duration={params.duration}
+          onDurationChange={(value) => setParam('duration', value)}
+          decay={params.decay}
+          onDecayChange={(value) => setParam('decay', value)}
+        >
           {(controls) => (
             <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <ModUISlider
@@ -370,7 +435,21 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Compressor':
       return output ? (
-        <Compressor input={input || {current: null}} output={output} enabled={enabled}>
+        <Compressor
+          input={input || {current: null}}
+          output={output}
+          enabled={enabled}
+          threshold={params.threshold}
+          onThresholdChange={(value) => setParam('threshold', value)}
+          knee={params.knee}
+          onKneeChange={(value) => setParam('knee', value)}
+          ratio={params.ratio}
+          onRatioChange={(value) => setParam('ratio', value)}
+          attack={params.attack}
+          onAttackChange={(value) => setParam('attack', value)}
+          release={params.release}
+          onReleaseChange={(value) => setParam('release', value)}
+        >
           {(controls) => (
             <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <ModUISlider
@@ -398,7 +477,13 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Distortion':
       return output ? (
-        <Distortion input={input || {current: null}} output={output} enabled={enabled}>
+        <Distortion
+          input={input || {current: null}}
+          output={output}
+          enabled={enabled}
+          amount={params.amount}
+          onAmountChange={(value) => setParam('amount', value)}
+        >
           {(controls) => (
             <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <ModUISlider
@@ -415,9 +500,66 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
         </Distortion>
       ) : null;
 
+    case 'DiodeFilter':
+      return output ? (
+        <DiodeFilter
+          input={input || {current: null}}
+          output={output}
+          cv={cv}
+          enabled={enabled}
+          cutoff={params.cutoff}
+          onCutoffChange={(value) => setParam('cutoff', value)}
+          resonance={params.resonance}
+          onResonanceChange={(value) => setParam('resonance', value)}
+          drive={params.drive}
+          onDriveChange={(value) => setParam('drive', value)}
+          cvAmount={params.cvAmount}
+          onCvAmountChange={(value) => setParam('cvAmount', value)}
+        >
+          {(controls) => (
+            <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
+              <ModUISlider
+                label="Cutoff"
+                value={controls.cutoff}
+                onChange={controls.setCutoff}
+                min={20}
+                max={10000}
+                step={1}
+                formatValue={(v) => `${v.toFixed(0)} Hz`}
+              />
+              <ModUISlider
+                label="Resonance"
+                value={controls.resonance}
+                onChange={controls.setResonance}
+                min={0.1}
+                max={20}
+                step={0.1}
+                formatValue={(v) => v.toFixed(1)}
+              />
+              <ModUISlider
+                label="Drive"
+                value={controls.drive}
+                onChange={controls.setDrive}
+                min={0.1}
+                max={5}
+                step={0.1}
+                formatValue={(v) => v.toFixed(1)}
+              />
+            </div>
+          )}
+        </DiodeFilter>
+      ) : null;
+
     case 'Panner':
       return output ? (
-        <Panner input={input || {current: null}} output={output} cv={cv} enabled={enabled}>
+        <Panner
+          input={input || {current: null}}
+          output={output}
+          cv={cv}
+          enabled={enabled}
+          pan={params.pan}
+          onPanChange={(value) => setParam('pan', value)}
+        >
           {(controls) => (
             <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <ModUISlider
@@ -436,7 +578,15 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'CrossFade':
       return output ? (
-        <CrossFade inputs={[input || {current: null}, input2 || {current: null}]} output={output} enabled={enabled}>
+        <CrossFade
+          inputs={[input || {current: null}, input2 || {current: null}]}
+          output={output}
+          enabled={enabled}
+          mix={params.mix}
+          onMixChange={(value) => setParam('mix', value)}
+          mode={params.mode}
+          onModeChange={(value) => setParam('mode', value)}
+        >
           {(controls) => (
             <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <ModUISlider
@@ -473,7 +623,12 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
           inputStreams[1] || {current: null},
           inputStreams[2] || {current: null},
           inputStreams[3] || {current: null}
-        ]} output={output} enabled={enabled}>
+        ]}
+        output={output}
+        enabled={enabled}
+        levels={params.levels}
+        onLevelsChange={(value) => setParam('levels', value)}
+        >
           {(controls) => (
             <div style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>
               {controls.levels.map((level, i) => (
@@ -495,7 +650,21 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'EQ':
       return output ? (
-        <EQ input={input || {current: null}} output={output} enabled={enabled}>
+        <EQ
+          input={input || {current: null}}
+          output={output}
+          enabled={enabled}
+          lowGain={params.lowGain}
+          onLowGainChange={(value) => setParam('lowGain', value)}
+          midGain={params.midGain}
+          onMidGainChange={(value) => setParam('midGain', value)}
+          highGain={params.highGain}
+          onHighGainChange={(value) => setParam('highGain', value)}
+          lowFreq={params.lowFreq}
+          onLowFreqChange={(value) => setParam('lowFreq', value)}
+          highFreq={params.highFreq}
+          onHighFreqChange={(value) => setParam('highFreq', value)}
+        >
           {(controls) => (
             <div style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>
               <ModUISlider
@@ -532,7 +701,19 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Chorus':
       return output ? (
-        <Chorus input={input || {current: null}} output={output} enabled={enabled}>
+        <Chorus
+          input={input || {current: null}}
+          output={output}
+          enabled={enabled}
+          rate={params.rate}
+          onRateChange={(value) => setParam('rate', value)}
+          depth={params.depth}
+          onDepthChange={(value) => setParam('depth', value)}
+          delay={params.delay}
+          onDelayChange={(value) => setParam('delay', value)}
+          wet={params.wet}
+          onWetChange={(value) => setParam('wet', value)}
+        >
           {(controls) => (
             <div style={{display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center'}}>
               <XYPad
@@ -568,7 +749,19 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Phaser':
       return output ? (
-        <Phaser input={input || {current: null}} output={output} enabled={enabled}>
+        <Phaser
+          input={input || {current: null}}
+          output={output}
+          enabled={enabled}
+          rate={params.rate}
+          onRateChange={(value) => setParam('rate', value)}
+          depth={params.depth}
+          onDepthChange={(value) => setParam('depth', value)}
+          feedback={params.feedback}
+          onFeedbackChange={(value) => setParam('feedback', value)}
+          baseFreq={params.baseFreq}
+          onBaseFreqChange={(value) => setParam('baseFreq', value)}
+        >
           {(controls) => (
             <div style={{display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center'}}>
               <XYPad
@@ -604,7 +797,19 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Flanger':
       return output ? (
-        <Flanger input={input || {current: null}} output={output} enabled={enabled}>
+        <Flanger
+          input={input || {current: null}}
+          output={output}
+          enabled={enabled}
+          rate={params.rate}
+          onRateChange={(value) => setParam('rate', value)}
+          depth={params.depth}
+          onDepthChange={(value) => setParam('depth', value)}
+          feedback={params.feedback}
+          onFeedbackChange={(value) => setParam('feedback', value)}
+          delay={params.delay}
+          onDelayChange={(value) => setParam('delay', value)}
+        >
           {(controls) => (
             <div style={{display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center'}}>
               <XYPad
@@ -640,7 +845,15 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Tremolo':
       return output ? (
-        <Tremolo input={input || {current: null}} output={output} enabled={enabled}>
+        <Tremolo
+          input={input || {current: null}}
+          output={output}
+          enabled={enabled}
+          rate={params.rate}
+          onRateChange={(value) => setParam('rate', value)}
+          depth={params.depth}
+          onDepthChange={(value) => setParam('depth', value)}
+        >
           {(controls) => (
             <div style={{display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center'}}>
               <XYPad
@@ -667,7 +880,15 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'BitCrusher':
       return output ? (
-        <BitCrusher input={input || {current: null}} output={output} enabled={enabled}>
+        <BitCrusher
+          input={input || {current: null}}
+          output={output}
+          enabled={enabled}
+          bitDepth={params.bitDepth}
+          onBitDepthChange={(value) => setParam('bitDepth', value)}
+          sampleReduction={params.sampleReduction}
+          onSampleReductionChange={(value) => setParam('sampleReduction', value)}
+        >
           {(controls) => (
             <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <ModUISlider
@@ -695,7 +916,15 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Limiter':
       return output ? (
-        <Limiter input={input || {current: null}} output={output} enabled={enabled}>
+        <Limiter
+          input={input || {current: null}}
+          output={output}
+          enabled={enabled}
+          threshold={params.threshold}
+          onThresholdChange={(value) => setParam('threshold', value)}
+          release={params.release}
+          onReleaseChange={(value) => setParam('release', value)}
+        >
           {(controls) => (
             <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <ModUISlider
@@ -723,7 +952,17 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Gate':
       return output ? (
-        <Gate input={input || {current: null}} output={output} enabled={enabled}>
+        <Gate
+          input={input || {current: null}}
+          output={output}
+          enabled={enabled}
+          threshold={params.threshold}
+          onThresholdChange={(value) => setParam('threshold', value)}
+          attack={params.attack}
+          onAttackChange={(value) => setParam('attack', value)}
+          release={params.release}
+          onReleaseChange={(value) => setParam('release', value)}
+        >
           {(controls) => (
             <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <ModUISlider
@@ -760,7 +999,19 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'AutoWah':
       return output ? (
-        <AutoWah input={input || {current: null}} output={output} enabled={enabled}>
+        <AutoWah
+          input={input || {current: null}}
+          output={output}
+          enabled={enabled}
+          sensitivity={params.sensitivity}
+          onSensitivityChange={(value) => setParam('sensitivity', value)}
+          baseFreq={params.baseFreq}
+          onBaseFreqChange={(value) => setParam('baseFreq', value)}
+          maxFreq={params.maxFreq}
+          onMaxFreqChange={(value) => setParam('maxFreq', value)}
+          Q={params.Q}
+          onQChange={(value) => setParam('Q', value)}
+        >
           {(controls) => (
             <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <ModUISlider
@@ -797,7 +1048,15 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'RingModulator':
       return output ? (
-        <RingModulator input={input || {current: null}} output={output} enabled={enabled}>
+        <RingModulator
+          input={input || {current: null}}
+          output={output}
+          enabled={enabled}
+          frequency={params.frequency}
+          onFrequencyChange={(value) => setParam('frequency', value)}
+          wet={params.wet}
+          onWetChange={(value) => setParam('wet', value)}
+        >
           {(controls) => (
             <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <ModUISlider
@@ -825,7 +1084,16 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'VCA':
       return output ? (
-        <VCA input={input || {current: null}} output={output} cv={cv} enabled={enabled}>
+        <VCA
+          input={input || {current: null}}
+          output={output}
+          cv={cv}
+          enabled={enabled}
+          gain={params.gain}
+          onGainChange={(value) => setParam('gain', value)}
+          cvAmount={params.cvAmount}
+          onCvAmountChange={(value) => setParam('cvAmount', value)}
+        >
           {(controls) => (
             <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <ModUISlider
@@ -844,7 +1112,15 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'LFO':
       return output ? (
-        <LFO output={output}>
+        <LFO
+          output={output}
+          frequency={params.frequency}
+          onFrequencyChange={(value) => setParam('frequency', value)}
+          amplitude={params.amplitude}
+          onAmplitudeChange={(value) => setParam('amplitude', value)}
+          waveform={params.waveform}
+          onWaveformChange={(value) => setParam('waveform', value)}
+        >
           {(controls) => (
             <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <ModUISlider
@@ -884,7 +1160,18 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'ADSR':
       return output ? (
-        <ADSR gate={cv} output={output}>
+        <ADSR
+          gate={cv}
+          output={output}
+          attack={params.attack}
+          onAttackChange={(value) => setParam('attack', value)}
+          decay={params.decay}
+          onDecayChange={(value) => setParam('decay', value)}
+          sustain={params.sustain}
+          onSustainChange={(value) => setParam('sustain', value)}
+          release={params.release}
+          onReleaseChange={(value) => setParam('release', value)}
+        >
           {(controls) => (
             <div style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>
               <ModUISlider
@@ -945,7 +1232,16 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
     case 'Sequencer':
       const gateOutput = outputStreams[1] || null;
       return output ? (
-        <Sequencer output={output} gateOutput={gateOutput}>
+        <Sequencer
+          output={output}
+          gateOutput={gateOutput}
+          steps={params.steps}
+          onStepsChange={(value) => setParam('steps', value)}
+          bpm={params.bpm}
+          onBpmChange={(value) => setParam('bpm', value)}
+          division={params.division}
+          onDivisionChange={(value) => setParam('division', value)}
+        >
           {(controls) => (
             <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <ModUISlider
@@ -998,9 +1294,9 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                         newSteps[i].value = value;
                         controls.setSteps(newSteps);
                       }}
-                      min={0}
-                      max={1}
-                      step={0.01}
+                      min={-12}
+                      max={12}
+                      step={1}
                       formatValue={(v) => v.toFixed(2)}
                     />
                   </div>
@@ -1027,7 +1323,11 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Clock':
       return output ? (
-        <Clock output={output}>
+        <Clock
+          output={output}
+          bpm={params.bpm}
+          onBpmChange={(value) => setParam('bpm', value)}
+        >
           {(controls) => (
             <div style={{display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center'}}>
               <Knob
@@ -1070,7 +1370,15 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'MP3Deck':
       return output ? (
-        <MP3Deck output={output}>
+        <MP3Deck
+          output={output}
+          src={params.src}
+          onSrcChange={(value) => setParam('src', value)}
+          gain={params.gain}
+          onGainChange={(value) => setParam('gain', value)}
+          loop={params.loop}
+          onLoopChange={(value) => setParam('loop', value)}
+        >
           {(controls) => {
             const formatTime = (seconds: number) => {
               if (!isFinite(seconds)) return '0:00';
@@ -1139,7 +1447,15 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'StreamingAudioDeck':
       return output ? (
-        <StreamingAudioDeck output={output}>
+        <StreamingAudioDeck
+          output={output}
+          url={params.url}
+          onUrlChange={(value) => setParam('url', value)}
+          gain={params.gain}
+          onGainChange={(value) => setParam('gain', value)}
+          loop={params.loop}
+          onLoopChange={(value) => setParam('loop', value)}
+        >
           {(controls) => {
             const formatTime = (seconds: number) => {
               if (!isFinite(seconds)) return '0:00';

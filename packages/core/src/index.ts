@@ -53,6 +53,9 @@ export type { CompressorProps, CompressorRenderProps, CompressorHandle } from '.
 export { Distortion } from './components/processors/Distortion';
 export type { DistortionProps, DistortionRenderProps, DistortionHandle } from './components/processors/Distortion';
 
+export { DiodeFilter } from './components/processors/DiodeFilter';
+export type { DiodeFilterProps, DiodeFilterRenderProps, DiodeFilterHandle } from './components/processors/DiodeFilter';
+
 export { Panner } from './components/processors/Panner';
 export type { PannerProps, PannerRenderProps, PannerHandle } from './components/processors/Panner';
 

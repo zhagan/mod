@@ -242,7 +242,7 @@ import { useState, useRef } from 'react';
 function App() {
   const seqOut = useRef(null);
   const toneOut = useRef(null);
-  const [steps, setSteps] = useState([0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]);
+  const [steps, setSteps] = useState([0, 0, 0, 0, 0, 0, 0, 0]);
   const [bpm, setBpm] = useState(120);
   const [currentStep, setCurrentStep] = useState(0);
 
@@ -359,7 +359,7 @@ function App() {
 ### Sequence Length
 
 - Set via `numSteps` prop (default 8)
-- Steps array is initialized with 0.5 for each step
+- Steps array is initialized with 0 for each step
 - Can be changed dynamically via `setSteps()`
 
 ### Playback

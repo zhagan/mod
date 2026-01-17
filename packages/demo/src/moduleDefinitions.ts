@@ -1,3 +1,4 @@
+import { DiodeFilter } from '@mode-7/mod';
 import { ModuleDefinition } from './types';
 
 export const MODULE_DEFINITIONS: Record<string, ModuleDefinition> = {
@@ -26,7 +27,7 @@ export const MODULE_DEFINITIONS: Record<string, ModuleDefinition> = {
     color: '#f093fb',
     inputs: 0,
     outputs: 1,
-    defaultParams: { gain: 1.0 },
+    defaultParams: { gain: 1.0, isMuted: false, selectedDeviceId: null },
   },
   MP3Deck: {
     type: 'MP3Deck',
@@ -44,7 +45,7 @@ export const MODULE_DEFINITIONS: Record<string, ModuleDefinition> = {
     color: '#43e97b',
     inputs: 0,
     outputs: 1,
-    defaultParams: { url: '', gain: 1.0, isPlaying: false },
+    defaultParams: { url: '', gain: 1.0, loop: false },
   },
   LFO: {
     type: 'LFO',
@@ -71,7 +72,11 @@ export const MODULE_DEFINITIONS: Record<string, ModuleDefinition> = {
     color: '#ffecd2',
     inputs: 0,
     outputs: 2, // CV output + Gate output
-    defaultParams: { steps: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5], bpm: 120, isPlaying: false },
+    defaultParams: {
+      steps: Array.from({ length: 8 }, () => ({ active: false, value: 0 })),
+      bpm: 120,
+      division: 4,
+    },
   },
   Clock: {
     type: 'Clock',
@@ -126,6 +131,15 @@ export const MODULE_DEFINITIONS: Record<string, ModuleDefinition> = {
     inputs: 1,
     outputs: 1,
     defaultParams: { amount: 50 },
+  },
+  DiodeFilter: {
+    type: 'DiodeFilter',
+    label: 'Diode Filter',
+    category: 'processor',
+    color: '#ff6b9d',
+    inputs: 1,
+    outputs: 1,
+    defaultParams: { cutoff: 1000, resonance: 0.1, drive: 0.0, cvAmount: 1000 },
   },
   Panner: {
     type: 'Panner',
@@ -242,7 +256,7 @@ export const MODULE_DEFINITIONS: Record<string, ModuleDefinition> = {
     color: '#30cfd0',
     inputs: 2,
     outputs: 1,
-    defaultParams: { mix: 0.5 },
+    defaultParams: { mix: 0.5, mode: 'equal-power' },
   },
   Mixer: {
     type: 'Mixer',

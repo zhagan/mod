@@ -71,7 +71,7 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
   const audioContext = useAudioContext();
   const initialSteps: step[] = []
   for (let i = 0; i < numSteps ; i++) {
-    initialSteps.push({active: false, value: 0.5})
+    initialSteps.push({active: false, value: 0})
   }
   const [steps, setSteps] = useControlledState(controlledSteps, initialSteps, onStepsChange);
   const [currentStep, setCurrentStep] = useState(0);
@@ -104,7 +104,7 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
 
     // Use ConstantSourceNode to output CV values
     const constantSource = audioContext.createConstantSource();
-    constantSource.offset.value = steps[0].value || 0.5;
+    constantSource.offset.value = steps[0].value || 0;
     constantSourceRef.current = constantSource;
 
     // Create gain node for output
