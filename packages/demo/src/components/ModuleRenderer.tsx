@@ -17,6 +17,7 @@ import {
   Reverb,
   Compressor,
   Distortion,
+  DiodeFilter,
   Panner,
   EQ,
   Chorus,
@@ -415,7 +416,43 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
         </Distortion>
       ) : null;
 
-    case 'Panner':
+    case 'DiodeFilter':
+      return output ? (
+        <DiodeFilter input={input || {current: null}} output={output} enabled={enabled}>
+          {(controls) => (
+            <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
+              <ModUISlider
+                label="Cutoff"
+                value={controls.cutoff}
+                onChange={controls.setCutoff}
+                min={0.1}
+                max={20000}
+                step={1}
+                formatValue={(v) => `${v.toFixed(0)} Hz`}
+              />
+              <ModUISlider
+                label="Resonance"
+                value={controls.resonance}
+                onChange={controls.setResonance}
+                min={0.1}
+                max={20}
+                step={0.1}
+                formatValue={(v) => v.toFixed(1)}
+              />
+              <ModUISlider
+                label="Drive"
+                value={controls.drive}
+                onChange={controls.setDrive}
+                min={0.1}
+                max={5}
+                step={0.1}
+                formatValue={(v) => v.toFixed(1)}
+              />
+            </div>
+          )}
+        </DiodeFilter>): null;
+
+case 'Panner':
       return output ? (
         <Panner input={input || {current: null}} output={output} cv={cv} enabled={enabled}>
           {(controls) => (

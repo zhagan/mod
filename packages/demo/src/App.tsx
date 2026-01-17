@@ -19,6 +19,7 @@ import {
   Reverb,
   Compressor,
   Distortion,
+  DiodeFilter,
   Panner,
   EQ,
   Chorus,
@@ -375,6 +376,7 @@ function ModularSynth() {
           {renderModuleButton('Reverb')}
           {renderModuleButton('Compressor')}
           {renderModuleButton('Distortion')}
+          {renderModuleButton('DiodeFilter')}
           {renderModuleButton('Panner')}
           {renderModuleButton('EQ')}
           {renderModuleButton('Chorus')}

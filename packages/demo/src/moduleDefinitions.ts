@@ -1,3 +1,4 @@
+import { DiodeFilter } from '@mode-7/mod';
 import { ModuleDefinition } from './types';
 
 export const MODULE_DEFINITIONS: Record<string, ModuleDefinition> = {
@@ -126,6 +127,15 @@ export const MODULE_DEFINITIONS: Record<string, ModuleDefinition> = {
     inputs: 1,
     outputs: 1,
     defaultParams: { amount: 50 },
+  },
+  DiodeFilter: {
+    type: 'DiodeFilter',
+    label: 'Diode Filter',
+    category: 'processor',
+    color: '#ff6b9d',
+    inputs: 1,
+    outputs: 1,
+    defaultParams: { cutoff: 1.0, resounance: 1.0, drive: 0.5 },
   },
   Panner: {
     type: 'Panner',
