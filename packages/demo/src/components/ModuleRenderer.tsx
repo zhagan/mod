@@ -99,6 +99,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
   // Get CV input (just get the first one since each component only has one CV port)
   const cv = Object.values(cvInputStreams).find(stream => stream !== null) || undefined;
   const clockInput = cvInputStreams['cv-clock'] || undefined;
+  const resetInput = cvInputStreams['cv-reset'] || undefined;
 
   switch (moduleType) {
     case 'ToneGenerator':
@@ -1237,13 +1238,25 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
           output={output}
           gateOutput={gateOutput}
           clock={clockInput}
+          reset={resetInput}
           steps={params.steps}
           onStepsChange={(value) => setParam('steps', value)}
           division={params.division}
           onDivisionChange={(value) => setParam('division', value)}
+          length={params.length}
+          onLengthChange={(value) => setParam('length', value)}
         >
           {(controls) => (
             <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
+              <ModUISlider
+                label="Length"
+                value={controls.length}
+                onChange={controls.setLength}
+                min={1}
+                max={32}
+                step={1}
+                formatValue={(v) => v.toFixed(0)}
+              />
               <ModUISelect
                 value={controls.division.toString()}
                 onChange={ (value) => {

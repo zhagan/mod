@@ -169,7 +169,7 @@ textarea,
 .canvas {
   flex: 1;
   position: relative;
-  overflow: hidden;
+  overflow: auto;
   background-image:
     repeating-linear-gradient(
       0deg,

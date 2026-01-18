@@ -166,6 +166,7 @@ function ModularSynth() {
       ports.push({ id: `${id}-cv-gate`, type: 'input', label: 'Gate' });
     } else if (type === 'Sequencer') {
       ports.push({ id: `${id}-cv-clock`, type: 'input', label: 'Clock' });
+      ports.push({ id: `${id}-cv-reset`, type: 'input', label: 'Reset' });
     }
 
     // Create output ports based on definition
@@ -258,10 +259,12 @@ function ModularSynth() {
 
     const dotRect = portDot.getBoundingClientRect();
     const canvasRect = canvasRef.current.getBoundingClientRect();
+    const scrollLeft = canvasRef.current.scrollLeft;
+    const scrollTop = canvasRef.current.scrollTop;
 
     const position = {
-      x: dotRect.left + dotRect.width / 2 - canvasRect.left,
-      y: dotRect.top + dotRect.height / 2 - canvasRect.top,
+      x: dotRect.left + dotRect.width / 2 - canvasRect.left + scrollLeft,
+      y: dotRect.top + dotRect.height / 2 - canvasRect.top + scrollTop,
     };
 
     // Cache the result
@@ -657,11 +660,11 @@ function ModularSynth() {
 
         {modules.map((module) => {
           const inputPorts = module.ports.filter(p =>
-            p.type === 'input' && !p.label.startsWith('CV') && p.label !== 'Gate' && p.label !== 'Clock'
+            p.type === 'input' && !p.label.startsWith('CV') && p.label !== 'Gate' && p.label !== 'Clock' && p.label !== 'Reset'
           );
           const outputPorts = module.ports.filter(p => p.type === 'output');
           const cvPorts = module.ports.filter(p =>
-            p.type === 'input' && (p.label === 'CV' || p.label === 'Gate' || p.label === 'Clock')
+            p.type === 'input' && (p.label === 'CV' || p.label === 'Gate' || p.label === 'Clock' || p.label === 'Reset')
           );
 
           // Get connected input streams for each input port (excluding CV)

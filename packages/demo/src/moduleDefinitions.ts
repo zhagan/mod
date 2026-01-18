@@ -75,6 +75,7 @@ export const MODULE_DEFINITIONS: Record<string, ModuleDefinition> = {
     defaultParams: {
       steps: Array.from({ length: 8 }, () => ({ active: false, value: 0 })),
       division: 4,
+      length: 8,
     },
   },
   Clock: {

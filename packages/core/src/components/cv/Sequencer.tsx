@@ -14,6 +14,7 @@ export interface SequencerHandle {
     steps: step[];
     currentStep: number;
     division: number;
+    length: number;
   };
 }
 
@@ -23,6 +24,8 @@ export interface SequencerRenderProps {
   currentStep: number;
   division: number;
   setDivision: (value: number) => void;
+  length: number;
+  setLength: (value: number) => void;
   reset: () => void;
 }
 
@@ -30,6 +33,7 @@ export interface SequencerProps {
   output: ModStreamRef;
   gateOutput?: ModStreamRef; // Optional separate gate/trigger output
   clock?: ModStreamRef;
+  reset?: ModStreamRef;
   label?: string;
   numSteps?: number;
   // Controlled props
@@ -37,6 +41,8 @@ export interface SequencerProps {
   onStepsChange?: (steps: step[]) => void;
   division?: number;
   onDivisionChange?: (division: number) => void;
+  length?: number;
+  onLengthChange?: (length: number) => void;
   // Event callbacks
   onCurrentStepChange?: (currentStep: number) => void;
   // Render props
@@ -108,30 +114,36 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
   output,
   gateOutput,
   clock,
+  reset: resetInput,
   label = 'sequencer',
   numSteps = 8,
   steps: controlledSteps,
   onStepsChange,
   division: controlledDivision,
   onDivisionChange,
+  length: controlledLength,
+  onLengthChange,
   onCurrentStepChange,
   children,
 }, ref) => {
   const audioContext = useAudioContext();
-  const initialSteps: step[] = []
+  const initialSteps: step[] = [];
   for (let i = 0; i < numSteps ; i++) {
     initialSteps.push({active: false, value: 0})
   }
   const [steps, setSteps] = useControlledState(controlledSteps, initialSteps, onStepsChange);
   const [currentStep, setCurrentStep] = useState(0);
   const [division, setDivision] = useControlledState(controlledDivision, 4, onDivisionChange);
+  const [length, setLength] = useControlledState(controlledLength, numSteps, onLengthChange);
   const [isListenerReady, setIsListenerReady] = useState(false);
+  const [isResetListenerReady, setIsResetListenerReady] = useState(false);
 
   const constantSourceRef = useRef<ConstantSourceNode | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
   const gateSourceRef = useRef<ConstantSourceNode | null>(null);
   const gateGainRef = useRef<GainNode | null>(null);
   const clockListenerRef = useRef<AudioWorkletNode | null>(null);
+  const resetListenerRef = useRef<AudioWorkletNode | null>(null);
   const gateDurationRef = useRef(0.05);
   const pulseAccumulatorRef = useRef(0);
   // Store refs for current state
@@ -139,12 +151,33 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
   const currentStepRef = useRef(currentStep);
   const divisionRef = useRef(division);
 
+  const normalizeSteps = (nextLength: number, current: step[]) => {
+    const clampedLength = Math.max(1, Math.min(32, nextLength));
+    const nextSteps = current.slice(0, clampedLength);
+    while (nextSteps.length < clampedLength) {
+      nextSteps.push({ active: false, value: 0 });
+    }
+    return nextSteps;
+  };
+
   useEffect(() => { stepsRef.current = steps; }, [steps]);
   useEffect(() => { currentStepRef.current = currentStep; }, [currentStep]);
   useEffect(() => {
     divisionRef.current = division;
     pulseAccumulatorRef.current = 0;
   }, [division]);
+
+  useEffect(() => {
+    const normalized = normalizeSteps(length, steps);
+    if (normalized.length !== steps.length) {
+      setSteps(normalized);
+    }
+    if (currentStepRef.current >= normalized.length) {
+      const nextStep = Math.max(0, normalized.length - 1);
+      currentStepRef.current = nextStep;
+      setCurrentStep(nextStep);
+    }
+  }, [length, steps, setSteps]);
 
   // Create sequencer nodes once
   useEffect(() => {
@@ -288,6 +321,40 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
     };
   }, [audioContext]);
 
+  // Create reset listener
+  useEffect(() => {
+    if (!audioContext) return;
+    let cancelled = false;
+
+    loadClockDetectorWorklet(audioContext).then(() => {
+      if (cancelled) return;
+      const node = new AudioWorkletNode(audioContext, 'clock-detector', {
+        numberOfInputs: 1,
+        numberOfOutputs: 0,
+        channelCount: 1,
+      });
+      resetListenerRef.current = node;
+      node.port.onmessage = (event) => {
+        if (event.data?.type !== 'pulse') return;
+        resetSequence();
+      };
+      setIsResetListenerReady(true);
+    }).catch((err) => {
+      if (cancelled) return;
+      console.error('Failed to load reset detector worklet', err);
+    });
+
+    return () => {
+      cancelled = true;
+      if (resetListenerRef.current) {
+        resetListenerRef.current.port.onmessage = null;
+        try { resetListenerRef.current.disconnect(); } catch (e) {}
+        resetListenerRef.current = null;
+      }
+      setIsResetListenerReady(false);
+    };
+  }, [audioContext]);
+
   // Connect clock input to listener
   const clockKey = clock?.current?.audioNode ? String(clock.current.audioNode) : 'null';
   useEffect(() => {
@@ -300,8 +367,20 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
     };
   }, [clockKey, isListenerReady]);
 
+  // Connect reset input to listener
+  const resetKey = resetInput?.current?.audioNode ? String(resetInput.current.audioNode) : 'null';
+  useEffect(() => {
+    if (!resetInput?.current || !resetListenerRef.current || !isResetListenerReady) return;
+    const inGain = resetInput.current.gain;
+    const listener = resetListenerRef.current;
+    inGain.connect(listener);
+    return () => {
+      try { inGain.disconnect(listener); } catch (e) {}
+    };
+  }, [resetKey, isResetListenerReady]);
+
   // Reset function
-  const reset = () => {
+  const resetSequence = () => {
     setCurrentStep(0);
     currentStepRef.current = 0;
     pulseAccumulatorRef.current = 0;
@@ -313,9 +392,9 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
 
   // Expose imperative handle
   useImperativeHandle(ref, () => ({
-    reset,
-    getState: () => ({ steps, currentStep, division }),
-  }), [steps, currentStep, division]);
+    reset: resetSequence,
+    getState: () => ({ steps, currentStep, division, length }),
+  }), [steps, currentStep, division, length]);
 
   // Event callback effects
   useEffect(() => {
@@ -330,7 +409,9 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
       currentStep,
       division,
       setDivision,
-      reset,
+      length,
+      setLength,
+      reset: resetSequence,
     })}</>;
   }
 
