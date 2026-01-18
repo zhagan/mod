@@ -36,7 +36,14 @@ export const MODULE_DEFINITIONS: Record<string, ModuleDefinition> = {
     color: '#4facfe',
     inputs: 0,
     outputs: 1,
-    defaultParams: { src: '', gain: 1.0, loop: false, isPlaying: false },
+    defaultParams: {
+      src: '',
+      gain: 1.0,
+      playbackMode: 'one-shot',
+      startTime: 0,
+      endTime: 0,
+      pitch: 0,
+    },
   },
   StreamingAudioDeck: {
     type: 'StreamingAudioDeck',

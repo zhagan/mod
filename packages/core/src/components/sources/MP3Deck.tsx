@@ -3,16 +3,105 @@ import { useAudioContext } from '../../context/AudioContext';
 import { ModStreamRef } from '../../types/ModStream';
 import { useControlledState } from '../../hooks/useControlledState';
 
+const MP3_DECK_WORKLETS = `
+class GateDetector extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this._isHigh = false;
+  }
+  process(inputs) {
+    const input = inputs[0];
+    if (!input || input.length === 0) return true;
+    const channel = input[0];
+    if (!channel) return true;
+    let isHigh = this._isHigh;
+    for (let i = 0; i < channel.length; i++) {
+      const value = channel[i];
+      if (!isHigh && value > 0.5) {
+        this.port.postMessage({ type: 'gate-on' });
+        isHigh = true;
+      } else if (isHigh && value < 0.2) {
+        this.port.postMessage({ type: 'gate-off' });
+        isHigh = false;
+      }
+    }
+    this._isHigh = isHigh;
+    return true;
+  }
+}
+
+class CvFollower extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this._counter = 0;
+    this._sum = 0;
+  }
+  process(inputs) {
+    const input = inputs[0];
+    if (!input || input.length === 0) return true;
+    const channel = input[0];
+    if (!channel) return true;
+    for (let i = 0; i < channel.length; i++) {
+      this._sum += channel[i];
+      this._counter += 1;
+      if (this._counter >= 256) {
+        const avg = this._sum / this._counter;
+        this.port.postMessage({ type: 'cv', value: avg });
+        this._sum = 0;
+        this._counter = 0;
+      }
+    }
+    return true;
+  }
+}
+
+registerProcessor('mp3-gate-detector', GateDetector);
+registerProcessor('mp3-cv-follower', CvFollower);
+`;
+
+const mp3DeckWorkletLoaders = new WeakMap<AudioContext, Promise<void>>();
+const mp3DeckWorkletUrls = new WeakMap<AudioContext, string>();
+
+const loadMp3DeckWorklets = (audioContext: AudioContext) => {
+  let loader = mp3DeckWorkletLoaders.get(audioContext);
+  if (!loader) {
+    const blob = new Blob([MP3_DECK_WORKLETS], { type: 'application/javascript' });
+    const url = URL.createObjectURL(blob);
+    mp3DeckWorkletUrls.set(audioContext, url);
+    loader = audioContext.audioWorklet.addModule(url).then(() => {
+      const loadedUrl = mp3DeckWorkletUrls.get(audioContext);
+      if (loadedUrl) {
+        URL.revokeObjectURL(loadedUrl);
+        mp3DeckWorkletUrls.delete(audioContext);
+      }
+    }).catch((err) => {
+      const loadedUrl = mp3DeckWorkletUrls.get(audioContext);
+      if (loadedUrl) {
+        URL.revokeObjectURL(loadedUrl);
+        mp3DeckWorkletUrls.delete(audioContext);
+      }
+      mp3DeckWorkletLoaders.delete(audioContext);
+      throw err;
+    });
+    mp3DeckWorkletLoaders.set(audioContext, loader);
+  }
+  return loader;
+};
+
 export interface MP3DeckHandle {
   play: () => void;
   pause: () => void;
   stop: () => void;
+  trigger: () => void;
   seek: (time: number) => void;
   loadFile: (file: File) => void;
   getState: () => {
     src: string;
     gain: number;
-    loop: boolean;
+    playbackMode: PlaybackMode;
+    startTime: number;
+    endTime: number;
+    pitch: number;
     isPlaying: boolean;
     isReady: boolean;
     currentTime: number;
@@ -21,18 +110,27 @@ export interface MP3DeckHandle {
   };
 }
 
+export type PlaybackMode = 'one-shot' | 'gate' | 'loop';
+
 export interface MP3DeckRenderProps {
   src: string;
   setSrc: (src: string) => void;
   loadFile: (file: File) => void;
   gain: number;
   setGain: (value: number) => void;
-  loop: boolean;
-  setLoop: (value: boolean) => void;
+  playbackMode: PlaybackMode;
+  setPlaybackMode: (value: PlaybackMode) => void;
+  startTime: number;
+  setStartTime: (value: number) => void;
+  endTime: number;
+  setEndTime: (value: number) => void;
+  pitch: number;
+  setPitch: (value: number) => void;
   isPlaying: boolean;
   play: () => void;
   pause: () => void;
   stop: () => void;
+  trigger: () => void;
   currentTime: number;
   duration: number;
   seek: (time: number) => void;
@@ -43,6 +141,8 @@ export interface MP3DeckRenderProps {
 
 export interface MP3DeckProps {
   output: ModStreamRef;
+  trigger?: ModStreamRef;
+  pitchCv?: ModStreamRef;
   label?: string;
   // Controlled props
   src?: string;
@@ -51,6 +151,14 @@ export interface MP3DeckProps {
   onGainChange?: (gain: number) => void;
   loop?: boolean;
   onLoopChange?: (loop: boolean) => void;
+  playbackMode?: PlaybackMode;
+  onPlaybackModeChange?: (mode: PlaybackMode) => void;
+  startTime?: number;
+  onStartTimeChange?: (time: number) => void;
+  endTime?: number;
+  onEndTimeChange?: (time: number) => void;
+  pitch?: number;
+  onPitchChange?: (pitch: number) => void;
   // Event callbacks
   onPlayingChange?: (isPlaying: boolean) => void;
   onTimeUpdate?: (currentTime: number, duration: number) => void;
@@ -62,6 +170,8 @@ export interface MP3DeckProps {
 
 export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
   output,
+  trigger: triggerInput,
+  pitchCv,
   label = 'mp3-deck',
   src: controlledSrc,
   onSrcChange,
@@ -69,6 +179,14 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
   onGainChange,
   loop: controlledLoop,
   onLoopChange,
+  playbackMode: controlledPlaybackMode,
+  onPlaybackModeChange,
+  startTime: controlledStartTime,
+  onStartTimeChange,
+  endTime: controlledEndTime,
+  onEndTimeChange,
+  pitch: controlledPitch,
+  onPitchChange,
   onPlayingChange,
   onTimeUpdate,
   onError,
@@ -78,17 +196,101 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
   const audioContext = useAudioContext();
   const [src, setSrc] = useControlledState(controlledSrc, '', onSrcChange);
   const [gain, setGain] = useControlledState(controlledGain, 1.0, onGainChange);
-  const [loop, setLoop] = useControlledState(controlledLoop, false, onLoopChange);
+  const [loop] = useControlledState(controlledLoop, false, onLoopChange);
+  const [playbackMode, setPlaybackMode] = useControlledState<PlaybackMode>(
+    controlledPlaybackMode,
+    loop ? 'loop' : 'one-shot',
+    onPlaybackModeChange
+  );
+  const [startTime, setStartTime] = useControlledState(controlledStartTime, 0, onStartTimeChange);
+  const [endTime, setEndTime] = useControlledState(controlledEndTime, 0, onEndTimeChange);
+  const [pitch, setPitch] = useControlledState(controlledPitch, 0.0, onPitchChange);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
+  const [isWorkletReady, setIsWorkletReady] = useState(false);
 
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
   const blobUrlRef = useRef<string | null>(null);
+  const pitchCvNodeRef = useRef<AudioWorkletNode | null>(null);
+  const triggerNodeRef = useRef<AudioWorkletNode | null>(null);
+  const pitchCvValueRef = useRef(0);
+  const gateStateRef = useRef(false);
+  const pitchRef = useRef(pitch);
+  const playbackModeRef = useRef<PlaybackMode>(playbackMode);
+  const startTimeRef = useRef(startTime);
+  const endTimeRef = useRef(endTime);
+
+  const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+
+  const getEffectiveStart = () => {
+    if (!duration) return 0;
+    return clamp(startTimeRef.current, 0, duration);
+  };
+
+  const getEffectiveEnd = () => {
+    if (!duration) return 0;
+    const end = endTimeRef.current > 0 ? endTimeRef.current : duration;
+    return clamp(end, 0, duration);
+  };
+
+  const updatePlaybackRate = () => {
+    if (!audioElementRef.current) return;
+    const cvValue = Number.isFinite(pitchCvValueRef.current) ? pitchCvValueRef.current : 0;
+    const semitones = clamp(cvValue, -24, 24);
+    const baseOctaves = Number.isFinite(pitchRef.current) ? pitchRef.current : 0;
+    const rate = clamp(Math.pow(2, baseOctaves + semitones / 12), 0.01, 32);
+    const element = audioElementRef.current;
+    element.playbackRate = rate;
+    element.defaultPlaybackRate = rate;
+    if ('preservesPitch' in element) {
+      element.preservesPitch = false;
+    }
+    if ('mozPreservesPitch' in element) {
+      (element as any).mozPreservesPitch = false;
+    }
+    if ('webkitPreservesPitch' in element) {
+      (element as any).webkitPreservesPitch = false;
+    }
+  };
+
+  const seekToStart = () => {
+    if (!audioElementRef.current) return;
+    audioElementRef.current.currentTime = getEffectiveStart();
+  };
+
+  const stopAtStart = () => {
+    if (!audioElementRef.current) return;
+    audioElementRef.current.pause();
+    seekToStart();
+  };
+
+  const triggerPlayback = async () => {
+    if (!audioElementRef.current) return;
+    seekToStart();
+    await play();
+  };
+
+  useEffect(() => {
+    playbackModeRef.current = playbackMode;
+  }, [playbackMode]);
+
+  useEffect(() => {
+    pitchRef.current = pitch;
+    updatePlaybackRate();
+  }, [pitch]);
+
+  useEffect(() => {
+    startTimeRef.current = startTime;
+  }, [startTime]);
+
+  useEffect(() => {
+    endTimeRef.current = endTime;
+  }, [endTime]);
 
   // Create output gain once (stable connection for Monitor)
   useEffect(() => {
@@ -159,7 +361,16 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
 
         // Create fresh audio element
         audioElement = new Audio();
-        audioElement.loop = loop;
+        if ('preservesPitch' in audioElement) {
+          audioElement.preservesPitch = false;
+        }
+        if ('mozPreservesPitch' in audioElement) {
+          (audioElement as any).mozPreservesPitch = false;
+        }
+        if ('webkitPreservesPitch' in audioElement) {
+          (audioElement as any).webkitPreservesPitch = false;
+        }
+        audioElement.loop = false;
         // Only set crossOrigin for remote URLs, not blob URLs
         if (!src.startsWith('blob:')) {
           audioElement.crossOrigin = 'anonymous';
@@ -167,6 +378,7 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
         audioElement.preload = 'auto';
         audioElement.src = src;
         audioElementRef.current = audioElement;
+        updatePlaybackRate();
 
         // Create source from audio element
         sourceNode = audioContext.createMediaElementSource(audioElement);
@@ -186,6 +398,26 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
         });
 
         audioElement.addEventListener('timeupdate', () => {
+          const current = audioElement!.currentTime;
+          const regionStart = getEffectiveStart();
+          const regionEnd = getEffectiveEnd();
+          if (regionEnd > 0 && current >= regionEnd) {
+            if (playbackModeRef.current === 'loop') {
+              audioElement!.currentTime = regionStart;
+              if (!audioElement!.paused) {
+                audioElement!.play().catch(() => {
+                  setError('Playback failed. User interaction may be required.');
+                });
+              }
+            } else {
+              audioElement!.pause();
+              audioElement!.currentTime = regionStart;
+              setIsPlaying(false);
+              onEnd?.();
+            }
+          } else if (current < regionStart) {
+            audioElement!.currentTime = regionStart;
+          }
           setCurrentTime(audioElement!.currentTime);
         });
 
@@ -232,12 +464,11 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
     };
   }, [audioContext, src]);
 
-  // Update loop when it changes
+  // Sync playback mode when legacy loop prop changes
   useEffect(() => {
-    if (audioElementRef.current) {
-      audioElementRef.current.loop = loop;
-    }
-  }, [loop]);
+    if (controlledPlaybackMode !== undefined) return;
+    setPlaybackMode(loop ? 'loop' : 'one-shot');
+  }, [loop, controlledPlaybackMode, setPlaybackMode]);
 
   // Update gain when it changes
   useEffect(() => {
@@ -245,6 +476,18 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
       gainNodeRef.current.gain.value = gain;
     }
   }, [gain]);
+
+  // Update playback rate when pitch or CV changes
+  // Clamp playback position to region when start/end changes
+  useEffect(() => {
+    if (!audioElementRef.current || !duration) return;
+    const start = getEffectiveStart();
+    const end = getEffectiveEnd();
+    if (end > 0 && end < start) return;
+    if (audioElementRef.current.currentTime < start || (end > 0 && audioElementRef.current.currentTime > end)) {
+      audioElementRef.current.currentTime = start;
+    }
+  }, [startTime, endTime, duration]);
 
   // Load file from File object
   const loadFile = (file: File) => {
@@ -273,12 +516,103 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
     return () => clearInterval(interval);
   }, [isPlaying]);
 
+  // Set up CV/trigger worklets
+  useEffect(() => {
+    if (!audioContext) return;
+    let cancelled = false;
+
+    loadMp3DeckWorklets(audioContext).then(() => {
+      if (cancelled) return;
+
+      if (!triggerNodeRef.current) {
+        const triggerNode = new AudioWorkletNode(audioContext, 'mp3-gate-detector', {
+          numberOfInputs: 1,
+          numberOfOutputs: 0,
+          channelCount: 1,
+        });
+        triggerNode.port.onmessage = (event) => {
+          if (event.data?.type === 'gate-on') {
+            gateStateRef.current = true;
+            triggerPlayback();
+          }
+          if (event.data?.type === 'gate-off') {
+            gateStateRef.current = false;
+            if (playbackMode === 'gate') {
+              stopAtStart();
+            }
+          }
+        };
+        triggerNodeRef.current = triggerNode;
+      }
+
+      if (!pitchCvNodeRef.current) {
+        const pitchNode = new AudioWorkletNode(audioContext, 'mp3-cv-follower', {
+          numberOfInputs: 1,
+          numberOfOutputs: 0,
+          channelCount: 1,
+        });
+        pitchNode.port.onmessage = (event) => {
+          if (event.data?.type !== 'cv') return;
+          pitchCvValueRef.current = event.data.value;
+          updatePlaybackRate();
+        };
+        pitchCvNodeRef.current = pitchNode;
+      }
+      setIsWorkletReady(true);
+    }).catch((err) => {
+      if (cancelled) return;
+      console.error('Failed to load MP3Deck worklets', err);
+    });
+
+    return () => {
+      cancelled = true;
+      if (triggerNodeRef.current) {
+        triggerNodeRef.current.port.onmessage = null;
+        try { triggerNodeRef.current.disconnect(); } catch (e) {}
+        triggerNodeRef.current = null;
+      }
+      if (pitchCvNodeRef.current) {
+        pitchCvNodeRef.current.port.onmessage = null;
+        try { pitchCvNodeRef.current.disconnect(); } catch (e) {}
+        pitchCvNodeRef.current = null;
+      }
+      setIsWorkletReady(false);
+    };
+  }, [audioContext, playbackMode]);
+
+  const triggerKey = triggerInput?.current?.audioNode ? String(triggerInput.current.audioNode) : 'null';
+  useEffect(() => {
+    if (!triggerInput?.current || !triggerNodeRef.current || !isWorkletReady) return;
+    const inGain = triggerInput.current.gain;
+    const listener = triggerNodeRef.current;
+    inGain.connect(listener);
+    return () => {
+      try { inGain.disconnect(listener); } catch (e) {}
+    };
+  }, [triggerKey, isWorkletReady]);
+
+  const pitchCvKey = pitchCv?.current?.audioNode ? String(pitchCv.current.audioNode) : 'null';
+  useEffect(() => {
+    if (!pitchCv?.current || !pitchCvNodeRef.current || !isWorkletReady) return;
+    const inGain = pitchCv.current.gain;
+    const listener = pitchCvNodeRef.current;
+    inGain.connect(listener);
+    return () => {
+      try { inGain.disconnect(listener); } catch (e) {}
+      pitchCvValueRef.current = 0;
+      updatePlaybackRate();
+    };
+  }, [pitchCvKey, isWorkletReady]);
+
   // Playback controls
   const play = async () => {
     if (audioElementRef.current && audioContext) {
       // Resume audio context if suspended
       if (audioContext.state === 'suspended') {
         await audioContext.resume();
+      }
+      if (audioElementRef.current.currentTime < getEffectiveStart()) {
+        seekToStart();
       }
       audioElementRef.current.play().catch(() => {
         setError('Playback failed. User interaction may be required.');
@@ -295,14 +629,24 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
   const stop = () => {
     if (audioElementRef.current) {
       audioElementRef.current.pause();
-      audioElementRef.current.currentTime = 0;
+      seekToStart();
     }
   };
 
   const seek = (time: number) => {
     if (audioElementRef.current) {
-      audioElementRef.current.currentTime = time;
+      const start = getEffectiveStart();
+      const end = getEffectiveEnd();
+      const bounded = end > 0 ? clamp(time, start, end) : Math.max(start, time);
+      audioElementRef.current.currentTime = bounded;
     }
+  };
+
+  const triggerPlaybackCommand = async () => {
+    if (playbackMode === 'gate') {
+      gateStateRef.current = true;
+    }
+    await triggerPlayback();
   };
 
   // Expose imperative handle
@@ -310,10 +654,23 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
     play,
     pause,
     stop,
+    trigger: triggerPlaybackCommand,
     seek,
     loadFile,
-    getState: () => ({ src, gain, loop, isPlaying, isReady, currentTime, duration, error }),
-  }), [src, gain, loop, isPlaying, isReady, currentTime, duration, error]);
+    getState: () => ({
+      src,
+      gain,
+      playbackMode,
+      startTime,
+      endTime,
+      pitch,
+      isPlaying,
+      isReady,
+      currentTime,
+      duration,
+      error
+    }),
+  }), [src, gain, playbackMode, startTime, endTime, pitch, isPlaying, isReady, currentTime, duration, error]);
 
   // Event callback effects
   useEffect(() => {
@@ -340,12 +697,19 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
       loadFile,
       gain,
       setGain,
-      loop,
-      setLoop,
+      playbackMode,
+      setPlaybackMode,
+      startTime,
+      setStartTime,
+      endTime,
+      setEndTime,
+      pitch,
+      setPitch,
       isPlaying,
       play,
       pause,
       stop,
+      trigger: triggerPlaybackCommand,
       currentTime,
       duration,
       seek,

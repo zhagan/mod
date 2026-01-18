@@ -167,6 +167,9 @@ function ModularSynth() {
     } else if (type === 'Sequencer') {
       ports.push({ id: `${id}-cv-clock`, type: 'input', label: 'Clock' });
       ports.push({ id: `${id}-cv-reset`, type: 'input', label: 'Reset' });
+    } else if (type === 'MP3Deck') {
+      ports.push({ id: `${id}-cv-trigger`, type: 'input', label: 'Trigger' });
+      ports.push({ id: `${id}-cv-pitch`, type: 'input', label: 'Pitch' });
     }
 
     // Create output ports based on definition
@@ -660,11 +663,18 @@ function ModularSynth() {
 
         {modules.map((module) => {
           const inputPorts = module.ports.filter(p =>
-            p.type === 'input' && !p.label.startsWith('CV') && p.label !== 'Gate' && p.label !== 'Clock' && p.label !== 'Reset'
+            p.type === 'input'
+            && !p.label.startsWith('CV')
+            && p.label !== 'Gate'
+            && p.label !== 'Clock'
+            && p.label !== 'Reset'
+            && p.label !== 'Trigger'
+            && p.label !== 'Pitch'
           );
           const outputPorts = module.ports.filter(p => p.type === 'output');
           const cvPorts = module.ports.filter(p =>
-            p.type === 'input' && (p.label === 'CV' || p.label === 'Gate' || p.label === 'Clock' || p.label === 'Reset')
+            p.type === 'input'
+            && (p.label === 'CV' || p.label === 'Gate' || p.label === 'Clock' || p.label === 'Reset' || p.label === 'Trigger' || p.label === 'Pitch')
           );
 
           // Get connected input streams for each input port (excluding CV)
