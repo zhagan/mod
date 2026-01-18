@@ -24,6 +24,7 @@ export interface ClockRenderProps {
 
 export interface ClockProps {
   output: ModStreamRef;
+  startOutput?: ModStreamRef;
   label?: string;
   // Controlled props
   bpm?: number;
@@ -36,6 +37,7 @@ export interface ClockProps {
 
 export const Clock = React.forwardRef<ClockHandle, ClockProps>(({
   output,
+  startOutput,
   label = 'clock',
   bpm: controlledBpm,
   onBpmChange,
@@ -48,7 +50,10 @@ export const Clock = React.forwardRef<ClockHandle, ClockProps>(({
 
   const constantSourceRef = useRef<ConstantSourceNode | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
-  const intervalRef = useRef<number | null>(null);
+  const startSourceRef = useRef<ConstantSourceNode | null>(null);
+  const startGainRef = useRef<GainNode | null>(null);
+  const schedulerRef = useRef<number | null>(null);
+  const nextPulseTimeRef = useRef<number>(0);
   const bpmRef = useRef(bpm);
 
   useEffect(() => { bpmRef.current = bpm; }, [bpm]);
@@ -78,9 +83,33 @@ export const Clock = React.forwardRef<ClockHandle, ClockProps>(({
       },
     };
 
+    if (startOutput) {
+      const startSource = audioContext.createConstantSource();
+      startSource.offset.value = 0;
+      startSourceRef.current = startSource;
+
+      const startGain = audioContext.createGain();
+      startGain.gain.value = 1.0;
+      startGainRef.current = startGain;
+
+      startSource.connect(startGain);
+      startSource.start(0);
+
+      startOutput.current = {
+        audioNode: startSource,
+        gain: startGain,
+        context: audioContext,
+        metadata: {
+          label: `${label}-start`,
+          sourceType: 'cv',
+        },
+      };
+    }
+
     return () => {
-      if (intervalRef.current !== null) {
-        clearInterval(intervalRef.current);
+      if (schedulerRef.current !== null) {
+        clearTimeout(schedulerRef.current);
+        schedulerRef.current = null;
       }
       constantSource.stop();
       constantSource.disconnect();
@@ -88,35 +117,45 @@ export const Clock = React.forwardRef<ClockHandle, ClockProps>(({
       output.current = null;
       constantSourceRef.current = null;
       gainNodeRef.current = null;
+      if (startSourceRef.current) {
+        startSourceRef.current.stop();
+        startSourceRef.current.disconnect();
+        startSourceRef.current = null;
+      }
+      if (startGainRef.current) {
+        startGainRef.current.disconnect();
+        startGainRef.current = null;
+      }
+      if (startOutput) {
+        startOutput.current = null;
+      }
     };
-  }, [audioContext, label]);
+  }, [audioContext, label, startOutput]);
 
   const start = () => {
     if (isRunning || !audioContext || !constantSourceRef.current) return;
     setIsRunning(true);
-
-    const pulseInterval = (60 / bpmRef.current) * 1000;
-
-    intervalRef.current = window.setInterval(() => {
-      if (!constantSourceRef.current || !audioContext) return;
-
-      const now = audioContext.currentTime;
-      constantSourceRef.current.offset.setValueAtTime(1, now);
-      constantSourceRef.current.offset.setValueAtTime(0, now + 0.01);
-    }, pulseInterval);
+    if (startSourceRef.current) {
+      startSourceRef.current.offset.setValueAtTime(1, audioContext.currentTime);
+    }
+    nextPulseTimeRef.current = audioContext.currentTime;
+    schedulePulses();
   };
 
   const stop = () => {
     if (!isRunning) return;
     setIsRunning(false);
 
-    if (intervalRef.current !== null) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
+    if (schedulerRef.current !== null) {
+      clearTimeout(schedulerRef.current);
+      schedulerRef.current = null;
     }
 
     if (constantSourceRef.current && audioContext) {
       constantSourceRef.current.offset.setValueAtTime(0, audioContext.currentTime);
+    }
+    if (startSourceRef.current && audioContext) {
+      startSourceRef.current.offset.setValueAtTime(0, audioContext.currentTime);
     }
   };
 
@@ -124,22 +163,32 @@ export const Clock = React.forwardRef<ClockHandle, ClockProps>(({
     stop();
   };
 
+  const schedulePulses = () => {
+    if (!audioContext || !constantSourceRef.current) return;
+
+    const pulseDuration = 0.01;
+    const pulseInterval = (60 / bpmRef.current) / 16; // 64th-note pulses
+    const lookahead = 0.1;
+    const scheduleAheadTime = 0.05;
+
+    while (nextPulseTimeRef.current < audioContext.currentTime + lookahead) {
+      const time = nextPulseTimeRef.current;
+      constantSourceRef.current.offset.setValueAtTime(1, time);
+      constantSourceRef.current.offset.setValueAtTime(0, time + pulseDuration);
+      nextPulseTimeRef.current += pulseInterval;
+    }
+
+    schedulerRef.current = window.setTimeout(schedulePulses, scheduleAheadTime * 1000);
+  };
+
   useEffect(() => {
     if (isRunning && audioContext) {
-      if (intervalRef.current !== null) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
+      if (schedulerRef.current !== null) {
+        clearTimeout(schedulerRef.current);
+        schedulerRef.current = null;
       }
-
-      const pulseInterval = (60 / bpmRef.current) * 1000;
-
-      intervalRef.current = window.setInterval(() => {
-        if (!constantSourceRef.current || !audioContext) return;
-
-        const now = audioContext.currentTime;
-        constantSourceRef.current.offset.setValueAtTime(1, now);
-        constantSourceRef.current.offset.setValueAtTime(0, now + 0.01);
-      }, pulseInterval);
+      nextPulseTimeRef.current = audioContext.currentTime;
+      schedulePulses();
     }
   }, [bpm]);
 

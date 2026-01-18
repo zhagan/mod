@@ -74,7 +74,6 @@ export const MODULE_DEFINITIONS: Record<string, ModuleDefinition> = {
     outputs: 2, // CV output + Gate output
     defaultParams: {
       steps: Array.from({ length: 8 }, () => ({ active: false, value: 0 })),
-      bpm: 120,
       division: 4,
     },
   },
@@ -84,8 +83,8 @@ export const MODULE_DEFINITIONS: Record<string, ModuleDefinition> = {
     category: 'cv',
     color: '#fddb92',
     inputs: 0,
-    outputs: 1,
-    defaultParams: { bpm: 120, isRunning: false },
+    outputs: 2,
+    defaultParams: { bpm: 120 },
   },
   Delay: {
     type: 'Delay',

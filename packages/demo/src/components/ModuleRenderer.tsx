@@ -98,6 +98,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
   // Get CV input (just get the first one since each component only has one CV port)
   const cv = Object.values(cvInputStreams).find(stream => stream !== null) || undefined;
+  const clockInput = cvInputStreams['cv-clock'] || undefined;
 
   switch (moduleType) {
     case 'ToneGenerator':
@@ -1235,24 +1236,14 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
         <Sequencer
           output={output}
           gateOutput={gateOutput}
+          clock={clockInput}
           steps={params.steps}
           onStepsChange={(value) => setParam('steps', value)}
-          bpm={params.bpm}
-          onBpmChange={(value) => setParam('bpm', value)}
           division={params.division}
           onDivisionChange={(value) => setParam('division', value)}
         >
           {(controls) => (
             <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
-              <ModUISlider
-                label="BPM"
-                value={controls.bpm}
-                onChange={controls.setBpm}
-                min={20}
-                max={300}
-                step={1}
-                formatValue={(v) => v.toFixed(0)}
-              />
               <ModUISelect
                 value={controls.division.toString()}
                 onChange={ (value) => {
@@ -1273,7 +1264,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                   <div key={`seq-div-${i}`} style={{display: 'flex', alignItems: 'center', flexDirection: 'row', gap: '12px'}}>
                     <div className="enabled-toggle-dot"
                          key={`step-indicator-${i}`}
-                         style={{backgroundColor: i === controls.currentStep && controls.isPlaying ? 'red' : 'lightblue'}}>
+                         style={{backgroundColor: i === controls.currentStep ? 'red' : 'lightblue'}}>
                     </div>
                     <ModUIButton
                       key={`step-button-${i}`}
@@ -1304,13 +1295,6 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
               </div>
               <div style={{display: 'flex', gap: '8px'}}>
                 <ModUIButton
-                  icon={controls.isPlaying ? <Pause size={16}/> : <Play size={16}/>}
-                  active={controls.isPlaying}
-                  onClick={controls.isPlaying ? controls.pause : controls.play}
-                  variant="success"
-                  title={controls.isPlaying ? 'Pause' : 'Play'}
-                />
-                <ModUIButton
                   icon={<RotateCcw size={16}/>}
                   onClick={controls.reset}
                   title="Reset"
@@ -1322,9 +1306,11 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
       ) : null;
 
     case 'Clock':
+      const startOutput = outputStreams[1] || null;
       return output ? (
         <Clock
           output={output}
+          startOutput={startOutput}
           bpm={params.bpm}
           onBpmChange={(value) => setParam('bpm', value)}
         >
