@@ -164,6 +164,8 @@ function ModularSynth() {
       ports.push({ id: `${id}-cv-gain`, type: 'input', label: 'CV' });
     } else if (type === 'ADSR') {
       ports.push({ id: `${id}-cv-gate`, type: 'input', label: 'Gate' });
+    } else if (type === 'Sequencer') {
+      ports.push({ id: `${id}-cv-clock`, type: 'input', label: 'Clock' });
     }
 
     // Create output ports based on definition
@@ -654,9 +656,13 @@ function ModularSynth() {
         </svg>
 
         {modules.map((module) => {
-          const inputPorts = module.ports.filter(p => p.type === 'input' && !p.label.startsWith('CV') && p.label !== 'Gate');
+          const inputPorts = module.ports.filter(p =>
+            p.type === 'input' && !p.label.startsWith('CV') && p.label !== 'Gate' && p.label !== 'Clock'
+          );
           const outputPorts = module.ports.filter(p => p.type === 'output');
-          const cvPorts = module.ports.filter(p => p.type === 'input' && (p.label === 'CV' || p.label === 'Gate'));
+          const cvPorts = module.ports.filter(p =>
+            p.type === 'input' && (p.label === 'CV' || p.label === 'Gate' || p.label === 'Clock')
+          );
 
           // Get connected input streams for each input port (excluding CV)
           const inputStreams = inputPorts.map(port => {

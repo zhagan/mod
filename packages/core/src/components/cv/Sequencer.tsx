@@ -9,14 +9,11 @@ export interface step {
 }
 
 export interface SequencerHandle {
-  play: () => void;
-  pause: () => void;
   reset: () => void;
   getState: () => {
     steps: step[];
     currentStep: number;
-    bpm: number;
-    isPlaying: boolean;
+    division: number;
   };
 }
 
@@ -24,48 +21,100 @@ export interface SequencerRenderProps {
   steps: step[];
   setSteps: (steps: step[]) => void;
   currentStep: number;
-  bpm: number;
-  setBpm: (value: number) => void;
   division: number;
   setDivision: (value: number) => void;
-  isPlaying: boolean;
-  play: () => void;
-  pause: () => void;
   reset: () => void;
 }
 
 export interface SequencerProps {
   output: ModStreamRef;
   gateOutput?: ModStreamRef; // Optional separate gate/trigger output
+  clock?: ModStreamRef;
   label?: string;
   numSteps?: number;
   // Controlled props
   steps?: step[];
   onStepsChange?: (steps: step[]) => void;
-  bpm?: number;
-  onBpmChange?: (bpm: number) => void;
   division?: number;
   onDivisionChange?: (division: number) => void;
   // Event callbacks
   onCurrentStepChange?: (currentStep: number) => void;
-  onPlayingChange?: (isPlaying: boolean) => void;
   // Render props
   children?: (props: SequencerRenderProps) => ReactNode;
 }
 
+// Inline worklet to detect clock pulses from an audio/CV input.
+const CLOCK_DETECTOR_WORKLET = `
+class ClockDetector extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this._last = 0;
+    this._cooldown = 0;
+  }
+  process(inputs) {
+    const input = inputs[0];
+    if (!input || input.length === 0) return true;
+    const channel = input[0];
+    if (!channel) return true;
+    for (let i = 0; i < channel.length; i++) {
+      const value = channel[i];
+      if (this._cooldown > 0) {
+        this._cooldown--;
+        this._last = value;
+        continue;
+      }
+      if (this._last <= 0.5 && value > 0.5) {
+        this.port.postMessage({ type: 'pulse' });
+        this._cooldown = 32;
+      }
+      this._last = value;
+    }
+    return true;
+  }
+}
+registerProcessor('clock-detector', ClockDetector);
+`;
+
+const clockDetectorLoaders = new WeakMap<AudioContext, Promise<void>>();
+const clockDetectorUrls = new WeakMap<AudioContext, string>();
+
+const loadClockDetectorWorklet = (audioContext: AudioContext) => {
+  let loader = clockDetectorLoaders.get(audioContext);
+  if (!loader) {
+    const blob = new Blob([CLOCK_DETECTOR_WORKLET], { type: 'application/javascript' });
+    const url = URL.createObjectURL(blob);
+    clockDetectorUrls.set(audioContext, url);
+    loader = audioContext.audioWorklet.addModule(url).then(() => {
+      const loadedUrl = clockDetectorUrls.get(audioContext);
+      if (loadedUrl) {
+        URL.revokeObjectURL(loadedUrl);
+        clockDetectorUrls.delete(audioContext);
+      }
+    }).catch((err) => {
+      const loadedUrl = clockDetectorUrls.get(audioContext);
+      if (loadedUrl) {
+        URL.revokeObjectURL(loadedUrl);
+        clockDetectorUrls.delete(audioContext);
+      }
+      clockDetectorLoaders.delete(audioContext);
+      throw err;
+    });
+    clockDetectorLoaders.set(audioContext, loader);
+  }
+  return loader;
+};
+
 export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
   output,
   gateOutput,
+  clock,
   label = 'sequencer',
   numSteps = 8,
   steps: controlledSteps,
   onStepsChange,
-  bpm: controlledBpm,
-  onBpmChange,
   division: controlledDivision,
   onDivisionChange,
   onCurrentStepChange,
-  onPlayingChange,
   children,
 }, ref) => {
   const audioContext = useAudioContext();
@@ -75,28 +124,27 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
   }
   const [steps, setSteps] = useControlledState(controlledSteps, initialSteps, onStepsChange);
   const [currentStep, setCurrentStep] = useState(0);
-  const [bpm, setBpm] = useControlledState(controlledBpm, 120, onBpmChange);
   const [division, setDivision] = useControlledState(controlledDivision, 4, onDivisionChange);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [isListenerReady, setIsListenerReady] = useState(false);
 
   const constantSourceRef = useRef<ConstantSourceNode | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
   const gateSourceRef = useRef<ConstantSourceNode | null>(null);
   const gateGainRef = useRef<GainNode | null>(null);
-  const intervalRef = useRef<number | null>(null);
-  const schedulerRef = useRef<number | null>(null);
-  const nextStepTimeRef = useRef<number>(0);
+  const clockListenerRef = useRef<AudioWorkletNode | null>(null);
+  const gateDurationRef = useRef(0.05);
+  const pulseAccumulatorRef = useRef(0);
   // Store refs for current state
   const stepsRef = useRef(steps);
   const currentStepRef = useRef(currentStep);
-  const bpmRef = useRef(bpm);
   const divisionRef = useRef(division);
-
 
   useEffect(() => { stepsRef.current = steps; }, [steps]);
   useEffect(() => { currentStepRef.current = currentStep; }, [currentStep]);
-  useEffect(() => { bpmRef.current = bpm; }, [bpm]);
-  useEffect(() => { divisionRef.current = division; }, [division]);
+  useEffect(() => {
+    divisionRef.current = division;
+    pulseAccumulatorRef.current = 0;
+  }, [division]);
 
   // Create sequencer nodes once
   useEffect(() => {
@@ -153,11 +201,8 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
       };
     }
 
-    // Cleanup
-    return () => {
-      if (intervalRef.current !== null) {
-        clearInterval(intervalRef.current);
-      }
+  // Cleanup
+  return () => {
       constantSource.stop();
       constantSource.disconnect();
       gainNode.disconnect();
@@ -180,92 +225,102 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
     };
   }, [audioContext, label, gateOutput]);
 
-  // Play function
-  const play = () => {
-    if (isPlaying || !audioContext) return;
-    setIsPlaying(true);
-    nextStepTimeRef.current = audioContext.currentTime;
-    scheduleSteps();
-  };
-
-  // Pause function
-  const pause = () => {
-    if (!isPlaying) return;
-    setIsPlaying(false);
-    if (schedulerRef.current !== null) {
-      clearTimeout(schedulerRef.current);
-      schedulerRef.current = null;
-    }
-  };
-
-  const scheduleSteps = () => {
+  // Create clock listener
+  useEffect(() => {
     if (!audioContext) return;
+    let cancelled = false;
 
-    const stepDuration = (60 / bpmRef.current) / divisionRef.current; // seconds per step
-    const lookahead = 0.1; // seconds to look ahead
-    const scheduleAheadTime = 0.05; // seconds
+    loadClockDetectorWorklet(audioContext).then(() => {
+      if (cancelled) return;
+      const node = new AudioWorkletNode(audioContext, 'clock-detector', {
+        numberOfInputs: 1,
+        numberOfOutputs: 0,
+        channelCount: 1,
+      });
+      clockListenerRef.current = node;
+      const getPulsesPerStep = (divisionValue: number) => {
+        const pulsesPerStepMap: Record<number, number> = {
+          1: 16, // 1/4
+          2: 8,  // 1/8
+          3: 6,  // dotted 1/16
+          4: 4,  // 1/16
+          6: 3,  // dotted 1/32
+          8: 2,  // 1/32
+          12: 1.5, // dotted 1/64
+          16: 1, // 1/64
+        };
+        return pulsesPerStepMap[divisionValue] ?? Math.max(1, 16 / divisionValue);
+      };
 
-    while (nextStepTimeRef.current < audioContext.currentTime + lookahead) {
-      // Schedule step at nextStepTimeRef.current
-      const stepIdx = (currentStepRef.current + 1) % stepsRef.current.length;
+      node.port.onmessage = (event) => {
+        if (event.data?.type !== 'pulse') return;
+        if (!audioContext || !constantSourceRef.current) return;
+        if (!stepsRef.current.length) return;
+        const pulsesPerStep = getPulsesPerStep(divisionRef.current);
+        pulseAccumulatorRef.current += 1;
+        if (pulseAccumulatorRef.current < pulsesPerStep) return;
 
-      // Set CV/gate at scheduled time
-      if (constantSourceRef.current) {
-        constantSourceRef.current.offset.setValueAtTime(stepsRef.current[stepIdx].value, nextStepTimeRef.current);
+        pulseAccumulatorRef.current -= pulsesPerStep;
+        const nextStep = (currentStepRef.current + 1) % stepsRef.current.length;
+        const now = audioContext.currentTime;
+        constantSourceRef.current.offset.setValueAtTime(stepsRef.current[nextStep].value, now);
+        if (gateSourceRef.current && stepsRef.current[nextStep].active) {
+          gateSourceRef.current.offset.setValueAtTime(1, now);
+          gateSourceRef.current.offset.setValueAtTime(0, now + gateDurationRef.current);
+        }
+        currentStepRef.current = nextStep;
+        setCurrentStep(nextStep);
+      };
+      setIsListenerReady(true);
+    }).catch((err) => {
+      if (cancelled) return;
+      console.error('Failed to load clock detector worklet', err);
+    });
+
+    return () => {
+      cancelled = true;
+      if (clockListenerRef.current) {
+        clockListenerRef.current.port.onmessage = null;
+        try { clockListenerRef.current.disconnect(); } catch (e) {}
+        clockListenerRef.current = null;
       }
-      if (gateSourceRef.current && stepsRef.current[stepIdx].active) {
-        gateSourceRef.current.offset.setValueAtTime(1, nextStepTimeRef.current);
-        gateSourceRef.current.offset.setValueAtTime(0, nextStepTimeRef.current + stepDuration * 0.8);
-      }
+      setIsListenerReady(false);
+    };
+  }, [audioContext]);
 
-      // Update for next step
-      nextStepTimeRef.current += stepDuration;
-      setCurrentStep(stepIdx);
-    }
-
-    // Schedule next scheduler tick
-    schedulerRef.current = window.setTimeout(scheduleSteps, scheduleAheadTime * 1000);
-  };
+  // Connect clock input to listener
+  const clockKey = clock?.current?.audioNode ? String(clock.current.audioNode) : 'null';
+  useEffect(() => {
+    if (!clock?.current || !clockListenerRef.current || !isListenerReady) return;
+    const inGain = clock.current.gain;
+    const listener = clockListenerRef.current;
+    inGain.connect(listener);
+    return () => {
+      try { inGain.disconnect(listener); } catch (e) {}
+    };
+  }, [clockKey, isListenerReady]);
 
   // Reset function
   const reset = () => {
-    pause();
     setCurrentStep(0);
+    currentStepRef.current = 0;
+    pulseAccumulatorRef.current = 0;
     if (constantSourceRef.current && audioContext) {
       const now = audioContext.currentTime;
       constantSourceRef.current.offset.setValueAtTime(stepsRef.current[0].value, now);
     }
   };
 
-  // Update interval when BPM changes
-  useEffect(() => {
-    if (isPlaying && audioContext) {
-      // Clear existing scheduler
-      if (schedulerRef.current !== null) {
-        clearTimeout(schedulerRef.current);
-        schedulerRef.current = null;
-      }
-
-      scheduleSteps();
-    }
-  }, [bpm, division]);
-
   // Expose imperative handle
   useImperativeHandle(ref, () => ({
-    play,
-    pause,
     reset,
-    getState: () => ({ steps, currentStep, bpm, isPlaying }),
-  }), [steps, currentStep, bpm, isPlaying]);
+    getState: () => ({ steps, currentStep, division }),
+  }), [steps, currentStep, division]);
 
   // Event callback effects
   useEffect(() => {
     onCurrentStepChange?.(currentStep);
   }, [currentStep, onCurrentStepChange]);
-
-  useEffect(() => {
-    onPlayingChange?.(isPlaying);
-  }, [isPlaying, onPlayingChange]);
 
   // Render children with state
   if (children) {
@@ -273,13 +328,8 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
       steps,
       setSteps,
       currentStep,
-      bpm,
-      setBpm,
       division,
       setDivision,
-      isPlaying,
-      play,
-      pause,
       reset,
     })}</>;
   }
