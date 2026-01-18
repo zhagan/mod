@@ -5,6 +5,6 @@ export default defineConfig({
   plugins: [react()],
   base: '/mod/playground/',
   build: {
-    outDir: '../../docs/public/playground'
+    outDir: '../../site/mod/playground'
   }
 })
