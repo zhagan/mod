@@ -98,6 +98,7 @@ function ModularSynth() {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [moduleParams, setModuleParams] = useState<Record<string, Record<string, any>>>({});
   const [layoutVersion, setLayoutVersion] = useState(0);
+  const [contentSize, setContentSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
   const [draggingConnection, setDraggingConnection] = useState<{
     from: { moduleId: string; portId: string };
     mousePos: Position;
@@ -105,6 +106,7 @@ function ModularSynth() {
   const [hoveredPort, setHoveredPort] = useState<{ moduleId: string; portId: string } | null>(null);
 
   const canvasRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const mousePosRef = useRef<Position>({ x: 0, y: 0 });
   const rafIdRef = useRef<number | null>(null);
   const portPositionCacheRef = useRef<Map<string, Position>>(new Map());
@@ -242,6 +244,20 @@ function ModularSynth() {
   useLayoutEffect(() => {
     clearPortPositionCache();
     setLayoutVersion((prev) => prev + 1);
+    if (!canvasRef.current || !contentRef.current) return;
+    const canvasRect = canvasRef.current.getBoundingClientRect();
+    const moduleEls = contentRef.current.querySelectorAll('.module-wrapper');
+    let maxRight = canvasRect.width;
+    let maxBottom = canvasRect.height;
+    moduleEls.forEach((el) => {
+      const rect = el.getBoundingClientRect();
+      const right = rect.right - canvasRect.left + canvasRef.current!.scrollLeft;
+      const bottom = rect.bottom - canvasRect.top + canvasRef.current!.scrollTop;
+      if (right > maxRight) maxRight = right;
+      if (bottom > maxBottom) maxBottom = bottom;
+    });
+    const padding = 200;
+    setContentSize({ width: maxRight + padding, height: maxBottom + padding });
   }, [modules]);
 
   // Get position of a port element with caching
@@ -261,13 +277,12 @@ function ModularSynth() {
     if (!portDot || !canvasRef.current) return null;
 
     const dotRect = portDot.getBoundingClientRect();
-    const canvasRect = canvasRef.current.getBoundingClientRect();
-    const scrollLeft = canvasRef.current.scrollLeft;
-    const scrollTop = canvasRef.current.scrollTop;
+    const contentRect = contentRef.current?.getBoundingClientRect();
+    if (!contentRect) return null;
 
     const position = {
-      x: dotRect.left + dotRect.width / 2 - canvasRect.left + scrollLeft,
-      y: dotRect.top + dotRect.height / 2 - canvasRect.top + scrollTop,
+      x: dotRect.left + dotRect.width / 2 - contentRect.left,
+      y: dotRect.top + dotRect.height / 2 - contentRect.top,
     };
 
     // Cache the result
@@ -283,14 +298,14 @@ function ModularSynth() {
     // Only allow dragging from output ports
     if (portType !== 'output') return;
 
-    const canvasRect = canvasRef.current?.getBoundingClientRect();
-    if (!canvasRect) return;
+    const contentRect = contentRef.current?.getBoundingClientRect();
+    if (!contentRect) return;
 
     setDraggingConnection({
       from: { moduleId, portId },
       mousePos: {
-        x: event.clientX - canvasRect.left,
-        y: event.clientY - canvasRect.top,
+        x: event.clientX - contentRect.left,
+        y: event.clientY - contentRect.top,
       },
     });
   };
@@ -299,10 +314,10 @@ function ModularSynth() {
   const handleCanvasMouseMove = (e: React.MouseEvent) => {
     if (!draggingConnection || !canvasRef.current) return;
 
-    const canvasRect = canvasRef.current.getBoundingClientRect();
+    const contentRect = contentRef.current.getBoundingClientRect();
     mousePosRef.current = {
-      x: e.clientX - canvasRect.left,
-      y: e.clientY - canvasRect.top,
+      x: e.clientX - contentRect.left,
+      y: e.clientY - contentRect.top,
     };
 
     // Throttle state updates with requestAnimationFrame
@@ -384,9 +399,10 @@ function ModularSynth() {
     e.preventDefault();
     const moduleType = (e as any).dataTransfer?.getData('moduleType');
     if (moduleType && canvasRef.current) {
-      const canvasRect = canvasRef.current.getBoundingClientRect();
-      const x = e.clientX - canvasRect.left;
-      const y = e.clientY - canvasRect.top;
+      const contentRect = contentRef.current?.getBoundingClientRect();
+      if (!contentRect) return;
+      const x = e.clientX - contentRect.left;
+      const y = e.clientY - contentRect.top;
       addModule(moduleType, { x, y });
     }
   };
@@ -597,135 +613,145 @@ function ModularSynth() {
         onDragOver={handleCanvasDragOver}
         onDrop={handleCanvasDrop as any}
       >
-        {/* SVG for wires */}
-        <svg className="wires-svg">
-          {/* Render existing connections - memoized */}
-          {useMemo(() => connections.map((conn) => {
-            const fromPos = getPortPosition(conn.from.moduleId, conn.from.portId);
-            const toPos = getPortPosition(conn.to.moduleId, conn.to.portId);
+        <div
+          ref={contentRef}
+          className="canvas-content"
+          style={{ width: contentSize.width || '100%', height: contentSize.height || '100%' }}
+        >
+          {/* SVG for wires */}
+          <svg
+            className="wires-svg"
+            width={contentSize.width || '100%'}
+            height={contentSize.height || '100%'}
+          >
+            {/* Render existing connections - memoized */}
+            {useMemo(() => connections.map((conn) => {
+              const fromPos = getPortPosition(conn.from.moduleId, conn.from.portId);
+              const toPos = getPortPosition(conn.to.moduleId, conn.to.portId);
 
-            if (!fromPos || !toPos) return null;
+              if (!fromPos || !toPos) return null;
 
-            // Create a smooth curve
-            const midX = (fromPos.x + toPos.x) / 2;
-            const path = `M ${fromPos.x} ${fromPos.y} C ${midX} ${fromPos.y}, ${midX} ${toPos.y}, ${toPos.x} ${toPos.y}`;
+              // Create a smooth curve
+              const midX = (fromPos.x + toPos.x) / 2;
+              const path = `M ${fromPos.x} ${fromPos.y} C ${midX} ${fromPos.y}, ${midX} ${toPos.y}, ${toPos.x} ${toPos.y}`;
 
-            return (
-              <g key={conn.id}>
-                {/* Invisible thick path for easier clicking */}
-                <path
-                  d={path}
-                  stroke="transparent"
-                  strokeWidth="12"
-                  fill="none"
-                  strokeLinecap="round"
-                  style={{ cursor: 'pointer' }}
-                  onClick={(e) => handleWireClick(conn.id, e)}
-                />
-                {/* Visible wire */}
+              return (
+                <g key={conn.id}>
+                  {/* Invisible thick path for easier clicking */}
+                  <path
+                    d={path}
+                    stroke="transparent"
+                    strokeWidth="12"
+                    fill="none"
+                    strokeLinecap="round"
+                    style={{ cursor: 'pointer' }}
+                    onClick={(e) => handleWireClick(conn.id, e)}
+                  />
+                  {/* Visible wire */}
+                  <path
+                    d={path}
+                    stroke="#4CAF50"
+                    strokeWidth="3"
+                    fill="none"
+                    strokeLinecap="round"
+                    style={{
+                      filter: 'drop-shadow(0 0 4px rgba(76, 175, 80, 0.5))',
+                      pointerEvents: 'none'
+                    }}
+                  />
+                </g>
+              );
+            }), [connections, modules, layoutVersion])}
+
+            {/* Render dragging connection */}
+            {draggingConnection && (() => {
+              const fromPos = getPortPosition(draggingConnection.from.moduleId, draggingConnection.from.portId);
+              if (!fromPos) return null;
+
+              const midX = (fromPos.x + draggingConnection.mousePos.x) / 2;
+              const path = `M ${fromPos.x} ${fromPos.y} C ${midX} ${fromPos.y}, ${midX} ${draggingConnection.mousePos.y}, ${draggingConnection.mousePos.x} ${draggingConnection.mousePos.y}`;
+
+              return (
                 <path
                   d={path}
                   stroke="#4CAF50"
                   strokeWidth="3"
                   fill="none"
                   strokeLinecap="round"
-                  style={{
-                    filter: 'drop-shadow(0 0 4px rgba(76, 175, 80, 0.5))',
-                    pointerEvents: 'none'
-                  }}
+                  opacity="0.6"
+                  strokeDasharray="5,5"
+                  style={{ pointerEvents: 'none' }}
                 />
-              </g>
+              );
+            })()}
+          </svg>
+
+          {modules.map((module) => {
+            const inputPorts = module.ports.filter(p =>
+              p.type === 'input'
+              && !p.label.startsWith('CV')
+              && p.label !== 'Gate'
+              && p.label !== 'Clock'
+              && p.label !== 'Reset'
+              && p.label !== 'Trigger'
+              && p.label !== 'Pitch'
             );
-          }), [connections, modules, layoutVersion])}
+            const outputPorts = module.ports.filter(p => p.type === 'output');
+            const cvPorts = module.ports.filter(p =>
+              p.type === 'input'
+              && (p.label === 'CV' || p.label === 'Gate' || p.label === 'Clock' || p.label === 'Reset' || p.label === 'Trigger' || p.label === 'Pitch')
+            );
 
-          {/* Render dragging connection */}
-          {draggingConnection && (() => {
-            const fromPos = getPortPosition(draggingConnection.from.moduleId, draggingConnection.from.portId);
-            if (!fromPos) return null;
+            // Get connected input streams for each input port (excluding CV)
+            const inputStreams = inputPorts.map(port => {
+              const connection = connections.find(c => c.to.portId === port.id);
+              return connection ? getStreamRef(connection.from.portId) : null;
+            });
 
-            const midX = (fromPos.x + draggingConnection.mousePos.x) / 2;
-            const path = `M ${fromPos.x} ${fromPos.y} C ${midX} ${fromPos.y}, ${midX} ${draggingConnection.mousePos.y}, ${draggingConnection.mousePos.x} ${draggingConnection.mousePos.y}`;
+            // Get CV input streams
+            const cvInputStreams: { [key: string]: React.RefObject<any> | null } = {};
+            cvPorts.forEach(port => {
+              const connection = connections.find(c => c.to.portId === port.id);
+              const key = port.id.split('-').slice(-2).join('-'); // Extract 'cv-freq', 'cv-gain', etc.
+              cvInputStreams[key] = connection ? getStreamRef(connection.from.portId) : null;
+            });
+
+            // Get output stream refs for each output port
+            const outputStreams = outputPorts.map(port => getStreamRef(port.id));
 
             return (
-              <path
-                d={path}
-                stroke="#4CAF50"
-                strokeWidth="3"
-                fill="none"
-                strokeLinecap="round"
-                opacity="0.6"
-                strokeDasharray="5,5"
-                style={{ pointerEvents: 'none' }}
-              />
-            );
-          })()}
-        </svg>
-
-        {modules.map((module) => {
-          const inputPorts = module.ports.filter(p =>
-            p.type === 'input'
-            && !p.label.startsWith('CV')
-            && p.label !== 'Gate'
-            && p.label !== 'Clock'
-            && p.label !== 'Reset'
-            && p.label !== 'Trigger'
-            && p.label !== 'Pitch'
-          );
-          const outputPorts = module.ports.filter(p => p.type === 'output');
-          const cvPorts = module.ports.filter(p =>
-            p.type === 'input'
-            && (p.label === 'CV' || p.label === 'Gate' || p.label === 'Clock' || p.label === 'Reset' || p.label === 'Trigger' || p.label === 'Pitch')
-          );
-
-          // Get connected input streams for each input port (excluding CV)
-          const inputStreams = inputPorts.map(port => {
-            const connection = connections.find(c => c.to.portId === port.id);
-            return connection ? getStreamRef(connection.from.portId) : null;
-          });
-
-          // Get CV input streams
-          const cvInputStreams: { [key: string]: React.RefObject<any> | null } = {};
-          cvPorts.forEach(port => {
-            const connection = connections.find(c => c.to.portId === port.id);
-            const key = port.id.split('-').slice(-2).join('-'); // Extract 'cv-freq', 'cv-gain', etc.
-            cvInputStreams[key] = connection ? getStreamRef(connection.from.portId) : null;
-          });
-
-          // Get output stream refs for each output port
-          const outputStreams = outputPorts.map(port => getStreamRef(port.id));
-
-          return (
-            <ModuleWrapper
-              key={module.id}
-              id={module.id}
-              type={module.type}
-              position={module.position}
-              ports={module.ports}
-              color={module.color}
-              onMove={moveModule}
-              onDelete={deleteModule}
-              onPortMouseDown={handlePortMouseDown}
-              onPortMouseEnter={(moduleId, portId) => setHoveredPort({ moduleId, portId })}
-              onPortMouseLeave={() => setHoveredPort(null)}
-              isPortConnected={isPortConnected}
-              hoveredPortId={hoveredPort?.moduleId === module.id ? hoveredPort.portId : undefined}
-              enabled={module.enabled}
-              onEnabledToggle={toggleModuleEnabled}
-              supportsEnabled={supportsEnabled(module.type)}
-            >
-              <ModuleRenderer
-                moduleId={module.id}
-                moduleType={module.type}
-                inputStreams={inputStreams}
-                outputStreams={outputStreams}
-                cvInputStreams={cvInputStreams}
+              <ModuleWrapper
+                key={module.id}
+                id={module.id}
+                type={module.type}
+                position={module.position}
+                ports={module.ports}
+                color={module.color}
+                onMove={moveModule}
+                onDelete={deleteModule}
+                onPortMouseDown={handlePortMouseDown}
+                onPortMouseEnter={(moduleId, portId) => setHoveredPort({ moduleId, portId })}
+                onPortMouseLeave={() => setHoveredPort(null)}
+                isPortConnected={isPortConnected}
+                hoveredPortId={hoveredPort?.moduleId === module.id ? hoveredPort.portId : undefined}
                 enabled={module.enabled}
-                params={moduleParams[module.id] || getDefaultParams(module.type)}
-                onParamChange={updateModuleParam}
-              />
-            </ModuleWrapper>
-          );
-        })}
+                onEnabledToggle={toggleModuleEnabled}
+                supportsEnabled={supportsEnabled(module.type)}
+              >
+                <ModuleRenderer
+                  moduleId={module.id}
+                  moduleType={module.type}
+                  inputStreams={inputStreams}
+                  outputStreams={outputStreams}
+                  cvInputStreams={cvInputStreams}
+                  enabled={module.enabled}
+                  params={moduleParams[module.id] || getDefaultParams(module.type)}
+                  onParamChange={updateModuleParam}
+                />
+              </ModuleWrapper>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

@@ -97,6 +97,8 @@ export interface MP3DeckHandle {
   loadFile: (file: File) => void;
   getState: () => {
     src: string;
+    fileName: string;
+    fileDataUrl: string;
     gain: number;
     playbackMode: PlaybackMode;
     startTime: number;
@@ -115,6 +117,10 @@ export type PlaybackMode = 'one-shot' | 'gate' | 'loop';
 export interface MP3DeckRenderProps {
   src: string;
   setSrc: (src: string) => void;
+  fileName: string;
+  setFileName: (name: string) => void;
+  fileDataUrl: string;
+  setFileDataUrl: (dataUrl: string) => void;
   loadFile: (file: File) => void;
   gain: number;
   setGain: (value: number) => void;
@@ -147,6 +153,10 @@ export interface MP3DeckProps {
   // Controlled props
   src?: string;
   onSrcChange?: (src: string) => void;
+  fileName?: string;
+  onFileNameChange?: (name: string) => void;
+  fileDataUrl?: string;
+  onFileDataUrlChange?: (dataUrl: string) => void;
   gain?: number;
   onGainChange?: (gain: number) => void;
   loop?: boolean;
@@ -175,6 +185,10 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
   label = 'mp3-deck',
   src: controlledSrc,
   onSrcChange,
+  fileName: controlledFileName,
+  onFileNameChange,
+  fileDataUrl: controlledFileDataUrl,
+  onFileDataUrlChange,
   gain: controlledGain,
   onGainChange,
   loop: controlledLoop,
@@ -195,6 +209,8 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
 }, ref) => {
   const audioContext = useAudioContext();
   const [src, setSrc] = useControlledState(controlledSrc, '', onSrcChange);
+  const [fileName, setFileName] = useControlledState(controlledFileName, '', onFileNameChange);
+  const [fileDataUrl, setFileDataUrl] = useControlledState(controlledFileDataUrl, '', onFileDataUrlChange);
   const [gain, setGain] = useControlledState(controlledGain, 1.0, onGainChange);
   const [loop] = useControlledState(controlledLoop, false, onLoopChange);
   const [playbackMode, setPlaybackMode] = useControlledState<PlaybackMode>(
@@ -470,6 +486,14 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
     setPlaybackMode(loop ? 'loop' : 'one-shot');
   }, [loop, controlledPlaybackMode, setPlaybackMode]);
 
+  // If a persisted data URL is provided, prefer it for playback
+  useEffect(() => {
+    if (!fileDataUrl) return;
+    if (!src || src.startsWith('blob:')) {
+      setSrc(fileDataUrl);
+    }
+  }, [fileDataUrl, src, setSrc]);
+
   // Update gain when it changes
   useEffect(() => {
     if (gainNodeRef.current) {
@@ -496,9 +520,22 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
       URL.revokeObjectURL(blobUrlRef.current);
     }
 
-    const url = URL.createObjectURL(file);
-    blobUrlRef.current = url;
-    setSrc(url);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : '';
+      if (result) {
+        setFileName(file.name);
+        setFileDataUrl(result);
+        setSrc(result);
+      }
+    };
+    reader.onerror = () => {
+      const url = URL.createObjectURL(file);
+      blobUrlRef.current = url;
+      setFileName(file.name);
+      setSrc(url);
+    };
+    reader.readAsDataURL(file);
   };
 
   // Auto-pause when output becomes disconnected
@@ -659,6 +696,8 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
     loadFile,
     getState: () => ({
       src,
+      fileName,
+      fileDataUrl,
       gain,
       playbackMode,
       startTime,
@@ -670,7 +709,7 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
       duration,
       error
     }),
-  }), [src, gain, playbackMode, startTime, endTime, pitch, isPlaying, isReady, currentTime, duration, error]);
+  }), [src, fileName, fileDataUrl, gain, playbackMode, startTime, endTime, pitch, isPlaying, isReady, currentTime, duration, error]);
 
   // Event callback effects
   useEffect(() => {
@@ -694,6 +733,10 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
     return <>{children({
       src,
       setSrc,
+      fileName,
+      setFileName,
+      fileDataUrl,
+      setFileDataUrl,
       loadFile,
       gain,
       setGain,

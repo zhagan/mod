@@ -146,6 +146,7 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
   const resetListenerRef = useRef<AudioWorkletNode | null>(null);
   const gateDurationRef = useRef(0.05);
   const pulseAccumulatorRef = useRef(0);
+  const resetPendingRef = useRef(false);
   // Store refs for current state
   const stepsRef = useRef(steps);
   const currentStepRef = useRef(currentStep);
@@ -258,6 +259,20 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
     };
   }, [audioContext, label, gateOutput]);
 
+  const getPulsesPerStep = (divisionValue: number) => {
+    const pulsesPerStepMap: Record<number, number> = {
+      1: 16, // 1/4
+      2: 8,  // 1/8
+      3: 6,  // dotted 1/16
+      4: 4,  // 1/16
+      6: 3,  // dotted 1/32
+      8: 2,  // 1/32
+      12: 1.5, // dotted 1/64
+      16: 1, // 1/64
+    };
+    return pulsesPerStepMap[divisionValue] ?? Math.max(1, 16 / divisionValue);
+  };
+
   // Create clock listener
   useEffect(() => {
     if (!audioContext) return;
@@ -271,20 +286,6 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
         channelCount: 1,
       });
       clockListenerRef.current = node;
-      const getPulsesPerStep = (divisionValue: number) => {
-        const pulsesPerStepMap: Record<number, number> = {
-          1: 16, // 1/4
-          2: 8,  // 1/8
-          3: 6,  // dotted 1/16
-          4: 4,  // 1/16
-          6: 3,  // dotted 1/32
-          8: 2,  // 1/32
-          12: 1.5, // dotted 1/64
-          16: 1, // 1/64
-        };
-        return pulsesPerStepMap[divisionValue] ?? Math.max(1, 16 / divisionValue);
-      };
-
       node.port.onmessage = (event) => {
         if (event.data?.type !== 'pulse') return;
         if (!audioContext || !constantSourceRef.current) return;
@@ -294,7 +295,9 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
         if (pulseAccumulatorRef.current < pulsesPerStep) return;
 
         pulseAccumulatorRef.current -= pulsesPerStep;
-        const nextStep = (currentStepRef.current + 1) % stepsRef.current.length;
+        const nextStep = resetPendingRef.current
+          ? 0
+          : (currentStepRef.current + 1) % stepsRef.current.length;
         const now = audioContext.currentTime;
         constantSourceRef.current.offset.setValueAtTime(stepsRef.current[nextStep].value, now);
         if (gateSourceRef.current && stepsRef.current[nextStep].active) {
@@ -303,6 +306,7 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
         }
         currentStepRef.current = nextStep;
         setCurrentStep(nextStep);
+        resetPendingRef.current = false;
       };
       setIsListenerReady(true);
     }).catch((err) => {
@@ -384,6 +388,7 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
     setCurrentStep(0);
     currentStepRef.current = 0;
     pulseAccumulatorRef.current = 0;
+    resetPendingRef.current = true;
     if (constantSourceRef.current && audioContext) {
       const now = audioContext.currentTime;
       constantSourceRef.current.offset.setValueAtTime(stepsRef.current[0].value, now);
