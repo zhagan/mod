@@ -1376,6 +1376,10 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
           pitchCv={pitchCvInput}
           src={params.src}
           onSrcChange={(value) => setParam('src', value)}
+          fileName={params.fileName}
+          onFileNameChange={(value) => setParam('fileName', value)}
+          fileDataUrl={params.fileDataUrl}
+          onFileDataUrlChange={(value) => setParam('fileDataUrl', value)}
           gain={params.gain}
           onGainChange={(value) => setParam('gain', value)}
           playbackMode={params.playbackMode}
@@ -1405,6 +1409,9 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                   label="Load Audio"
                   icon={<Upload size={14}/>}
                 />
+                <div style={{fontSize: '11px', color: 'rgba(255,255,255,0.7)'}}>
+                  {controls.fileName ? `Loaded: ${controls.fileName}` : 'No sample loaded'}
+                </div>
                 <div style={{display: 'flex', gap: '8px', justifyContent: 'center'}}>
                   <ModUIButton
                     icon={<Zap size={16}/>}

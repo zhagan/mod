@@ -188,6 +188,12 @@ textarea,
   background-size: 20px 20px;
 }
 
+.canvas-content {
+  position: relative;
+  min-width: 100%;
+  min-height: 100%;
+}
+
 /* Wires SVG */
 .wires-svg {
   position: absolute;

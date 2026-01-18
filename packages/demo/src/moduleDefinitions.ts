@@ -38,6 +38,8 @@ export const MODULE_DEFINITIONS: Record<string, ModuleDefinition> = {
     outputs: 1,
     defaultParams: {
       src: '',
+      fileName: '',
+      fileDataUrl: '',
       gain: 1.0,
       playbackMode: 'one-shot',
       startTime: 0,
