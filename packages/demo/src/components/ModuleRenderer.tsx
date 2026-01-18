@@ -56,7 +56,6 @@ import {
   MicOff,
   Square,
   Upload,
-  Repeat,
   Zap,
   X,
   RotateCcw
@@ -100,6 +99,8 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
   const cv = Object.values(cvInputStreams).find(stream => stream !== null) || undefined;
   const clockInput = cvInputStreams['cv-clock'] || undefined;
   const resetInput = cvInputStreams['cv-reset'] || undefined;
+  const triggerInput = cvInputStreams['cv-trigger'] || undefined;
+  const pitchCvInput = cvInputStreams['cv-pitch'] || undefined;
 
   switch (moduleType) {
     case 'ToneGenerator':
@@ -1371,12 +1372,20 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
       return output ? (
         <MP3Deck
           output={output}
+          trigger={triggerInput}
+          pitchCv={pitchCvInput}
           src={params.src}
           onSrcChange={(value) => setParam('src', value)}
           gain={params.gain}
           onGainChange={(value) => setParam('gain', value)}
-          loop={params.loop}
-          onLoopChange={(value) => setParam('loop', value)}
+          playbackMode={params.playbackMode}
+          onPlaybackModeChange={(value) => setParam('playbackMode', value)}
+          startTime={params.startTime}
+          onStartTimeChange={(value) => setParam('startTime', value)}
+          endTime={params.endTime}
+          onEndTimeChange={(value) => setParam('endTime', value)}
+          pitch={params.pitch}
+          onPitchChange={(value) => setParam('pitch', value)}
         >
           {(controls) => {
             const formatTime = (seconds: number) => {
@@ -1396,6 +1405,25 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                   label="Load Audio"
                   icon={<Upload size={14}/>}
                 />
+                <div style={{display: 'flex', gap: '8px', justifyContent: 'center'}}>
+                  <ModUIButton
+                    icon={<Zap size={16}/>}
+                    onClick={controls.trigger}
+                    title="Trigger"
+                    variant="success"
+                    disabled={!hasAudio}
+                  />
+                </div>
+                <ModUISelect
+                  value={controls.playbackMode}
+                  onChange={(value) => controls.setPlaybackMode(value as any)}
+                  options={[
+                    {value: 'one-shot', label: 'One Shot'},
+                    {value: 'gate', label: 'Gate'},
+                    {value: 'loop', label: 'Loop'},
+                  ]}
+                  placeholder="Playback Mode"
+                />
                 <ModUISlider
                   label="Gain"
                   value={controls.gain}
@@ -1404,6 +1432,33 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                   max={2}
                   step={0.01}
                   formatValue={(v) => v.toFixed(2)}
+                />
+                <ModUISlider
+                  label="Pitch (Oct)"
+                  value={controls.pitch}
+                  onChange={controls.setPitch}
+                  min={-4}
+                  max={4}
+                  step={0.1}
+                  formatValue={(v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)} oct`}
+                />
+                <ModUISlider
+                  label="Start"
+                  value={controls.startTime}
+                  onChange={controls.setStartTime}
+                  min={0}
+                  max={controls.duration || 1}
+                  step={0.01}
+                  formatValue={(v) => `${v.toFixed(2)}s`}
+                />
+                <ModUISlider
+                  label="End"
+                  value={controls.endTime > 0 ? controls.endTime : controls.duration}
+                  onChange={controls.setEndTime}
+                  min={0}
+                  max={controls.duration || 1}
+                  step={0.01}
+                  formatValue={(v) => `${v.toFixed(2)}s`}
                 />
                 <div style={{display: 'flex', gap: '8px', justifyContent: 'center'}}>
                   <ModUIButton
@@ -1418,13 +1473,6 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                     icon={<Square size={16}/>}
                     onClick={controls.stop}
                     title="Stop"
-                    disabled={!hasAudio}
-                  />
-                  <ModUIButton
-                    icon={<Repeat size={16}/>}
-                    active={controls.loop}
-                    onClick={() => controls.setLoop(!controls.loop)}
-                    title="Loop"
                     disabled={!hasAudio}
                   />
                 </div>
