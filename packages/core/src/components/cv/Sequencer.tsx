@@ -147,6 +147,8 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
   const gateDurationRef = useRef(0.05);
   const pulseAccumulatorRef = useRef(0);
   const resetPendingRef = useRef(false);
+  const lastPulseTimeRef = useRef<number | null>(null);
+  const lastPulseIntervalRef = useRef<number | null>(null);
   // Store refs for current state
   const stepsRef = useRef(steps);
   const currentStepRef = useRef(currentStep);
@@ -291,6 +293,21 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
         if (!audioContext || !constantSourceRef.current) return;
         if (!stepsRef.current.length) return;
         const pulsesPerStep = getPulsesPerStep(divisionRef.current);
+        const now = audioContext.currentTime;
+        const lastPulseTime = lastPulseTimeRef.current;
+        const lastInterval = lastPulseIntervalRef.current;
+        if (lastPulseTime === null) {
+          resetPendingRef.current = true;
+          pulseAccumulatorRef.current = pulsesPerStep - 1;
+        } else {
+          const delta = now - lastPulseTime;
+          if (lastInterval !== null && delta > lastInterval * 2.5) {
+            resetPendingRef.current = true;
+            pulseAccumulatorRef.current = pulsesPerStep - 1;
+          }
+          lastPulseIntervalRef.current = delta;
+        }
+        lastPulseTimeRef.current = now;
         pulseAccumulatorRef.current += 1;
         if (pulseAccumulatorRef.current < pulsesPerStep) return;
 
@@ -298,11 +315,13 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
         const nextStep = resetPendingRef.current
           ? 0
           : (currentStepRef.current + 1) % stepsRef.current.length;
-        const now = audioContext.currentTime;
         constantSourceRef.current.offset.setValueAtTime(stepsRef.current[nextStep].value, now);
         if (gateSourceRef.current && stepsRef.current[nextStep].active) {
+          const baseGate = gateDurationRef.current;
+          const pulseInterval = lastPulseIntervalRef.current;
+          const gateDuration = pulseInterval ? Math.min(baseGate, pulseInterval * 0.5) : baseGate;
           gateSourceRef.current.offset.setValueAtTime(1, now);
-          gateSourceRef.current.offset.setValueAtTime(0, now + gateDurationRef.current);
+          gateSourceRef.current.offset.setValueAtTime(0, now + gateDuration);
         }
         currentStepRef.current = nextStep;
         setCurrentStep(nextStep);
@@ -387,8 +406,10 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
   const resetSequence = () => {
     setCurrentStep(0);
     currentStepRef.current = 0;
-    pulseAccumulatorRef.current = 0;
+    pulseAccumulatorRef.current = getPulsesPerStep(divisionRef.current) - 1;
     resetPendingRef.current = true;
+    lastPulseTimeRef.current = null;
+    lastPulseIntervalRef.current = null;
     if (constantSourceRef.current && audioContext) {
       const now = audioContext.currentTime;
       constantSourceRef.current.offset.setValueAtTime(stepsRef.current[0].value, now);
