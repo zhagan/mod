@@ -43,9 +43,7 @@ jobs:
           mkdir -p deploy
           touch deploy/.nojekyll
           cp -r docs/.vitepress/dist/* deploy/
-          if [ -d site ]; then
-            cp -r site/* deploy/
-          fi
+          cp -r site/playground deploy/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
