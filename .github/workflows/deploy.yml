@@ -44,6 +44,10 @@ jobs:
           mkdir -p deploy
           cp -r docs/.vitepress/dist/* deploy/
 
+      - name: Debug deploy index
+        run: |
+          sed -n '1,20p' deploy/index.html
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
