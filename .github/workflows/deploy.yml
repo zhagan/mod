@@ -31,7 +31,7 @@ jobs:
         run: npm ci
 
       - name: Build core package
-        run: npm run build --workspace=packages/core
+        run: npm run build --workspace=packages/core --base=/mod/
 
       - name: Build demo (playground)
         run: npm run build --workspace=packages/demo
