@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  base: '/mod/playground/',
+  base: '/playground/',
   build: {
     outDir: '../../site/playground'
   }

@@ -42,6 +42,7 @@ jobs:
         run: |
           mkdir -p deploy
           touch deploy/.nojekyll
+          printf '%s\n' 'mod.zackhagan.com' > deploy/CNAME
           cp -r docs/.vitepress/dist/* deploy/
           cp -r site/playground deploy/
 

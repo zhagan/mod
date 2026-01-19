@@ -3,7 +3,7 @@ import { defineConfig } from 'vitepress'
 export default defineConfig({
   title: 'MOD',
   description: 'Modular Web Audio components for React',
-  base: '/mod/',
+  base: '/',
 
   head: [
     ['link', { rel: 'icon', href: '/logo.png' }],
