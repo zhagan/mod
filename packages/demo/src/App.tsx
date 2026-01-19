@@ -530,7 +530,7 @@ function ModularSynth() {
     <div className="app">
       {/* Sidebar */}
       <div className="sidebar">
-        <a href="/" className="sidebar-header">
+        <a href="/mod/" className="sidebar-header">
           <img src={logo} alt="MOD Logo" className="sidebar-logo" />
           <h1 className="sidebar-title">MOD</h1>
         </a>
