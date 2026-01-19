@@ -31,7 +31,7 @@ jobs:
         run: npm ci
 
       - name: Build core package
-        run: npm run build --workspace=packages/core --base=/mod/
+        run: npm run build --workspace=packages/core
 
       - name: Build demo (playground)
         run: npm run build --workspace=packages/demo
@@ -43,10 +43,6 @@ jobs:
         run: |
           mkdir -p deploy
           cp -r docs/.vitepress/dist/* deploy/
-
-      - name: Debug deploy index
-        run: |
-          sed -n '1,20p' deploy/index.html
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
