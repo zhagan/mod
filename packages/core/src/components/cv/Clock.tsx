@@ -3,6 +3,100 @@ import { useAudioContext } from '../../context/AudioContext';
 import { ModStreamRef } from '../../types/ModStream';
 import { useControlledState } from '../../hooks/useControlledState';
 
+// Inline worklet to generate clock pulses on the audio thread.
+const CLOCK_WORKLET = `
+class ClockPulseProcessor extends AudioWorkletProcessor {
+  static get parameterDescriptors() {
+    return [
+      { name: 'bpm', defaultValue: 120, minValue: 1, maxValue: 999 },
+      { name: 'running', defaultValue: 0, minValue: 0, maxValue: 1 },
+    ];
+  }
+
+  constructor() {
+    super();
+    this._phase = 0;
+    this._lastRunning = 0;
+  }
+
+  process(inputs, outputs, parameters) {
+    const output = outputs[0];
+    if (!output || output.length === 0) return true;
+    const channel = output[0];
+    if (!channel) return true;
+
+    const bpmParam = parameters.bpm;
+    const runningParam = parameters.running;
+    const pulseWidthSamples = Math.max(1, Math.round(sampleRate * 0.01)); // 10ms pulse
+
+    const bpmIsConstant = bpmParam.length === 1;
+    const runningIsConstant = runningParam.length === 1;
+    const bpmValue = bpmIsConstant ? bpmParam[0] : 120;
+    const runningValue = runningIsConstant ? runningParam[0] : 0;
+    const samplesPerPulse = bpmIsConstant
+      ? Math.max(1, Math.round(sampleRate * 60 / (Math.max(1e-6, bpmValue) * 16)))
+      : 0;
+
+    for (let i = 0; i < channel.length; i++) {
+      const bpm = bpmIsConstant ? bpmValue : bpmParam[i];
+      const running = runningIsConstant ? runningValue : runningParam[i];
+
+      if (running <= 0) {
+        channel[i] = 0;
+        this._phase = 0;
+        this._lastRunning = running;
+        continue;
+      }
+
+      if (this._lastRunning <= 0 && running > 0) {
+        this._phase = 0;
+      }
+
+      const period = bpmIsConstant
+        ? samplesPerPulse
+        : Math.max(1, Math.round(sampleRate * 60 / (Math.max(1e-6, bpm) * 16)));
+      const phase = this._phase % period;
+      channel[i] = phase < pulseWidthSamples ? 1 : 0;
+      this._phase += 1;
+      this._lastRunning = running;
+    }
+
+    return true;
+  }
+}
+
+registerProcessor('clock-pulse', ClockPulseProcessor);
+`;
+
+const clockWorkletLoaders = new WeakMap<AudioContext, Promise<void>>();
+const clockWorkletUrls = new WeakMap<AudioContext, string>();
+
+const loadClockWorklet = (audioContext: AudioContext) => {
+  let loader = clockWorkletLoaders.get(audioContext);
+  if (!loader) {
+    const blob = new Blob([CLOCK_WORKLET], { type: 'application/javascript' });
+    const url = URL.createObjectURL(blob);
+    clockWorkletUrls.set(audioContext, url);
+    loader = audioContext.audioWorklet.addModule(url).then(() => {
+      const loadedUrl = clockWorkletUrls.get(audioContext);
+      if (loadedUrl) {
+        URL.revokeObjectURL(loadedUrl);
+        clockWorkletUrls.delete(audioContext);
+      }
+    }).catch((err) => {
+      const loadedUrl = clockWorkletUrls.get(audioContext);
+      if (loadedUrl) {
+        URL.revokeObjectURL(loadedUrl);
+        clockWorkletUrls.delete(audioContext);
+      }
+      clockWorkletLoaders.delete(audioContext);
+      throw err;
+    });
+    clockWorkletLoaders.set(audioContext, loader);
+  }
+  return loader;
+};
+
 export interface ClockHandle {
   start: () => void;
   stop: () => void;
@@ -52,11 +146,12 @@ export const Clock = React.forwardRef<ClockHandle, ClockProps>(({
   const gainNodeRef = useRef<GainNode | null>(null);
   const startSourceRef = useRef<ConstantSourceNode | null>(null);
   const startGainRef = useRef<GainNode | null>(null);
-  const schedulerRef = useRef<number | null>(null);
-  const nextPulseTimeRef = useRef<number>(0);
   const bpmRef = useRef(bpm);
+  const isRunningRef = useRef(isRunning);
+  const workletNodeRef = useRef<AudioWorkletNode | null>(null);
 
   useEffect(() => { bpmRef.current = bpm; }, [bpm]);
+  useEffect(() => { isRunningRef.current = isRunning; }, [isRunning]);
 
   // Create clock output once
   useEffect(() => {
@@ -106,17 +201,37 @@ export const Clock = React.forwardRef<ClockHandle, ClockProps>(({
       };
     }
 
+    if (!audioContext.audioWorklet || typeof AudioWorkletNode === 'undefined') {
+      console.error('AudioWorklet not supported in this environment.');
+    } else {
+      loadClockWorklet(audioContext).then(() => {
+        const node = new AudioWorkletNode(audioContext, 'clock-pulse', {
+          numberOfInputs: 0,
+          numberOfOutputs: 1,
+          outputChannelCount: [1],
+          parameterData: {
+            bpm: bpmRef.current,
+            running: isRunningRef.current ? 1 : 0,
+          },
+        });
+        node.connect(constantSource.offset);
+        workletNodeRef.current = node;
+      }).catch((err) => {
+        console.error('Failed to load clock worklet', err);
+      });
+    }
+
     return () => {
-      if (schedulerRef.current !== null) {
-        clearTimeout(schedulerRef.current);
-        schedulerRef.current = null;
-      }
       constantSource.stop();
       constantSource.disconnect();
       gainNode.disconnect();
       output.current = null;
       constantSourceRef.current = null;
       gainNodeRef.current = null;
+      if (workletNodeRef.current) {
+        try { workletNodeRef.current.disconnect(); } catch (e) {}
+        workletNodeRef.current = null;
+      }
       if (startSourceRef.current) {
         startSourceRef.current.stop();
         startSourceRef.current.disconnect();
@@ -138,18 +253,14 @@ export const Clock = React.forwardRef<ClockHandle, ClockProps>(({
     if (startSourceRef.current) {
       startSourceRef.current.offset.setValueAtTime(1, audioContext.currentTime);
     }
-    nextPulseTimeRef.current = audioContext.currentTime;
-    schedulePulses();
+    const runningParam = workletNodeRef.current?.parameters.get('running');
+    runningParam?.setValueAtTime(1, audioContext.currentTime);
   };
 
   const stop = () => {
     if (!isRunning) return;
     setIsRunning(false);
-
-    if (schedulerRef.current !== null) {
-      clearTimeout(schedulerRef.current);
-      schedulerRef.current = null;
-    }
+    if (!audioContext) return;
 
     if (constantSourceRef.current && audioContext) {
       constantSourceRef.current.offset.setValueAtTime(0, audioContext.currentTime);
@@ -157,40 +268,25 @@ export const Clock = React.forwardRef<ClockHandle, ClockProps>(({
     if (startSourceRef.current && audioContext) {
       startSourceRef.current.offset.setValueAtTime(0, audioContext.currentTime);
     }
+    const runningParam = workletNodeRef.current?.parameters.get('running');
+    runningParam?.setValueAtTime(0, audioContext.currentTime);
   };
 
   const reset = () => {
     stop();
   };
 
-  const schedulePulses = () => {
-    if (!audioContext || !constantSourceRef.current) return;
-
-    const pulseDuration = 0.01;
-    const pulseInterval = (60 / bpmRef.current) / 16; // 64th-note pulses
-    const lookahead = 0.1;
-    const scheduleAheadTime = 0.05;
-
-    while (nextPulseTimeRef.current < audioContext.currentTime + lookahead) {
-      const time = nextPulseTimeRef.current;
-      constantSourceRef.current.offset.setValueAtTime(1, time);
-      constantSourceRef.current.offset.setValueAtTime(0, time + pulseDuration);
-      nextPulseTimeRef.current += pulseInterval;
-    }
-
-    schedulerRef.current = window.setTimeout(schedulePulses, scheduleAheadTime * 1000);
-  };
+  useEffect(() => {
+    if (!audioContext) return;
+    const bpmParam = workletNodeRef.current?.parameters.get('bpm');
+    bpmParam?.setValueAtTime(bpm, audioContext.currentTime);
+  }, [bpm, audioContext]);
 
   useEffect(() => {
-    if (isRunning && audioContext) {
-      if (schedulerRef.current !== null) {
-        clearTimeout(schedulerRef.current);
-        schedulerRef.current = null;
-      }
-      nextPulseTimeRef.current = audioContext.currentTime;
-      schedulePulses();
-    }
-  }, [bpm]);
+    if (!audioContext) return;
+    const runningParam = workletNodeRef.current?.parameters.get('running');
+    runningParam?.setValueAtTime(isRunning ? 1 : 0, audioContext.currentTime);
+  }, [isRunning, audioContext]);
 
   useImperativeHandle(ref, () => ({
     start,

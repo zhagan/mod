@@ -6,9 +6,13 @@ class MockAudioContext {
   currentTime: number = 0;
   sampleRate: number = 44100;
   state: AudioContextState = 'running';
+  audioWorklet: { addModule: jest.Mock };
 
   constructor() {
     this.destination = {} as AudioDestinationNode;
+    this.audioWorklet = {
+      addModule: jest.fn(() => Promise.resolve()),
+    };
   }
 
   createGain(): GainNode {
@@ -216,6 +220,37 @@ class MockAudioContext {
   }
 }
 
+class MockAudioWorkletNode {
+  parameters: Map<string, AudioParam>;
+  constructor(_context: AudioContext, _name: string, _options?: AudioWorkletNodeOptions) {
+    this.parameters = new Map<string, AudioParam>([
+      ['bpm', {
+        value: 120,
+        setValueAtTime: jest.fn(),
+        linearRampToValueAtTime: jest.fn(),
+        exponentialRampToValueAtTime: jest.fn(),
+        setTargetAtTime: jest.fn(),
+        setValueCurveAtTime: jest.fn(),
+        cancelScheduledValues: jest.fn(),
+        cancelAndHoldAtTime: jest.fn(),
+      } as unknown as AudioParam],
+      ['running', {
+        value: 0,
+        setValueAtTime: jest.fn(),
+        linearRampToValueAtTime: jest.fn(),
+        exponentialRampToValueAtTime: jest.fn(),
+        setTargetAtTime: jest.fn(),
+        setValueCurveAtTime: jest.fn(),
+        cancelScheduledValues: jest.fn(),
+        cancelAndHoldAtTime: jest.fn(),
+      } as unknown as AudioParam],
+    ]);
+  }
+
+  connect = jest.fn();
+  disconnect = jest.fn();
+}
+
 // Mock MediaStream API
 class MockMediaStream {
   id: string = 'mock-stream-id';
@@ -273,6 +308,7 @@ class MockMediaDevices {
 // Install mocks
 global.AudioContext = MockAudioContext as any;
 global.webkitAudioContext = MockAudioContext as any;
+global.AudioWorkletNode = MockAudioWorkletNode as any;
 
 if (typeof navigator !== 'undefined') {
   Object.defineProperty(navigator, 'mediaDevices', {
