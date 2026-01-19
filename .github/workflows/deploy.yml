@@ -43,6 +43,7 @@ jobs:
         run: |
           mkdir -p deploy
           cp -r docs/.vitepress/dist/* deploy/
+          cp -r site/mod/playground deploy/playground
 
       - name: Debug deploy index
         run: |
