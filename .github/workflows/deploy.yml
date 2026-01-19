@@ -42,7 +42,6 @@ jobs:
       - name: Prepare deployment directory
         run: |
           mkdir -p deploy
-          cp index.html deploy/
           cp -r docs/.vitepress/dist/* deploy/
 
       - name: Setup Pages
