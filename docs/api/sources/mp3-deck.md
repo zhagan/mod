@@ -7,13 +7,27 @@ The `MP3Deck` component loads and plays local audio files (MP3, WAV, etc.). It p
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `output` | `ModStreamRef` | Required | Reference to output the audio signal |
+| `trigger` | `ModStreamRef` | - | Optional trigger input (gate) |
+| `pitchCv` | `ModStreamRef` | - | Optional pitch CV input |
 | `label` | `string` | `'mp3-deck'` | Label for the component in metadata |
 | `src` | `string` | `''` | Audio source URL (controlled or initial value) |
 | `onSrcChange` | `(src: string) => void` | - | Callback when source URL changes |
+| `fileName` | `string` | `''` | Loaded file name (controlled or initial value) |
+| `onFileNameChange` | `(name: string) => void` | - | Callback when file name changes |
+| `fileDataUrl` | `string` | `''` | Loaded file data URL (controlled or initial value) |
+| `onFileDataUrlChange` | `(dataUrl: string) => void` | - | Callback when file data URL changes |
 | `gain` | `number` | `1.0` | Gain level 0-1+ (controlled or initial value) |
 | `onGainChange` | `(gain: number) => void` | - | Callback when gain changes |
 | `loop` | `boolean` | `false` | Whether audio loops (controlled or initial value) |
 | `onLoopChange` | `(loop: boolean) => void` | - | Callback when loop state changes |
+| `playbackMode` | `'one-shot' \| 'gate' \| 'loop'` | `'one-shot'` | Playback mode |
+| `onPlaybackModeChange` | `(mode: PlaybackMode) => void` | - | Callback when playback mode changes |
+| `startTime` | `number` | `0` | Start position in seconds |
+| `onStartTimeChange` | `(time: number) => void` | - | Callback when start time changes |
+| `endTime` | `number` | `0` | End position in seconds (0 = full length) |
+| `onEndTimeChange` | `(time: number) => void` | - | Callback when end time changes |
+| `pitch` | `number` | `0` | Pitch offset in semitones |
+| `onPitchChange` | `(pitch: number) => void` | - | Callback when pitch changes |
 | `onPlayingChange` | `(isPlaying: boolean) => void` | - | Callback when playback state changes |
 | `onTimeUpdate` | `(currentTime: number, duration: number) => void` | - | Callback when playback position updates |
 | `onError` | `(error: string \| null) => void` | - | Callback when error state changes |
@@ -28,15 +42,28 @@ When using the `children` render prop, the following controls are provided:
 |----------|------|-------------|
 | `src` | `string` | Current audio source URL |
 | `setSrc` | `(src: string) => void` | Set audio source by URL |
+| `fileName` | `string` | Current file name |
+| `setFileName` | `(name: string) => void` | Update file name |
+| `fileDataUrl` | `string` | Current file data URL |
+| `setFileDataUrl` | `(dataUrl: string) => void` | Update file data URL |
 | `loadFile` | `(file: File) => void` | Load audio from a File object |
 | `gain` | `number` | Current gain level (0-1+) |
 | `setGain` | `(value: number) => void` | Update the gain level |
 | `loop` | `boolean` | Whether the audio loops |
 | `setLoop` | `(value: boolean) => void` | Enable or disable looping |
+| `playbackMode` | `'one-shot' \| 'gate' \| 'loop'` | Current playback mode |
+| `setPlaybackMode` | `(value: PlaybackMode) => void` | Update playback mode |
+| `startTime` | `number` | Current start position in seconds |
+| `setStartTime` | `(value: number) => void` | Update start position |
+| `endTime` | `number` | Current end position in seconds |
+| `setEndTime` | `(value: number) => void` | Update end position |
+| `pitch` | `number` | Current pitch offset in semitones |
+| `setPitch` | `(value: number) => void` | Update pitch offset |
 | `isPlaying` | `boolean` | Whether audio is currently playing |
 | `play` | `() => void` | Start playback |
 | `pause` | `() => void` | Pause playback |
 | `stop` | `() => void` | Stop playback and reset to start |
+| `trigger` | `() => void` | Trigger playback (one-shot/gate) |
 | `currentTime` | `number` | Current playback position in seconds |
 | `duration` | `number` | Total duration of audio in seconds |
 | `seek` | `(time: number) => void` | Seek to a specific time in seconds |
@@ -91,6 +118,14 @@ function App() {
         play,
         pause,
         stop,
+        playbackMode,
+        setPlaybackMode,
+        startTime,
+        setStartTime,
+        endTime,
+        setEndTime,
+        pitch,
+        setPitch,
         currentTime,
         duration,
         seek,
@@ -122,6 +157,17 @@ function App() {
 
           <div>
             <label>
+              Mode:
+              <select value={playbackMode} onChange={(e) => setPlaybackMode(e.target.value as any)}>
+                <option value="one-shot">One-shot</option>
+                <option value="gate">Gate</option>
+                <option value="loop">Loop</option>
+              </select>
+            </label>
+          </div>
+
+          <div>
+            <label>
               Position: {currentTime.toFixed(1)}s / {duration.toFixed(1)}s
             </label>
             <input
@@ -143,6 +189,43 @@ function App() {
               />
               Loop
             </label>
+          </div>
+
+          <div>
+            <label>
+              Start: {startTime.toFixed(2)}s
+              <input
+                type="range"
+                min="0"
+                max={duration || 0}
+                step="0.01"
+                value={startTime}
+                onChange={(e) => setStartTime(Number(e.target.value))}
+              />
+            </label>
+            <label>
+              End: {endTime.toFixed(2)}s
+              <input
+                type="range"
+                min="0"
+                max={duration || 0}
+                step="0.01"
+                value={endTime}
+                onChange={(e) => setEndTime(Number(e.target.value))}
+              />
+            </label>
+          </div>
+
+          <div>
+            <label>Pitch: {pitch.toFixed(1)} st</label>
+            <input
+              type="range"
+              min="-24"
+              max="24"
+              step="0.1"
+              value={pitch}
+              onChange={(e) => setPitch(Number(e.target.value))}
+            />
           </div>
 
           <div>
@@ -171,12 +254,13 @@ import { useRef } from 'react';
 
 function App() {
   const deckOut = useRef(null);
+  const triggerIn = useRef(null);
   const filterOut = useRef(null);
   const delayOut = useRef(null);
 
   return (
     <>
-      <MP3Deck output={deckOut}>
+      <MP3Deck output={deckOut} trigger={triggerIn}>
         {({ loadFile, play, pause, isPlaying, isReady }) => (
           <div>
             <input
@@ -342,6 +426,11 @@ function App() {
 **Note:** The imperative handle provides `play()`, `pause()`, `stop()`, `seek()`, and `loadFile()` methods for playback control, plus `getState()` for read-only state access. To control gain and loop programmatically, use the controlled props pattern shown above.
 
 ## Important Notes
+
+### Trigger + Pitch CV
+
+- `trigger` input starts playback on rising gate in `gate` or `one-shot` mode.
+- `pitchCv` applies pitch modulation (in semitone offsets) on top of the `pitch` value.
 
 ### Supported Formats
 
