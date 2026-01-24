@@ -397,9 +397,6 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
         const prevStepData = normalizeStep(stepsRef.current[prevStepIndex]);
         const nextStepIndex = (nextStep + 1) % stepsRef.current.length;
         const nextStepData = normalizeStep(stepsRef.current[nextStepIndex]);
-        const previousStepTime = lastStepTimeRef.current;
-        const stepInterval = previousStepTime !== null ? triggerTime - previousStepTime : null;
-        lastStepTimeRef.current = triggerTime;
         let swingOffset = 0;
         // Swing delays every other step to push/pull the 16th grid without moving the downbeat.
         const swingAmount = Math.max(-50, Math.min(50, swingRef.current));
@@ -413,6 +410,9 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
           swingOffset = shouldDelay ? delaySeconds : 0;
         }
         const triggerTime = now + swingOffset;
+        const previousStepTime = lastStepTimeRef.current;
+        const stepInterval = previousStepTime !== null ? triggerTime - previousStepTime : null;
+        lastStepTimeRef.current = triggerTime;
         const slideFromPrev = Boolean(
           stepInterval
           && prevStepData.active
