@@ -1246,6 +1246,8 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
           onDivisionChange={(value) => setParam('division', value)}
           length={params.length}
           onLengthChange={(value) => setParam('length', value)}
+          swing={params.swing}
+          onSwingChange={(value) => setParam('swing', value)}
         >
           {(controls) => (
             <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
@@ -1273,6 +1275,15 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                   {value: '12', label: '.1/64'},
                   {value: '16', label: '1/64'},
                 ]}/>
+              <ModUISlider
+                label="Swing"
+                value={controls.swing}
+                onChange={controls.setSwing}
+                min={-50}
+                max={50}
+                step={1}
+                formatValue={(v) => `${v.toFixed(0)}%`}
+              />
               <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
                 {controls.steps.map((step, i) => (
                   <div key={`seq-div-${i}`} style={{display: 'flex', alignItems: 'center', flexDirection: 'row', gap: '12px'}}>

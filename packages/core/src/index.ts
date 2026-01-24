@@ -8,6 +8,14 @@ export { useModStreamToMediaStream } from './hooks/useModStreamToMediaStream';
 // Types
 export type { ModStream, ModStreamRef } from './types/ModStream';
 
+// Transport + Scheduling
+export { Transport } from './transport';
+export type { TransportLike } from './transport';
+export { Scheduler } from './scheduler';
+export { PhaseSequencer } from './sequencer';
+export { WorkletTransport } from './transportWorklet';
+export { TransportBus } from './transportBus';
+
 // Source Components
 export { Microphone } from './components/sources/Microphone';
 export type { MicrophoneProps, MicrophoneRenderProps } from './components/sources/Microphone';

@@ -15,6 +15,7 @@ export interface SequencerHandle {
     currentStep: number;
     division: number;
     length: number;
+    swing: number;
   };
 }
 
@@ -26,6 +27,8 @@ export interface SequencerRenderProps {
   setDivision: (value: number) => void;
   length: number;
   setLength: (value: number) => void;
+  swing: number;
+  setSwing: (value: number) => void;
   reset: () => void;
 }
 
@@ -43,6 +46,8 @@ export interface SequencerProps {
   onDivisionChange?: (division: number) => void;
   length?: number;
   onLengthChange?: (length: number) => void;
+  swing?: number;
+  onSwingChange?: (swing: number) => void;
   // Event callbacks
   onCurrentStepChange?: (currentStep: number) => void;
   // Render props
@@ -123,6 +128,8 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
   onDivisionChange,
   length: controlledLength,
   onLengthChange,
+  swing: controlledSwing,
+  onSwingChange,
   onCurrentStepChange,
   children,
 }, ref) => {
@@ -135,6 +142,7 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
   const [currentStep, setCurrentStep] = useState(0);
   const [division, setDivision] = useControlledState(controlledDivision, 4, onDivisionChange);
   const [length, setLength] = useControlledState(controlledLength, numSteps, onLengthChange);
+  const [swing, setSwing] = useControlledState(controlledSwing, 0, onSwingChange);
   const [isListenerReady, setIsListenerReady] = useState(false);
   const [isResetListenerReady, setIsResetListenerReady] = useState(false);
 
@@ -149,10 +157,12 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
   const resetPendingRef = useRef(false);
   const lastPulseTimeRef = useRef<number | null>(null);
   const lastPulseIntervalRef = useRef<number | null>(null);
+  const stepTriggerCountRef = useRef(0);
   // Store refs for current state
   const stepsRef = useRef(steps);
   const currentStepRef = useRef(currentStep);
   const divisionRef = useRef(division);
+  const swingRef = useRef(swing);
 
   const normalizeSteps = (nextLength: number, current: step[]) => {
     const clampedLength = Math.max(1, Math.min(32, nextLength));
@@ -169,6 +179,7 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
     divisionRef.current = division;
     pulseAccumulatorRef.current = 0;
   }, [division]);
+  useEffect(() => { swingRef.current = swing; }, [swing]);
 
   useEffect(() => {
     const normalized = normalizeSteps(length, steps);
@@ -295,17 +306,8 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
         const pulsesPerStep = getPulsesPerStep(divisionRef.current);
         const now = audioContext.currentTime;
         const lastPulseTime = lastPulseTimeRef.current;
-        const lastInterval = lastPulseIntervalRef.current;
-        if (lastPulseTime === null) {
-          resetPendingRef.current = true;
-          pulseAccumulatorRef.current = pulsesPerStep - 1;
-        } else {
-          const delta = now - lastPulseTime;
-          if (lastInterval !== null && delta > lastInterval * 2.5) {
-            resetPendingRef.current = true;
-            pulseAccumulatorRef.current = pulsesPerStep - 1;
-          }
-          lastPulseIntervalRef.current = delta;
+        if (lastPulseTime !== null) {
+          lastPulseIntervalRef.current = now - lastPulseTime;
         }
         lastPulseTimeRef.current = now;
         pulseAccumulatorRef.current += 1;
@@ -315,14 +317,28 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
         const nextStep = resetPendingRef.current
           ? 0
           : (currentStepRef.current + 1) % stepsRef.current.length;
-        constantSourceRef.current.offset.setValueAtTime(stepsRef.current[nextStep].value, now);
+        let swingOffset = 0;
+        // Swing delays every other step to push/pull the 16th grid without moving the downbeat.
+        const swingAmount = Math.max(-50, Math.min(50, swingRef.current));
+        const pulseInterval = lastPulseIntervalRef.current;
+        if (pulseInterval && swingAmount !== 0) {
+          const stepInterval = pulseInterval * pulsesPerStep;
+          const delaySeconds = (Math.abs(swingAmount) / 100) * stepInterval;
+          const isOddStep = stepTriggerCountRef.current % 2 === 1;
+          const delayOdd = swingAmount > 0;
+          const shouldDelay = delayOdd ? isOddStep : !isOddStep;
+          swingOffset = shouldDelay ? delaySeconds : 0;
+        }
+        const triggerTime = now + swingOffset;
+        constantSourceRef.current.offset.setValueAtTime(stepsRef.current[nextStep].value, triggerTime);
         if (gateSourceRef.current && stepsRef.current[nextStep].active) {
           const baseGate = gateDurationRef.current;
           const pulseInterval = lastPulseIntervalRef.current;
           const gateDuration = pulseInterval ? Math.min(baseGate, pulseInterval * 0.5) : baseGate;
-          gateSourceRef.current.offset.setValueAtTime(1, now);
-          gateSourceRef.current.offset.setValueAtTime(0, now + gateDuration);
+          gateSourceRef.current.offset.setValueAtTime(1, triggerTime);
+          gateSourceRef.current.offset.setValueAtTime(0, triggerTime + gateDuration);
         }
+        stepTriggerCountRef.current += 1;
         currentStepRef.current = nextStep;
         setCurrentStep(nextStep);
         resetPendingRef.current = false;
@@ -410,6 +426,7 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
     resetPendingRef.current = true;
     lastPulseTimeRef.current = null;
     lastPulseIntervalRef.current = null;
+    stepTriggerCountRef.current = 0;
     if (constantSourceRef.current && audioContext) {
       const now = audioContext.currentTime;
       constantSourceRef.current.offset.setValueAtTime(stepsRef.current[0].value, now);
@@ -419,8 +436,8 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
   // Expose imperative handle
   useImperativeHandle(ref, () => ({
     reset: resetSequence,
-    getState: () => ({ steps, currentStep, division, length }),
-  }), [steps, currentStep, division, length]);
+    getState: () => ({ steps, currentStep, division, length, swing }),
+  }), [steps, currentStep, division, length, swing]);
 
   // Event callback effects
   useEffect(() => {
@@ -437,6 +454,8 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
       setDivision,
       length,
       setLength,
+      swing,
+      setSwing,
       reset: resetSequence,
     })}</>;
   }
