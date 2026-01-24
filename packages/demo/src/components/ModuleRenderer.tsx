@@ -1234,10 +1234,12 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Sequencer':
       const gateOutput = outputStreams[1] || null;
+      const accentOutput = outputStreams[2] || null;
       return output ? (
         <Sequencer
           output={output}
           gateOutput={gateOutput}
+          accentOutput={accentOutput}
           clock={clockInput}
           reset={resetInput}
           steps={params.steps}
@@ -1284,37 +1286,109 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 step={1}
                 formatValue={(v) => `${v.toFixed(0)}%`}
               />
-              <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+                  gap: '8px',
+                }}
+              >
                 {controls.steps.map((step, i) => (
-                  <div key={`seq-div-${i}`} style={{display: 'flex', alignItems: 'center', flexDirection: 'row', gap: '12px'}}>
-                    <div className="enabled-toggle-dot"
-                         key={`step-indicator-${i}`}
-                         style={{backgroundColor: i === controls.currentStep ? 'red' : 'lightblue'}}>
-                    </div>
-                    <ModUIButton
-                      key={`step-button-${i}`}
-                      active={step.active}
-                      onClick={() => {
-                        const newSteps = [...controls.steps]
-                        newSteps[i].active = !newSteps[i].active;
-                        controls.setSteps(newSteps);
+                  <div
+                    key={`seq-div-${i}`}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '20px 1fr',
+                      gridTemplateRows: '20px auto',
+                      gap: '6px',
+                      alignItems: 'center',
+                      padding: '6px',
+                      borderRadius: '6px',
+                      background: i === controls.currentStep ? 'rgba(255,0,0,0.08)' : 'rgba(0,0,0,0.03)',
+                    }}
+                  >
+                    <div
+                      className="enabled-toggle-dot"
+                      key={`step-indicator-${i}`}
+                      style={{
+                        backgroundColor: i === controls.currentStep ? 'red' : 'lightblue',
+                        width: '12px',
+                        height: '12px',
+                        borderRadius: '50%',
+                        justifySelf: 'center',
                       }}
-                    >
-                    </ModUIButton>
-                    <ModUISlider
-                      key={i}
-                      label={`Step ${i + 1}`}
-                      value={step.value}
-                      onChange={(value) => {
-                        const newSteps = [...controls.steps];
-                        newSteps[i].value = value;
-                        controls.setSteps(newSteps);
-                      }}
-                      min={-12}
-                      max={12}
-                      step={1}
-                      formatValue={(v) => v.toFixed(2)}
                     />
+                    <div style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
+                      <ModUIButton
+                        key={`step-button-${i}`}
+                        active={step.active}
+                        onClick={() => {
+                          const newSteps = [...controls.steps]
+                          newSteps[i].active = !newSteps[i].active;
+                          controls.setSteps(newSteps);
+                        }}
+                        size="small"
+                        title={`Step ${i + 1}`}
+                      />
+                      <ModUIButton
+                        key={`accent-button-${i}`}
+                        active={step.accent}
+                        disabled={!step.active}
+                        onClick={() => {
+                          const newSteps = [...controls.steps];
+                          newSteps[i].accent = !newSteps[i].accent;
+                          controls.setSteps(newSteps);
+                        }}
+                        title="Accent"
+                        size="small"
+                      >
+                        A
+                      </ModUIButton>
+                      <ModUIButton
+                        key={`slide-button-${i}`}
+                        active={step.slide}
+                        disabled={!step.active}
+                        onClick={() => {
+                          const newSteps = [...controls.steps];
+                          newSteps[i].slide = !newSteps[i].slide;
+                          controls.setSteps(newSteps);
+                        }}
+                        title="Slide"
+                        size="small"
+                      >
+                        S
+                      </ModUIButton>
+                      <Knob
+                        label=""
+                        value={step.lengthPct}
+                        onChange={(value) => {
+                          const newSteps = [...controls.steps];
+                          newSteps[i].lengthPct = value;
+                          controls.setSteps(newSteps);
+                        }}
+                        min={10}
+                        max={100}
+                        step={1}
+                        size={36}
+                        formatValue={(v) => `${v.toFixed(0)}%`}
+                      />
+                    </div>
+                    <div style={{gridColumn: '1 / span 2'}}>
+                      <ModUISlider
+                        key={i}
+                        label=""
+                        value={step.value}
+                        onChange={(value) => {
+                          const newSteps = [...controls.steps];
+                          newSteps[i].value = value;
+                          controls.setSteps(newSteps);
+                        }}
+                        min={-12}
+                        max={12}
+                        step={1}
+                        formatValue={(v) => v.toFixed(2)}
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
