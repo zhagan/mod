@@ -85,6 +85,7 @@ export const MODULE_DEFINITIONS: Record<string, ModuleDefinition> = {
       steps: Array.from({ length: 8 }, () => ({ active: false, value: 0 })),
       division: 4,
       length: 8,
+      swing: 0,
     },
   },
   Clock: {
