@@ -46,7 +46,7 @@ function LFOModulation() {
         <div className="source">
           <h2>Sound Source</h2>
           <ToneGenerator output={audio}>
-            {({ frequency, setFrequency, type, setType }) => (
+            {({ frequency, setFrequency, waveform, setWaveform }) => (
               <div>
                 <Slider
                   value={frequency}
@@ -56,8 +56,8 @@ function LFOModulation() {
                   label="Frequency"
                 />
                 <Select
-                  value={type}
-                  onChange={setType}
+                  value={waveform}
+                  onChange={setWaveform}
                   options={[
                     { value: 'sine', label: 'Sine' },
                     { value: 'sawtooth', label: 'Sawtooth' },
@@ -74,16 +74,24 @@ function LFOModulation() {
           <h2>Filter Modulation</h2>
           
           <LFO output={filterLFO}>
-            {({ rate, setRate, waveform, setWaveform }) => (
+            {({ frequency, setFrequency, amplitude, setAmplitude, waveform, setWaveform }) => (
               <div>
                 <h3>Filter LFO</h3>
                 <Knob
-                  value={rate}
-                  onChange={setRate}
+                  value={frequency}
+                  onChange={setFrequency}
                   min={0.1}
                   max={20}
                   step={0.1}
                   label="Rate (Hz)"
+                />
+                <Knob
+                  value={amplitude}
+                  onChange={setAmplitude}
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  label="Depth"
                 />
                 <Select
                   value={waveform}
@@ -102,8 +110,7 @@ function LFOModulation() {
           <Filter
             input={audio}
             output={step1}
-            cvInput={filterLFO}
-            cvTarget="frequency"
+            cv={filterLFO}
             cvAmount={5000}
           >
             {({ frequency, setFrequency, Q, setQ }) => (
@@ -134,16 +141,24 @@ function LFOModulation() {
           <h2>Tremolo (Amplitude)</h2>
           
           <LFO output={tremoloLFO}>
-            {({ rate, setRate }) => (
+            {({ frequency, setFrequency, amplitude, setAmplitude }) => (
               <div>
                 <h3>Tremolo LFO</h3>
                 <Knob
-                  value={rate}
-                  onChange={setRate}
+                  value={frequency}
+                  onChange={setFrequency}
                   min={0.5}
                   max={20}
                   step={0.1}
                   label="Rate (Hz)"
+                />
+                <Knob
+                  value={amplitude}
+                  onChange={setAmplitude}
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  label="Depth"
                 />
               </div>
             )}
@@ -152,8 +167,7 @@ function LFOModulation() {
           <Tremolo
             input={step1}
             output={step2}
-            cvInput={tremoloLFO}
-            cvTarget="depth"
+            cv={tremoloLFO}
           >
             {({ depth, setDepth }) => (
               <div>
@@ -176,16 +190,24 @@ function LFOModulation() {
           <h2>Auto-Pan</h2>
           
           <LFO output={panLFO}>
-            {({ rate, setRate }) => (
+            {({ frequency, setFrequency, amplitude, setAmplitude }) => (
               <div>
                 <h3>Pan LFO</h3>
                 <Knob
-                  value={rate}
-                  onChange={setRate}
+                  value={frequency}
+                  onChange={setFrequency}
                   min={0.1}
                   max={10}
                   step={0.1}
                   label="Rate (Hz)"
+                />
+                <Knob
+                  value={amplitude}
+                  onChange={setAmplitude}
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  label="Depth"
                 />
               </div>
             )}
@@ -194,8 +216,7 @@ function LFOModulation() {
           <Panner
             input={step2}
             output={step3}
-            cvInput={panLFO}
-            cvTarget="pan"
+            cv={panLFO}
             cvAmount={1}
           >
             {({ pan, setPan }) => (
@@ -274,25 +295,23 @@ Controls the intensity of modulation. Start subtle and increase to taste.
 
 ### Vibrato
 ```tsx
-<LFO output={lfo} rate={5} />
+<LFO output={lfo} frequency={5} />
 <ToneGenerator
   output={audio}
   frequency={440}
-  cvInput={lfo}
-  cvTarget="frequency"
+  cv={lfo}
   cvAmount={10}  // ±10Hz wobble
 />
 ```
 
 ### Wah Effect
 ```tsx
-<LFO output={lfo} rate={0.3} waveform="sine" />
+<LFO output={lfo} frequency={0.3} waveform="sine" />
 <Filter
   input={audio}
   output={output}
   type="bandpass"
-  cvInput={lfo}
-  cvTarget="frequency"
+  cv={lfo}
   cvAmount={3000}
   frequency={1000}
   Q={10}

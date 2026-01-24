@@ -49,16 +49,19 @@ features:
 
 ```tsx
 // A complete synthesizer in 10 lines
-import { AudioProvider, Sequencer, ADSR, ToneGenerator, Filter, VCA, Delay, Reverb, Monitor, useModStream } from '@mode-7/mod';
+import { AudioProvider, Clock, Sequencer, ADSR, ToneGenerator, Filter, VCA, Delay, Reverb, Monitor, useModStream } from '@mode-7/mod';
 
 function Synth() {
-  const seq = useModStream(), gate = useModStream(), env = useModStream();
+  const clock = useModStream(), seq = useModStream(), gate = useModStream(), env = useModStream();
   const tone = useModStream(), filtered = useModStream(), vca = useModStream();
   const delayed = useModStream(), final = useModStream();
 
   return (
     <AudioProvider>
-      <Sequencer output={seq} gateOutput={gate} bpm={120} />
+      <Clock output={clock}>
+        {({ start }) => <button onClick={start}>Start</button>}
+      </Clock>
+      <Sequencer output={seq} gateOutput={gate} clock={clock} />
       <ADSR gate={gate} output={env} attack={0.01} decay={0.3} sustain={0.5} release={0.5} />
       <ToneGenerator output={tone} cv={seq} frequency={220} />
       <Filter input={tone} output={filtered} type="lowpass" frequency={800} />
@@ -206,8 +209,21 @@ function DrumMachine() {
 
   return (
     <AudioProvider>
-      <Clock output={clock} bpm={120} />
-      <Sequencer output={kickSeq} gateOutput={kickGate} steps={[1,0,0,0, 1,0,0,0]} />
+      <Clock output={clock} bpm={120}>
+        {({ start }) => <button onClick={start}>Start</button>}
+      </Clock>
+      <Sequencer
+        output={kickSeq}
+        gateOutput={kickGate}
+        clock={clock}
+        steps={Array.from({ length: 8 }, (_, index) => ({
+          active: index === 0 || index === 4,
+          value: 0,
+          lengthPct: 80,
+          slide: false,
+          accent: false,
+        }))}
+      />
       <ToneGenerator output={kick} frequency={60} cv={kickSeq} />
       <ADSR gate={kickGate} output={kickEnv} attack={0.001} decay={0.3} sustain={0} />
       <VCA input={kick} output={kick} cv={kickEnv} />

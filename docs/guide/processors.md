@@ -10,6 +10,11 @@ Multimode resonant filter.
 **Types**: Lowpass, highpass, bandpass, notch, allpass, peaking, lowshelf, highshelf  
 **API**: [Filter](/api/processors/filter)
 
+### Diode Filter
+Nonlinear ladder filter with drive and resonance.
+
+**API**: [DiodeFilter](/api/processors/diode-filter)
+
 ### EQ
 Multi-band parametric equalizer.
 

@@ -57,12 +57,12 @@ function SimpleSynth() {
           <h2>Oscillators</h2>
 
           <ToneGenerator output={osc1Out} frequency={frequency}>
-            {({ type, setType, gain, setGain }) => (
+            {({ waveform, setWaveform, gain, setGain }) => (
               <div className="oscillator">
                 <h3>Osc 1</h3>
                 <Select
-                  value={type}
-                  onChange={setType}
+                  value={waveform}
+                  onChange={setWaveform}
                   options={[
                     { value: 'sine', label: 'Sine' },
                     { value: 'square', label: 'Square' },
@@ -83,12 +83,12 @@ function SimpleSynth() {
           </ToneGenerator>
 
           <ToneGenerator output={osc2Out} frequency={frequency * 1.5}>
-            {({ type, setType, gain, setGain }) => (
+            {({ waveform, setWaveform, gain, setGain }) => (
               <div className="oscillator">
                 <h3>Osc 2</h3>
                 <Select
-                  value={type}
-                  onChange={setType}
+                  value={waveform}
+                  onChange={setWaveform}
                   options={[
                     { value: 'sine', label: 'Sine' },
                     { value: 'square', label: 'Square' },
@@ -128,7 +128,7 @@ function SimpleSynth() {
         </div>
 
         {/* Filter */}
-        <Filter input={mixed} output={filtered} cvInput={envelope} cvTarget="frequency" cvAmount={8000}>
+        <Filter input={mixed} output={filtered} cv={envelope} cvAmount={8000}>
           {({ frequency, setFrequency, Q, setQ }) => (
             <div className="filter">
               <h2>Filter</h2>

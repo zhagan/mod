@@ -11,7 +11,7 @@ Creates cyclic modulation at sub-audio and audio rates.
 **API**: [LFO](/api/cv/lfo)
 
 ```tsx
-<LFO output={ref} rate={2} waveform="sine" depth={1} />
+<LFO output={ref} frequency={2} waveform="sine" amplitude={1} />
 ```
 
 **Common uses**:
@@ -51,13 +51,20 @@ Creates stepped patterns with multiple values.
 **API**: [Sequencer](/api/cv/sequencer)
 
 ```tsx
-<Sequencer output={ref} steps={[1, 0, 0.5, 0, 0.7, 0, 1, 0]} bpm={120}>
-  {({ isPlaying, play, stop }) => (
-    <button onClick={isPlaying ? stop : play}>
-      {isPlaying ? 'Stop' : 'Play'}
-    </button>
-  )}
-</Sequencer>
+<Clock output={clock} bpm={120}>
+  {({ start }) => <button onClick={start}>Start</button>}
+</Clock>
+<Sequencer
+  output={ref}
+  clock={clock}
+  steps={[0, 2, 4, 6].map((index) => ({
+    active: true,
+    value: index / 8,
+    lengthPct: 80,
+    slide: false,
+    accent: false,
+  }))}
+/>
 ```
 
 **Common uses**:
@@ -92,12 +99,11 @@ const lfo = useModStream();
 const output = useModStream();
 
 <ToneGenerator output={audio} frequency={110} />
-<LFO output={lfo} rate={0.5} waveform="sine" />
+<LFO output={lfo} frequency={0.5} waveform="sine" />
 <Filter
   input={audio}
   output={output}
-  cvInput={lfo}
-  cvTarget="frequency"
+  cv={lfo}
   cvAmount={5000}
 />
 ```
@@ -113,8 +119,7 @@ const output = useModStream();
 <Filter
   input={audio}
   output={output}
-  cvInput={env}
-  cvTarget="frequency"
+  cv={env}
   cvAmount={8000}
 />
 ```
@@ -122,13 +127,26 @@ const output = useModStream();
 ### Sequenced Melody
 ```tsx
 const seq = useModStream();
+const clock = useModStream();
 const tone = useModStream();
 
-<Sequencer output={seq} steps={[0, 0.25, 0.5, 0.75, 1, 0.75, 0.5, 0.25]} />
+<Clock output={clock}>
+  {({ start }) => <button onClick={start}>Start</button>}
+</Clock>
+<Sequencer
+  output={seq}
+  clock={clock}
+  steps={[0, 0.25, 0.5, 0.75, 1, 0.75, 0.5, 0.25].map((value) => ({
+    active: value > 0,
+    value,
+    lengthPct: 80,
+    slide: false,
+    accent: false,
+  }))}
+/>
 <ToneGenerator
   output={tone}
-  cvInput={seq}
-  cvTarget="frequency"
+  cv={seq}
   cvAmount={880}
   frequency={220}
 />

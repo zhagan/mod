@@ -50,21 +50,21 @@ Generate or input audio signals. Have `output` prop only.
 | [StreamingAudioDeck](/api/sources/streaming-audio-deck) | Streaming audio | url, loop, gain |
 
 ### CV Generators (Modulation)
-Generate control voltage signals. Have `output` prop, connect to `cvInput` of processors.
+Generate control voltage signals. Have `output` prop, connect to `cv` inputs of processors.
 
 | Component | Purpose | Key Props |
 |-----------|---------|-----------|
-| [LFO](/api/cv/lfo) | Cyclic modulation | rate (Hz), waveform, depth |
+| [LFO](/api/cv/lfo) | Cyclic modulation | frequency (Hz), waveform, amplitude |
 | [ADSR](/api/cv/adsr) | Envelopes | attack, decay, sustain, release |
-| [Sequencer](/api/cv/sequencer) | Step patterns | steps (array), bpm |
-| [Clock](/api/cv/clock) | Tempo sync | bpm |
+| [Sequencer](/api/cv/sequencer) | Step patterns | steps (step[]), clock, division, swing |
+| [Clock](/api/cv/clock) | Tempo sync | bpm, start/stop |
 
 ### Processors (Effects)
-Transform audio. Have `input` and `output` props. Can have `cvInput` for modulation.
+Transform audio. Have `input` and `output` props. Can have `cv` for modulation.
 
 | Component | Purpose | Key Props |
 |-----------|---------|-----------|
-| [Filter](/api/processors/filter) | Frequency filtering | type, frequency, Q, cvInput, cvTarget, cvAmount |
+| [Filter](/api/processors/filter) | Frequency filtering | type, frequency, Q, cv, cvAmount |
 | [Delay](/api/processors/delay) | Echo | delayTime, feedback, mix |
 | [Reverb](/api/processors/reverb) | Spatial reverb | roomSize, damping, mix |
 | [Distortion](/api/processors/distortion) | Distortion/overdrive | drive, type |
@@ -446,13 +446,12 @@ const lfo = useModStream();
 const filtered = useModStream();
 
 <ToneGenerator output={audio} frequency={220} />
-<LFO output={lfo} rate={2} waveform="sine" />
+<LFO output={lfo} frequency={2} waveform="sine" />
 <Filter
   input={audio}
   output={filtered}
   frequency={1000}
-  cvInput={lfo}
-  cvTarget="frequency"
+  cv={lfo}
   cvAmount={5000}
 />
 <Monitor input={filtered} />
@@ -471,8 +470,7 @@ const filtered = useModStream();
 <Filter
   input={audio}
   output={filtered}
-  cvInput={env}
-  cvTarget="frequency"
+  cv={env}
   cvAmount={8000}
 />
 <Monitor input={filtered} />
@@ -495,12 +493,12 @@ const output = useModStream();
 const audio = useModStream();
 
 <ToneGenerator output={audio}>
-  {({ frequency, setFrequency, type, setType, gain, setGain }) => (
+  {({ frequency, setFrequency, waveform, setWaveform, gain, setGain }) => (
     <div>
       <Slider value={frequency} onChange={setFrequency} min={20} max={2000} label="Frequency" />
       <Select
-        value={type}
-        onChange={setType}
+        value={waveform}
+        onChange={setWaveform}
         options={[
           { value: 'sine', label: 'Sine' },
           { value: 'square', label: 'Square' },
@@ -580,23 +578,18 @@ useEffect(() => {
 
 ## CV Modulation
 
-Connect CV generators to processors using `cvInput`, `cvTarget`, and `cvAmount`:
+Connect CV generators to processors using `cv` and `cvAmount`:
 
 ```tsx
-<LFO output={lfoRef} rate={5} />
+<LFO output={lfoRef} frequency={5} />
 <Filter
   input={audioRef}
   output={outRef}
   frequency={1000}        // Base frequency
-  cvInput={lfoRef}        // CV source
-  cvTarget="frequency"    // What to modulate
+  cv={lfoRef}        // CV source
   cvAmount={3000}         // Modulation depth (±3000Hz)
 />
 ```
-
-**Common cvTargets:**
-- Filter: `frequency`, `Q`
-- Processors: Check component docs for available targets
 
 ## Signal Flow Rules
 
@@ -604,7 +597,7 @@ Connect CV generators to processors using `cvInput`, `cvTarget`, and `cvAmount`:
 2. **Processors** have `input` AND `output`
 3. **Mixers** have `inputs` (array) AND `output`
 4. **Monitor** has `input` only
-5. **CV generators** have `output`, connect to `cvInput` props
+5. **CV generators** have `output`, connect to `cv` props
 6. **Visualizations** have `input`, don't affect audio
 
 ## Complete Example: Simple Synthesizer
@@ -635,7 +628,7 @@ function Synth() {
 
       {/* Oscillator */}
       <ToneGenerator output={osc} frequency={frequency}>
-        {({ type, setType, gain, setGain }) => (
+        {({ waveform, setWaveform, gain, setGain }) => (
           <div>
             <Slider
               value={frequency}
@@ -645,8 +638,8 @@ function Synth() {
               label="Frequency"
             />
             <Select
-              value={type}
-              onChange={setType}
+              value={waveform}
+              onChange={setWaveform}
               options={[
                 { value: 'sine', label: 'Sine' },
                 { value: 'square', label: 'Square' },
@@ -676,8 +669,7 @@ function Synth() {
       <Filter
         input={osc}
         output={filtered}
-        cvInput={env}
-        cvTarget="frequency"
+        cv={env}
         cvAmount={8000}
       >
         {({ frequency, setFrequency, Q, setQ }) => (
@@ -721,7 +713,7 @@ function Synth() {
 - ✅ Sources connect to `input` props
 - ✅ Processors output to other processors' `input`
 - ✅ Always end with Monitor
-- ✅ CV generators connect to `cvInput`, not `input`
+- ✅ CV generators connect to `cv`, not `input`
 
 ## Documentation Links
 
@@ -760,7 +752,6 @@ const ref = useModStream();
 
 // Modulation
 <CVGenerator output={cvRef} />
-<Processor cvInput={cvRef} cvTarget="paramName" cvAmount={100} />
 ```
 
 ---
@@ -822,8 +813,7 @@ Filters audio frequencies with multiple filter types and CV modulation support.
 - `onQChange: (q: number) => void` - Q change callback
 - `type: 'lowpass' | 'highpass' | 'bandpass' | 'notch' | 'allpass' | 'lowshelf' | 'highshelf' | 'peaking'` - Filter type (default: 'lowpass')
 - `onTypeChange: (type: BiquadFilterType) => void` - Type change callback
-- `cvInput: ModStreamRef` - CV modulation input
-- `cvTarget: 'frequency' | 'Q'` - Which parameter to modulate
+- `cv: ModStreamRef` - CV modulation input
 - `cvAmount: number` - Modulation depth (default: 1000)
 - `label: string` - Component label
 
@@ -839,15 +829,14 @@ const lfo = useModStream();
 const filtered = useModStream();
 
 <NoiseGenerator output={audio} />
-<LFO output={lfo} rate={3} waveform="sine" />
+<LFO output={lfo} frequency={3} waveform="sine" />
 <Filter
   input={audio}
   output={filtered}
   frequency={1000}
   Q={5}
   type="lowpass"
-  cvInput={lfo}
-  cvTarget="frequency"
+  cv={lfo}
   cvAmount={5000}  // ±5000Hz modulation
 />
 <Monitor input={filtered} />
@@ -859,17 +848,17 @@ Generates control voltage signals for modulation.
 
 **Props:**
 - `output: ModStreamRef` (required) - CV output stream
-- `rate: number` - Frequency in Hz (default: 1)
-- `onRateChange: (rate: number) => void` - Rate change callback
+- `frequency: number` - Frequency in Hz (default: 1)
+- `onFrequencyChange: (frequency: number) => void` - Frequency change callback
 - `waveform: 'sine' | 'square' | 'sawtooth' | 'triangle'` - Waveform (default: 'sine')
 - `onWaveformChange: (waveform: OscillatorType) => void` - Waveform change callback
-- `depth: number` - Modulation depth 0-1 (default: 1)
-- `onDepthChange: (depth: number) => void` - Depth change callback
+- `amplitude: number` - Modulation depth 0-1 (default: 1)
+- `onAmplitudeChange: (amplitude: number) => void` - Amplitude change callback
 - `label: string` - Component label
 
 **Render Props:**
 ```tsx
-{({ rate, setRate, waveform, setWaveform, depth, setDepth }) => ReactNode}
+{({ frequency, setFrequency, waveform, setWaveform, amplitude, setAmplitude }) => ReactNode}
 ```
 
 ### ADSR - Envelope Generator
@@ -909,7 +898,7 @@ const output = useModStream();
 <ADSR output={env} attack={0.01} decay={0.2} sustain={0.3} release={0.5}>
   {({ trigger }) => <Button onClick={trigger}>Trigger</Button>}
 </ADSR>
-<VCA input={audio} output={output} cvInput={env} cvAmount={1} />
+<VCA input={audio} output={output} cv={env} cvAmount={1} />
 <Monitor input={output} />
 ```
 
@@ -1073,7 +1062,7 @@ Controls gain/volume with CV modulation.
 - `output: ModStreamRef` (required) - Output stream
 - `gain: number` - Base gain 0-1 (default: 1)
 - `onGainChange: (gain: number) => void` - Gain change callback
-- `cvInput: ModStreamRef` - CV modulation input
+- `cv: ModStreamRef` - CV modulation input
 - `cvAmount: number` - Modulation depth 0-1 (default: 1)
 - `label: string` - Component label
 
@@ -1140,9 +1129,9 @@ Measures audio levels with peak detection and clipping indicator.
 
 1. **Missing AudioProvider** - Always wrap everything in `<AudioProvider>`
 2. **No Monitor** - Audio won't play without `<Monitor input={finalStream} />`
-3. **Wrong prop names** - It's `output` not `out`, `input` not `in`, `cvInput` not `cv` (except for ToneGenerator which uses `cv`)
+3. **Wrong prop names** - It's `output` not `out`, `input` not `in`, `cv` (not `cvInput`)
 4. **Forgetting useModStream** - Create refs with `const ref = useModStream()`, not `useRef(null)`
-5. **CV vs Audio inputs** - CV generators connect to `cvInput`, audio sources connect to `input`
+5. **CV vs Audio inputs** - CV generators connect to `cv`, audio sources connect to `input`
 6. **Import errors** - Everything imports from `@mode-7/mod`, including UI components
 
 ### Signal Flow Checklist
@@ -1151,7 +1140,7 @@ Measures audio levels with peak detection and clipping indicator.
 - ✅ Create stream refs with `useModStream()`
 - ✅ Sources (ToneGenerator, NoiseGenerator, etc.) have `output` prop
 - ✅ Processors (Filter, Delay, etc.) have both `input` and `output` props
-- ✅ CV generators (LFO, ADSR) connect to `cvInput` props
+- ✅ CV generators (LFO, ADSR) connect to `cv` props
 - ✅ Final output goes to `<Monitor input={...} />`
 - ✅ All components are connected in a valid chain
 
@@ -1169,7 +1158,7 @@ Measures audio levels with peak detection and clipping indicator.
 
 **Connection errors?**
 - Audio flows: Source → Processor → Monitor
-- CV flows: CV Generator → Processor's cvInput
+- CV flows: CV Generator → Processor's cv
 - Never connect CV to audio inputs or vice versa
 
 ---

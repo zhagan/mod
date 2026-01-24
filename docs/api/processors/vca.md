@@ -84,9 +84,10 @@ function App() {
 The most common use of a VCA - controlling note amplitude with an ADSR envelope:
 
 ```tsx
-import { ToneGenerator, ADSR, VCA, Monitor, Sequencer, useModStream } from '@mode-7/mod';
+import { Clock, ToneGenerator, ADSR, VCA, Monitor, Sequencer, useModStream } from '@mode-7/mod';
 
 function Synth() {
+  const clock = useModStream();
   const toneOut = useModStream();
   const adsrOut = useModStream();
   const sequencerCV = useModStream();
@@ -95,8 +96,11 @@ function Synth() {
 
   return (
     <>
+      <Clock output={clock}>
+        {({ start }) => <button onClick={start}>Start</button>}
+      </Clock>
       {/* Step sequencer provides pitch CV and gate triggers */}
-      <Sequencer output={sequencerCV} gateOutput={sequencerGate} />
+      <Sequencer output={sequencerCV} gateOutput={sequencerGate} clock={clock} />
 
       {/* Tone generator with pitch controlled by sequencer */}
       <ToneGenerator

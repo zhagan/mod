@@ -78,14 +78,14 @@ Components that generate control voltage signals for modulation:
 ```tsx
 <LFO output={ref} />       // Low-frequency oscillator
 <ADSR output={ref} />      // Envelope generator
-<Sequencer output={ref} /> // Step sequencer
 <Clock output={ref} />     // Timing/tempo clock
+<Sequencer output={ref} clock={clockRef} /> // Step sequencer (clock-driven)
 ```
 
 **Characteristics:**
 - Have an `output` prop (ModStreamRef)
 - Produce modulation signals (not audible audio)
-- Used to control parameters via `cvInput` props
+- Used to control parameters via `cv` props
 
 ### 3. Processors
 
@@ -261,7 +261,6 @@ CV modulation is one-way and automatic:
 
 ```tsx
 <LFO output={lfoRef} />
-<Filter input={audioRef} output={outRef} cvInput={lfoRef} cvTarget="frequency" />
 ```
 
 The LFO's output automatically modulates the filter's frequency. No manual state management needed.

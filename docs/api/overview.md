@@ -44,6 +44,7 @@ Components that transform audio signals:
 - [Reverb](/api/processors/reverb) - Reverb effect
 - [Compressor](/api/processors/compressor) - Dynamic range compressor
 - [Distortion](/api/processors/distortion) - Distortion effect
+- [DiodeFilter](/api/processors/diode-filter) - Nonlinear ladder filter
 - [Panner](/api/processors/panner) - Stereo panner
 - [EQ](/api/processors/eq) - 3-band equalizer
 - And many more...

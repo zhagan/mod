@@ -2,6 +2,72 @@
 
 The `Clock` component generates precise timing pulses (gate signals) that can trigger envelopes, sync sequencers, or create rhythmic patterns.
 
+## Clock Source
+
+### Where time originates
+
+Time is derived from the audio rendering clock (`AudioContext.currentTime`) inside an `AudioWorkletProcessor`. This keeps timing aligned to the audio sample clock instead of the UI thread.
+
+### Why that source was chosen
+
+The audio thread is the only clock that is sample-accurate and immune to UI jitter. Using it ensures gate pulses stay phase-stable even when the main thread is busy.
+
+### Tick model
+
+Each tick is a **16th-note pulse** generated on the audio thread. The pulse is a short gate (10ms width) at a fixed subdivision of the BPM.
+
+### Tick resolution and precision
+
+Ticks are computed per sample in the worklet, so timing is sample-accurate. The pulse width and spacing are derived directly from the audio sample rate.
+
+### Scheduling
+
+The clock is generated in real time by the worklet, not via `setTimeout` or UI loops. There is no lookahead buffer: pulses are emitted by the audio engine as each render quantum is processed.
+
+### How far ahead events are planned
+
+No lookahead scheduling is used for the clock itself. Downstream components that need lookahead scheduling should use their own scheduler.
+
+### BPM & transport
+
+Tempo is controlled by the `bpm` AudioParam on the worklet. Changes are applied at audio rate (sample-accurate). Start/stop/reset toggle the worklet’s `running` parameter, which resets phase when starting.
+
+### Sync
+
+Multiple sequencers stay in sync by connecting to the same clock output. Since all pulses are generated from the same audio clock, their phase remains locked. Late subscribers will receive the next pulse on time (they will not retroactively align to earlier pulses).
+
+### Threading / execution context
+
+The clock runs in an `AudioWorkletProcessor` (audio rendering thread). The UI thread only updates parameters (BPM, running), which minimizes drift and jitter.
+
+### Transport and TransportBus
+
+For applications that need a shared timeline across modules (tempo, phase, start/stop), use the `Transport` / `WorkletTransport` plus a `TransportBus`. The Clock is a CV pulse source; the Transport is the global timeline.
+
+- `Transport` / `WorkletTransport` expose beat-accurate time conversions (`getBeatAtTime`, `getTimeAtBeat`).
+- `TransportBus` lets devices subscribe to `tick`, `tempo`, `start`, `stop`, and `seek` without direct references.
+- When using a transport, you can still drive a sequencer with a Clock, but the transport is the better choice for phase-locked scheduling.
+
+Minimal usage sketch:
+
+```ts
+import { WorkletTransport, TransportBus, Scheduler } from '@mode-7/mod';
+
+const transport = await WorkletTransport.create(audioContext, { bpm: 120 });
+const bus = new TransportBus(transport);
+const scheduler = new Scheduler(transport, { lookaheadMs: 100, intervalMs: 25 });
+
+scheduler.start(false);
+const stop = bus.on('tick', (payload) => scheduler.advance((payload as any).time));
+transport.start();
+```
+
+### Known limitations
+
+- UI changes (rapid BPM slider movement) are still applied from the main thread, so the control signal itself can be jittery even though the worklet is not.
+- Background tab throttling can affect UI-driven state, but the audio thread continues running once started.
+- Extreme CPU load can cause audio glitches, which will manifest as irregular pulses.
+
 ## Props
 
 | Prop | Type | Default | Description |
@@ -27,6 +93,31 @@ When using the `children` render prop, the following controls are provided:
 | `reset` | `() => void` | Stop the clock and reset |
 
 ## Usage
+
+### Clock -> Sequencer (Required)
+
+Sequencers need a clock input to advance steps. Create a `Clock`, connect its output to the `Sequencer` `clock` input, and start the clock.
+
+```tsx
+import { Clock, Sequencer, Monitor } from '@mode-7/mod';
+import { useRef } from 'react';
+
+function App() {
+  const clockOut = useRef(null);
+  const seqOut = useRef(null);
+  const seqGate = useRef(null);
+
+  return (
+    <>
+      <Clock output={clockOut}>
+        {({ start }) => <button onClick={start}>Start</button>}
+      </Clock>
+      <Sequencer output={seqOut} gateOutput={seqGate} clock={clockOut} />
+      <Monitor input={seqOut} />
+    </>
+  );
+}
+```
 
 ### Basic Usage
 
@@ -179,14 +270,21 @@ function App() {
         }}
       </Clock>
 
-      <Sequencer output={seqOut} numSteps={16}>
+      <Sequencer output={seqOut} clock={clockOut} numSteps={16}>
         {({ setSteps }) => {
           React.useEffect(() => {
             // Create a rhythmic pattern
-            setSteps([
+            const pattern = [
               1.0, 0.0, 0.5, 0.0, 0.8, 0.0, 0.3, 0.0,
               1.0, 0.0, 0.5, 0.0, 0.6, 0.4, 0.2, 0.0,
-            ]);
+            ];
+            setSteps(pattern.map((value) => ({
+              active: value > 0,
+              value,
+              lengthPct: 80,
+              slide: false,
+              accent: false,
+            })));
           }, []);
           return null;
         }}

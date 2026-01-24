@@ -32,8 +32,11 @@ import { useState } from 'react';
 function RhythmicPatterns() {
   const clock = useModStream();
   const kickSeq = useModStream();
+  const kickGate = useModStream();
   const snareSeq = useModStream();
+  const snareGate = useModStream();
   const hihatSeq = useModStream();
+  const hihatGate = useModStream();
   
   const kickTone = useModStream();
   const kickEnv = useModStream();
@@ -84,14 +87,18 @@ function RhythmicPatterns() {
         <div className="drum">
           <h2>Kick Drum</h2>
           
-          <Sequencer output={kickSeq} clockInput={clock} steps={8}>
-            {({ steps, setStep }) => (
+          <Sequencer output={kickSeq} gateOutput={kickGate} clock={clock} numSteps={8}>
+            {({ steps, setSteps }) => (
               <div className="pattern">
-                {steps.map((active, i) => (
+                {steps.map((step, i) => (
                   <Button
                     key={i}
-                    active={active > 0}
-                    onClick={() => setStep(i, active > 0 ? 0 : 1)}
+                    active={step.active}
+                    onClick={() => {
+                      const next = [...steps];
+                      next[i] = { ...next[i], active: !next[i].active };
+                      setSteps(next);
+                    }}
                   >
                     {i + 1}
                   </Button>
@@ -100,7 +107,7 @@ function RhythmicPatterns() {
             )}
           </Sequencer>
 
-          <ToneGenerator output={kickTone} frequency={60} type="sine" />
+          <ToneGenerator output={kickTone} frequency={60} waveform="sine" />
           
           <ADSR
             output={kickEnv}
@@ -108,7 +115,7 @@ function RhythmicPatterns() {
             decay={0.3}
             sustain={0}
             release={0.1}
-            cvInput={kickSeq}
+            gate={kickGate}
           />
           
           <Filter
@@ -116,8 +123,7 @@ function RhythmicPatterns() {
             output={kick}
             type="lowpass"
             frequency={200}
-            cvInput={kickEnv}
-            cvTarget="frequency"
+            cv={kickEnv}
             cvAmount={1000}
           />
         </div>
@@ -126,14 +132,18 @@ function RhythmicPatterns() {
         <div className="drum">
           <h2>Snare Drum</h2>
           
-          <Sequencer output={snareSeq} clockInput={clock} steps={8}>
-            {({ steps, setStep }) => (
+          <Sequencer output={snareSeq} gateOutput={snareGate} clock={clock} numSteps={8}>
+            {({ steps, setSteps }) => (
               <div className="pattern">
-                {steps.map((active, i) => (
+                {steps.map((step, i) => (
                   <Button
                     key={i}
-                    active={active > 0}
-                    onClick={() => setStep(i, active > 0 ? 0 : 1)}
+                    active={step.active}
+                    onClick={() => {
+                      const next = [...steps];
+                      next[i] = { ...next[i], active: !next[i].active };
+                      setSteps(next);
+                    }}
                   >
                     {i + 1}
                   </Button>
@@ -150,7 +160,7 @@ function RhythmicPatterns() {
             decay={0.15}
             sustain={0}
             release={0.05}
-            cvInput={snareSeq}
+            gate={snareGate}
           />
           
           <Filter
@@ -158,8 +168,7 @@ function RhythmicPatterns() {
             output={snare}
             type="highpass"
             frequency={1000}
-            cvInput={snareEnv}
-            cvTarget="frequency"
+            cv={snareEnv}
             cvAmount={2000}
           />
         </div>
@@ -168,14 +177,18 @@ function RhythmicPatterns() {
         <div className="drum">
           <h2>Hi-Hat</h2>
           
-          <Sequencer output={hihatSeq} clockInput={clock} steps={16}>
-            {({ steps, setStep }) => (
+          <Sequencer output={hihatSeq} gateOutput={hihatGate} clock={clock} numSteps={16}>
+            {({ steps, setSteps }) => (
               <div className="pattern">
-                {steps.map((active, i) => (
+                {steps.map((step, i) => (
                   <Button
                     key={i}
-                    active={active > 0}
-                    onClick={() => setStep(i, active > 0 ? 0 : 1)}
+                    active={step.active}
+                    onClick={() => {
+                      const next = [...steps];
+                      next[i] = { ...next[i], active: !next[i].active };
+                      setSteps(next);
+                    }}
                     size="small"
                   >
                     {i + 1}
@@ -193,7 +206,7 @@ function RhythmicPatterns() {
             decay={0.05}
             sustain={0}
             release={0.02}
-            cvInput={hihatSeq}
+            gate={hihatGate}
           />
           
           <Filter
@@ -202,7 +215,7 @@ function RhythmicPatterns() {
             type="highpass"
             frequency={5000}
             Q={1}
-            cvInput={hihatEnv}
+            cv={hihatEnv}
           />
         </div>
 

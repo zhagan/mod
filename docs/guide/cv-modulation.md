@@ -13,7 +13,7 @@ CV (Control Voltage) is a signal used to control audio parameters. In hardware m
 
 ## Basic CV Modulation
 
-Connect a CV generator's output to a processor's `cvInput`:
+Connect a CV generator's output to a processor's `cv`:
 
 ```tsx
 import { ToneGenerator, LFO, Filter, Monitor, useModStream } from '@mode-7/mod';
@@ -26,13 +26,12 @@ function BasicModulation() {
   return (
     <>
       <ToneGenerator output={audio} frequency={220} />
-      <LFO output={lfo} rate={2} />
+      <LFO output={lfo} frequency={2} />
 
       <Filter
         input={audio}
         output={output}
-        cvInput={lfo}
-        cvTarget="frequency"
+        cv={lfo}
         cvAmount={5000}
       />
 
@@ -62,8 +61,7 @@ The `cvAmount` prop controls modulation depth:
 
 ```tsx
 <Filter
-  cvInput={lfo}
-  cvTarget="frequency"
+  cv={lfo}
   cvAmount={5000}  // Modulates ±5000Hz
   frequency={1000} // Center frequency
 />
@@ -89,18 +87,29 @@ function LFOExample() {
       <NoiseGenerator output={audio} />
 
       <LFO output={lfo}>
-        {({ rate, setRate, depth, setDepth, waveform, setWaveform }) => (
+        {({ frequency, setFrequency, amplitude, setAmplitude, waveform, setWaveform }) => (
           <div>
             <h3>LFO</h3>
             <label>
-              Rate: {rate} Hz
+              Rate: {frequency} Hz
               <input
                 type="range"
                 min={0.01}
                 max={20}
                 step={0.01}
-                value={rate}
-                onChange={e => setRate(+e.target.value)}
+                value={frequency}
+                onChange={e => setFrequency(+e.target.value)}
+              />
+            </label>
+            <label>
+              Depth: {amplitude}
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={amplitude}
+                onChange={e => setAmplitude(+e.target.value)}
               />
             </label>
             <label>
@@ -119,8 +128,7 @@ function LFOExample() {
       <Filter
         input={audio}
         output={filtered}
-        cvInput={lfo}
-        cvTarget="frequency"
+        cv={lfo}
         cvAmount={8000}
         frequency={1000}
       />
@@ -166,8 +174,7 @@ function EnvelopeExample() {
       <Filter
         input={audio}
         output={filtered}
-        cvInput={envelope}
-        cvTarget="frequency"
+        cv={envelope}
         cvAmount={10000}
         frequency={100}
       />
@@ -200,15 +207,14 @@ function MultipleModulators() {
     <>
       <ToneGenerator output={audio} />
 
-      <LFO output={lfo1} rate={0.5} />
-      <LFO output={lfo2} rate={5} />
+      <LFO output={lfo1} frequency={0.5} />
+      <LFO output={lfo2} frequency={5} />
 
       {/* First modulation */}
       <Filter
         input={audio}
         output={mod1}
-        cvInput={lfo1}
-        cvTarget="frequency"
+        cv={lfo1}
         cvAmount={2000}
       />
 
@@ -216,8 +222,7 @@ function MultipleModulators() {
       <Filter
         input={mod1}
         output={mod2}
-        cvInput={lfo2}
-        cvTarget="frequency"
+        cv={lfo2}
         cvAmount={500}
       />
 
@@ -235,27 +240,33 @@ Sequencers create stepped patterns:
 function SequencerModulation() {
   const audio = useModStream();
   const seq = useModStream();
+  const clock = useModStream();
   const output = useModStream();
 
   return (
     <>
       <ToneGenerator output={audio} frequency={110} />
 
-      <Sequencer output={seq}>
-        {({ steps, setStep, isPlaying, play, stop }) => (
+      <Clock output={clock}>
+        {({ start }) => <button onClick={start}>Start</button>}
+      </Clock>
+
+      <Sequencer output={seq} clock={clock}>
+        {({ steps, setSteps }) => (
           <div>
-            <button onClick={isPlaying ? stop : play}>
-              {isPlaying ? 'Stop' : 'Play'}
-            </button>
-            {steps.map((value, i) => (
+            {steps.map((step, i) => (
               <input
                 key={i}
                 type="range"
-                min={0}
-                max={1}
-                step={0.01}
-                value={value}
-                onChange={e => setStep(i, +e.target.value)}
+                min={-12}
+                max={12}
+                step={1}
+                value={step.value}
+                onChange={(e) => {
+                  const next = [...steps];
+                  next[i] = { ...next[i], value: Number(e.target.value), active: true };
+                  setSteps(next);
+                }}
               />
             ))}
           </div>
@@ -265,8 +276,7 @@ function SequencerModulation() {
       <Filter
         input={audio}
         output={output}
-        cvInput={seq}
-        cvTarget="frequency"
+        cv={seq}
         cvAmount={5000}
         frequency={500}
       />
@@ -289,11 +299,13 @@ function SyncedModulation() {
 
   return (
     <>
-      <Clock output={clock} bpm={120} />
+      <Clock output={clock} bpm={120}>
+        {({ start }) => <button onClick={start}>Start</button>}
+      </Clock>
 
-      {/* Both LFOs sync to clock */}
-      <LFO output={lfo1} clockInput={clock} />
-      <LFO output={lfo2} clockInput={clock} />
+      {/* Both LFOs share the same tempo-derived rate */}
+      <LFO output={lfo1} frequency={2} />
+      <LFO output={lfo2} frequency={4} />
 
       {/* Use lfo1 and lfo2 for modulation... */}
     </>
@@ -307,11 +319,10 @@ function SyncedModulation() {
 Pitch modulation using LFO:
 
 ```tsx
-<LFO output={lfo} rate={5} />
+<LFO output={lfo} frequency={5} />
 <ToneGenerator
   output={audio}
-  cvInput={lfo}
-  cvTarget="frequency"
+  cv={lfo}
   cvAmount={10}  // ±10Hz wiggle
   frequency={440}
 />
@@ -321,13 +332,12 @@ Pitch modulation using LFO:
 Amplitude modulation using LFO:
 
 ```tsx
-<LFO output={lfo} rate={4} />
+<LFO output={lfo} frequency={4} />
 <ToneGenerator output={audio} frequency={440} />
 <Tremolo
   input={audio}
   output={output}
-  cvInput={lfo}
-  cvTarget="depth"
+  cv={lfo}
   cvAmount={0.8}
 />
 ```
@@ -340,8 +350,7 @@ Envelope-controlled filter:
 <Filter
   input={audio}
   output={output}
-  cvInput={env}
-  cvTarget="frequency"
+  cv={env}
   cvAmount={8000}
   frequency={100}
 />
@@ -351,12 +360,24 @@ Envelope-controlled filter:
 Sequencer-controlled gain:
 
 ```tsx
-<Sequencer output={seq} steps={[1, 0, 0.5, 0, 1, 0, 0.7, 0]} />
+<Clock output={clock}>
+  {({ start }) => <button onClick={start}>Start</button>}
+</Clock>
+<Sequencer
+  output={seq}
+  clock={clock}
+  steps={[0, 2, 4, 6].map((index) => ({
+    active: true,
+    value: index / 8,
+    lengthPct: 80,
+    slide: false,
+    accent: false,
+  }))}
+/>
 <Gate
   input={audio}
   output={output}
-  cvInput={seq}
-  cvTarget="threshold"
+  cv={seq}
   cvAmount={-40}  // dB
 />
 ```
