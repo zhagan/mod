@@ -61,8 +61,9 @@ class DiodeFilterProcessor extends AudioWorkletProcessor {
     const outputChannels = outputs[0] || [];
     const numChannels = Math.max(inputChannels.length, outputChannels.length, 1);
     for (let ch = 0; ch < numChannels; ch++) {
-      const input = inputChannels[ch] || new Float32Array(128);
-      const output = outputChannels[ch] || new Float32Array(128);
+      const output = outputChannels[ch];
+      if (!output) continue;
+      const input = inputChannels[ch] || inputChannels[0] || new Float32Array(128);
       if (!this._stages[ch] || this._stages[ch].length !== 4) {
         this._stages[ch] = [0,0,0,0];
         this._prevOut[ch] = 0;
@@ -166,6 +167,9 @@ export const DiodeFilter = React.forwardRef<DiodeFilterHandle, DiodeFilterProps>
       const node = new AudioWorkletNode(audioContext, 'diode-filter-processor', {
         numberOfInputs: 1,
         numberOfOutputs: 1,
+        channelCount: 2,
+        channelCountMode: 'explicit',
+        channelInterpretation: 'speakers',
         outputChannelCount: [2],
         parameterData: { cutoff, resonance, drive },
       });
