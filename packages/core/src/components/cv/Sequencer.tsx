@@ -6,6 +6,9 @@ import { useControlledState } from '../../hooks/useControlledState';
 export interface step {
   active: boolean;
   value: number;
+  lengthPct: number;
+  slide: boolean;
+  accent: boolean;
 }
 
 export interface SequencerHandle {
@@ -35,6 +38,7 @@ export interface SequencerRenderProps {
 export interface SequencerProps {
   output: ModStreamRef;
   gateOutput?: ModStreamRef; // Optional separate gate/trigger output
+  accentOutput?: ModStreamRef; // Optional accent CV output
   clock?: ModStreamRef;
   reset?: ModStreamRef;
   label?: string;
@@ -118,6 +122,7 @@ const loadClockDetectorWorklet = (audioContext: AudioContext) => {
 export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
   output,
   gateOutput,
+  accentOutput,
   clock,
   reset: resetInput,
   label = 'sequencer',
@@ -136,7 +141,7 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
   const audioContext = useAudioContext();
   const initialSteps: step[] = [];
   for (let i = 0; i < numSteps ; i++) {
-    initialSteps.push({active: false, value: 0})
+    initialSteps.push({ active: false, value: 0, lengthPct: 80, slide: false, accent: false });
   }
   const [steps, setSteps] = useControlledState(controlledSteps, initialSteps, onStepsChange);
   const [currentStep, setCurrentStep] = useState(0);
@@ -150,6 +155,8 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
   const gainNodeRef = useRef<GainNode | null>(null);
   const gateSourceRef = useRef<ConstantSourceNode | null>(null);
   const gateGainRef = useRef<GainNode | null>(null);
+  const accentSourceRef = useRef<ConstantSourceNode | null>(null);
+  const accentGainRef = useRef<GainNode | null>(null);
   const clockListenerRef = useRef<AudioWorkletNode | null>(null);
   const resetListenerRef = useRef<AudioWorkletNode | null>(null);
   const gateDurationRef = useRef(0.05);
@@ -158,17 +165,34 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
   const lastPulseTimeRef = useRef<number | null>(null);
   const lastPulseIntervalRef = useRef<number | null>(null);
   const stepTriggerCountRef = useRef(0);
+  const slideTimeRef = useRef(0.065);
+  const gateOffTimeRef = useRef(-Infinity);
   // Store refs for current state
   const stepsRef = useRef(steps);
   const currentStepRef = useRef(currentStep);
   const divisionRef = useRef(division);
   const swingRef = useRef(swing);
 
+  const clampLengthPct = (value: number | undefined) => {
+    if (!Number.isFinite(value)) {
+      return 80;
+    }
+    return Math.max(10, Math.min(100, value as number));
+  };
+
+  const normalizeStep = (input: step | undefined) => ({
+    active: input?.active ?? false,
+    value: input?.value ?? 0,
+    lengthPct: clampLengthPct(input?.lengthPct),
+    slide: input?.slide ?? false,
+    accent: input?.accent ?? false,
+  });
+
   const normalizeSteps = (nextLength: number, current: step[]) => {
     const clampedLength = Math.max(1, Math.min(32, nextLength));
-    const nextSteps = current.slice(0, clampedLength);
+    const nextSteps = current.slice(0, clampedLength).map((step) => normalizeStep(step));
     while (nextSteps.length < clampedLength) {
-      nextSteps.push({ active: false, value: 0 });
+      nextSteps.push({ active: false, value: 0, lengthPct: 80, slide: false, accent: false });
     }
     return nextSteps;
   };
@@ -183,7 +207,21 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
 
   useEffect(() => {
     const normalized = normalizeSteps(length, steps);
-    if (normalized.length !== steps.length) {
+    const needsUpdate = normalized.length !== steps.length
+      || normalized.some((step, index) => {
+        const current = steps[index];
+        if (!current) {
+          return true;
+        }
+        return (
+          step.active !== current.active
+          || step.value !== current.value
+          || step.lengthPct !== current.lengthPct
+          || step.slide !== current.slide
+          || step.accent !== current.accent
+        );
+      });
+    if (needsUpdate) {
       setSteps(normalized);
     }
     if (currentStepRef.current >= normalized.length) {
@@ -248,6 +286,30 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
       };
     }
 
+    // Create accent output if provided
+    if (accentOutput) {
+      const accentSource = audioContext.createConstantSource();
+      accentSource.offset.value = 0;
+      accentSourceRef.current = accentSource;
+
+      const accentGain = audioContext.createGain();
+      accentGain.gain.value = 1.0;
+      accentGainRef.current = accentGain;
+
+      accentSource.connect(accentGain);
+      accentSource.start(0);
+
+      accentOutput.current = {
+        audioNode: accentSource,
+        gain: accentGain,
+        context: audioContext,
+        metadata: {
+          label: `${label}-accent`,
+          sourceType: 'cv',
+        },
+      };
+    }
+
   // Cleanup
   return () => {
       constantSource.stop();
@@ -269,8 +331,20 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
       if (gateOutput) {
         gateOutput.current = null;
       }
+      if (accentSourceRef.current) {
+        accentSourceRef.current.stop();
+        accentSourceRef.current.disconnect();
+        accentSourceRef.current = null;
+      }
+      if (accentGainRef.current) {
+        accentGainRef.current.disconnect();
+        accentGainRef.current = null;
+      }
+      if (accentOutput) {
+        accentOutput.current = null;
+      }
     };
-  }, [audioContext, label, gateOutput]);
+  }, [audioContext, label, gateOutput, accentOutput]);
 
   const getPulsesPerStep = (divisionValue: number) => {
     const pulsesPerStepMap: Record<number, number> = {
@@ -317,6 +391,14 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
         const nextStep = resetPendingRef.current
           ? 0
           : (currentStepRef.current + 1) % stepsRef.current.length;
+        const currentStepData = normalizeStep(stepsRef.current[nextStep]);
+        const prevStepIndex = (nextStep - 1 + stepsRef.current.length) % stepsRef.current.length;
+        const prevStepData = normalizeStep(stepsRef.current[prevStepIndex]);
+        const nextStepIndex = (nextStep + 1) % stepsRef.current.length;
+        const nextStepData = normalizeStep(stepsRef.current[nextStepIndex]);
+        const stepInterval = lastPulseIntervalRef.current
+          ? lastPulseIntervalRef.current * pulsesPerStep
+          : null;
         let swingOffset = 0;
         // Swing delays every other step to push/pull the 16th grid without moving the downbeat.
         const swingAmount = Math.max(-50, Math.min(50, swingRef.current));
@@ -330,13 +412,71 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
           swingOffset = shouldDelay ? delaySeconds : 0;
         }
         const triggerTime = now + swingOffset;
-        constantSourceRef.current.offset.setValueAtTime(stepsRef.current[nextStep].value, triggerTime);
-        if (gateSourceRef.current && stepsRef.current[nextStep].active) {
-          const baseGate = gateDurationRef.current;
-          const pulseInterval = lastPulseIntervalRef.current;
-          const gateDuration = pulseInterval ? Math.min(baseGate, pulseInterval * 0.5) : baseGate;
-          gateSourceRef.current.offset.setValueAtTime(1, triggerTime);
-          gateSourceRef.current.offset.setValueAtTime(0, triggerTime + gateDuration);
+        const slideFromPrev = Boolean(
+          stepInterval
+          && prevStepData.active
+          && currentStepData.active
+          && currentStepData.slide
+        );
+        const slideIntoNext = Boolean(
+          stepInterval
+          && currentStepData.active
+          && nextStepData.active
+          && nextStepData.slide
+        );
+        if (slideFromPrev && stepInterval) {
+          const slideTime = Math.max(0.01, slideTimeRef.current);
+          // Hold the previous value at the boundary, then glide into the current step value.
+          constantSourceRef.current.offset.setValueAtTime(prevStepData.value, triggerTime);
+          constantSourceRef.current.offset.linearRampToValueAtTime(
+            currentStepData.value,
+            triggerTime + slideTime
+          );
+        } else {
+          constantSourceRef.current.offset.setValueAtTime(currentStepData.value, triggerTime);
+        }
+        if (gateSourceRef.current) {
+          const gateParam = gateSourceRef.current.offset;
+          gateParam.cancelScheduledValues(triggerTime);
+          const gateIsHigh = gateOffTimeRef.current > triggerTime + 1e-6;
+          const legato = slideFromPrev && gateIsHigh;
+          if (currentStepData.active) {
+            if (!legato) {
+              // Legato slide keeps the gate high instead of retriggering the envelope.
+              gateParam.setValueAtTime(1, triggerTime);
+            }
+            const baseGate = gateDurationRef.current;
+            const gateLengthPct = slideIntoNext ? 100 : clampLengthPct(currentStepData.lengthPct);
+            const currentGateDuration = stepInterval
+              ? (stepInterval * gateLengthPct) / 100
+              : (baseGate * gateLengthPct) / 100;
+            let gateOffTime = triggerTime + currentGateDuration;
+            if (slideIntoNext && stepInterval) {
+              const nextGateLengthPct = clampLengthPct(nextStepData.lengthPct);
+              const nextGateDuration = (stepInterval * nextGateLengthPct) / 100;
+              gateOffTime = triggerTime + stepInterval + nextGateDuration;
+            }
+            gateParam.setValueAtTime(0, gateOffTime);
+            gateOffTimeRef.current = gateOffTime;
+          } else if (!legato) {
+            gateParam.setValueAtTime(0, triggerTime);
+            gateOffTimeRef.current = triggerTime;
+          }
+        }
+        if (accentSourceRef.current) {
+          const accentParam = accentSourceRef.current.offset;
+          accentParam.cancelScheduledValues(triggerTime);
+          if (currentStepData.active && currentStepData.accent) {
+            const baseAccent = gateDurationRef.current;
+            const accentLengthPct = clampLengthPct(currentStepData.lengthPct);
+            const accentDuration = stepInterval
+              ? (stepInterval * accentLengthPct) / 100
+              : (baseAccent * accentLengthPct) / 100;
+            accentParam.setValueAtTime(1, triggerTime);
+            accentParam.setValueAtTime(0, triggerTime + accentDuration);
+          } else {
+            accentParam.setValueAtTime(0, triggerTime);
+          }
         }
         stepTriggerCountRef.current += 1;
         currentStepRef.current = nextStep;
@@ -427,6 +567,7 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
     lastPulseTimeRef.current = null;
     lastPulseIntervalRef.current = null;
     stepTriggerCountRef.current = 0;
+    gateOffTimeRef.current = -Infinity;
     if (constantSourceRef.current && audioContext) {
       const now = audioContext.currentTime;
       constantSourceRef.current.offset.setValueAtTime(stepsRef.current[0].value, now);

@@ -143,44 +143,26 @@ function ModularSynth() {
 
     // Create input ports based on definition
     for (let i = 0; i < definition.inputs; i++) {
-      const portId = `${id}-in-${i}`;
+      const suffix = definition.inputIds?.[i] ?? `in-${i}`;
+      const portId = `${id}-${suffix}`;
+      const label = definition.inputLabels?.[i]
+        ?? (definition.inputs === 1 ? 'In' : `In ${i + 1}`);
       ports.push({
         id: portId,
         type: 'input',
-        label: definition.inputs === 1 ? 'In' : `In ${i + 1}`,
+        label,
       });
-    }
-
-    // Add CV input ports for modules that support CV modulation
-    if (type === 'Filter') {
-      ports.push({ id: `${id}-cv-freq`, type: 'input', label: 'CV' });
-    } else if (type === 'ToneGenerator') {
-      ports.push({ id: `${id}-cv-freq`, type: 'input', label: 'CV' });
-    } else if (type === 'NoiseGenerator') {
-      ports.push({ id: `${id}-cv-gain`, type: 'input', label: 'CV' });
-    } else if (type === 'DiodeFilter') {
-      ports.push({ id: `${id}-cv-cutoff`, type: 'input', label: 'CV' });
-    } else if (type === 'Panner') {
-      ports.push({ id: `${id}-cv-pan`, type: 'input', label: 'CV' });
-    } else if (type === 'VCA') {
-      ports.push({ id: `${id}-cv-gain`, type: 'input', label: 'CV' });
-    } else if (type === 'ADSR') {
-      ports.push({ id: `${id}-cv-gate`, type: 'input', label: 'Gate' });
-    } else if (type === 'Sequencer') {
-      ports.push({ id: `${id}-cv-clock`, type: 'input', label: 'Clock' });
-      ports.push({ id: `${id}-cv-reset`, type: 'input', label: 'Reset' });
-    } else if (type === 'MP3Deck') {
-      ports.push({ id: `${id}-cv-trigger`, type: 'input', label: 'Trigger' });
-      ports.push({ id: `${id}-cv-pitch`, type: 'input', label: 'Pitch' });
     }
 
     // Create output ports based on definition
     for (let i = 0; i < definition.outputs; i++) {
       const portId = `${id}-out-${i}`;
+      const label = definition.outputLabels?.[i]
+        ?? (definition.outputs === 1 ? 'Out' : `Out ${i + 1}`);
       ports.push({
         id: portId,
         type: 'output',
-        label: definition.outputs === 1 ? 'Out' : `Out ${i + 1}`,
+        label,
       });
     }
 
