@@ -295,17 +295,8 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
         const pulsesPerStep = getPulsesPerStep(divisionRef.current);
         const now = audioContext.currentTime;
         const lastPulseTime = lastPulseTimeRef.current;
-        const lastInterval = lastPulseIntervalRef.current;
-        if (lastPulseTime === null) {
-          resetPendingRef.current = true;
-          pulseAccumulatorRef.current = pulsesPerStep - 1;
-        } else {
-          const delta = now - lastPulseTime;
-          if (lastInterval !== null && delta > lastInterval * 2.5) {
-            resetPendingRef.current = true;
-            pulseAccumulatorRef.current = pulsesPerStep - 1;
-          }
-          lastPulseIntervalRef.current = delta;
+        if (lastPulseTime !== null) {
+          lastPulseIntervalRef.current = now - lastPulseTime;
         }
         lastPulseTimeRef.current = now;
         pulseAccumulatorRef.current += 1;
