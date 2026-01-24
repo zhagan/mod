@@ -14,7 +14,7 @@ The audio thread is the only clock that is sample-accurate and immune to UI jitt
 
 ### Tick model
 
-Each tick is a **16th-note pulse** generated on the audio thread. The pulse is a short gate (10ms width) at a fixed subdivision of the BPM.
+Each tick is a **64th-note pulse** (16 pulses per quarter note) generated on the audio thread. The pulse is a short gate (10ms width) at a fixed subdivision of the BPM.
 
 ### Tick resolution and precision
 
