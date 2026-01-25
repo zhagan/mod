@@ -542,6 +542,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 min={20}
                 max={10000}
                 step={1}
+                scale="log"
                 formatValue={(v) => `${v.toFixed(0)} Hz`}
               />
               <ModUISlider

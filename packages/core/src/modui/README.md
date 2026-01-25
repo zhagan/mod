@@ -112,6 +112,7 @@ function MyComponent() {
 | `min` | `number` | `0` | Minimum value |
 | `max` | `number` | `100` | Maximum value |
 | `step` | `number` | `1` | Step increment |
+| `scale` | `'linear' \| 'log'` | `'linear'` | Slider mapping mode |
 | `label` | `string` | - | Optional label text |
 | `unit` | `string` | `''` | Unit suffix (e.g., "Hz", "%") |
 | `formatValue` | `(value: number) => string` | - | Custom value formatter |

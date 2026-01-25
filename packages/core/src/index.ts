@@ -123,7 +123,7 @@ export type { LevelMeterProps, LevelMeterRenderProps } from './components/visual
 
 // ModUI - Visual Components
 export { Slider } from './modui/Slider';
-export type { SliderProps } from './modui/Slider';
+export type { SliderProps, SliderScale } from './modui/Slider';
 
 export { Knob } from './modui/Knob';
 export type { KnobProps } from './modui/Knob';

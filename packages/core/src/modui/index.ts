@@ -1,5 +1,5 @@
 export { Slider } from './Slider';
-export type { SliderProps } from './Slider';
+export type { SliderProps, SliderScale } from './Slider';
 
 export { Knob } from './Knob';
 export type { KnobProps } from './Knob';
