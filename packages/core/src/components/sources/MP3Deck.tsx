@@ -243,6 +243,8 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
   const endTimeRef = useRef(endTime);
   const pendingAutoplayRef = useRef(false);
   const unlockListenerRef = useRef<(() => void) | null>(null);
+  const stopTimeoutRef = useRef<number | null>(null);
+  const playRetryRef = useRef<number | null>(null);
 
   const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
   const FADE_IN_TIME = 0.001;
@@ -273,8 +275,12 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
       if (resetToStart) seekToStart();
       return;
     }
+    if (stopTimeoutRef.current !== null) {
+      clearTimeout(stopTimeoutRef.current);
+      stopTimeoutRef.current = null;
+    }
     fadeGainTo(0, FADE_OUT_TIME);
-    setTimeout(() => {
+    stopTimeoutRef.current = window.setTimeout(() => {
       if (!audioElementRef.current) return;
       audioElementRef.current.pause();
       if (resetToStart) seekToStart();
@@ -283,6 +289,7 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
         gainNodeRef.current.gain.cancelScheduledValues(now);
         gainNodeRef.current.gain.setValueAtTime(gain, now);
       }
+      stopTimeoutRef.current = null;
     }, FADE_OUT_TIME * 1000);
   };
 
@@ -323,10 +330,7 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
     return message.includes('user interaction') || message.includes('gesture') || message.includes('notallowed');
   };
 
-  const isIgnorablePlayError = (err: any) => {
-    if (isAutoplayError(err)) return true;
-    return err?.name === 'AbortError';
-  };
+  const isAbortPlayError = (err: any) => err?.name === 'AbortError';
 
   const getEffectiveStart = () => {
     if (!duration) return 0;
@@ -380,6 +384,10 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
 
   const triggerPlayback = async () => {
     if (!audioElementRef.current) return;
+    if (stopTimeoutRef.current !== null) {
+      clearTimeout(stopTimeoutRef.current);
+      stopTimeoutRef.current = null;
+    }
     if (audioContext && audioContext.state !== 'running') {
       handleAutoplayBlocked();
       return;
@@ -519,8 +527,11 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
               audioElement!.currentTime = regionStart;
               if (!audioElement!.paused) {
                 audioElement!.play().catch((err) => {
-                  if (isIgnorablePlayError(err)) {
+                  if (isAutoplayError(err)) {
                     handleAutoplayBlocked();
+                    return;
+                  }
+                  if (isAbortPlayError(err)) {
                     return;
                   }
                   setError('Playback failed. User interaction may be required.');
@@ -677,8 +688,11 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
         element.currentTime = regionStart;
         if (!element.paused) {
           element.play().catch((err) => {
-            if (isIgnorablePlayError(err)) {
+            if (isAutoplayError(err)) {
               handleAutoplayBlocked();
+              return;
+            }
+            if (isAbortPlayError(err)) {
               return;
             }
             setError('Playback failed. User interaction may be required.');
@@ -783,6 +797,10 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
   // Playback controls
   const play = async () => {
     if (audioElementRef.current && audioContext) {
+      if (stopTimeoutRef.current !== null) {
+        clearTimeout(stopTimeoutRef.current);
+        stopTimeoutRef.current = null;
+      }
       fadeIn();
       // Resume audio context if suspended
       if (audioContext.state !== 'running') {
@@ -802,8 +820,27 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
         seekToStart();
       }
       audioElementRef.current.play().catch((err) => {
-        if (isIgnorablePlayError(err)) {
+        if (isAutoplayError(err)) {
           handleAutoplayBlocked();
+          return;
+        }
+        if (isAbortPlayError(err)) {
+          if (playRetryRef.current !== null) {
+            return;
+          }
+          playRetryRef.current = window.setTimeout(() => {
+            playRetryRef.current = null;
+            audioElementRef.current?.play().catch((retryErr) => {
+              if (isAutoplayError(retryErr)) {
+                handleAutoplayBlocked();
+                return;
+              }
+              if (isAbortPlayError(retryErr)) {
+                return;
+              }
+              setError('Playback failed. User interaction may be required.');
+            });
+          }, 0);
           return;
         }
         setError('Playback failed. User interaction may be required.');
