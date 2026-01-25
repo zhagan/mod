@@ -277,7 +277,7 @@ export const MODULE_DEFINITIONS: Record<string, ModuleDefinition> = {
     inputLabels: ['In', 'CV'],
     inputIds: ['in-0', 'cv-gain'],
     outputs: 1,
-    defaultParams: { gain: 1.0, cvAmount: 1.0 },
+    defaultParams: { gain: 0.0, cvAmount: 1.0 },
   },
   CrossFade: {
     type: 'CrossFade',

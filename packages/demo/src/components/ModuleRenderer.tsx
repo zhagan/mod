@@ -1118,9 +1118,9 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 value={controls.gain}
                 onChange={controls.setGain}
                 min={0}
-                max={2}
+                max={16}
                 step={0.01}
-                formatValue={(v) => `${(v * 100).toFixed(0)}%`}
+                formatValue={(v) => `${v.toFixed(2)}x`}
               />
             </div>
           )}
@@ -1150,11 +1150,11 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 formatValue={(v) => `${v.toFixed(2)} Hz`}
               />
               <ModUISlider
-                label="Amplitude"
+                label="Depth (oct)"
                 value={controls.amplitude}
                 onChange={controls.setAmplitude}
                 min={0}
-                max={1}
+                max={4}
                 step={0.01}
                 formatValue={(v) => v.toFixed(2)}
               />
@@ -1522,17 +1522,14 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
             const hasAudio = controls.duration > 0;
 
             return (
-              <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
-                <ModUIFilePicker
-                  onFileSelect={(file) => controls.loadFile(file)}
-                  accept="audio/*"
-                  label="Load Audio"
-                  icon={<Upload size={14}/>}
-                />
-                <div style={{fontSize: '11px', color: 'rgba(255,255,255,0.7)'}}>
-                  {controls.fileName ? `Loaded: ${controls.fileName}` : 'No sample loaded'}
-                </div>
-                <div style={{display: 'flex', gap: '8px', justifyContent: 'center'}}>
+              <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
+                  <ModUIFilePicker
+                    onFileSelect={(file) => controls.loadFile(file)}
+                    accept="audio/*"
+                    label="Load"
+                    icon={<Upload size={14}/>}
+                  />
                   <ModUIButton
                     icon={<Zap size={16}/>}
                     onClick={controls.trigger}
@@ -1540,79 +1537,68 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                     variant="success"
                     disabled={!hasAudio}
                   />
+                  <div style={{fontSize: '10px', color: 'rgba(255,255,255,0.7)'}}>
+                    {controls.fileName ? controls.fileName : 'No sample loaded'}
+                  </div>
                 </div>
-                <ModUISelect
-                  value={controls.playbackMode}
-                  onChange={(value) => controls.setPlaybackMode(value as any)}
-                  options={[
-                    {value: 'one-shot', label: 'One Shot'},
-                    {value: 'gate', label: 'Gate'},
-                    {value: 'loop', label: 'Loop'},
-                  ]}
-                  placeholder="Playback Mode"
-                />
-                <ModUISlider
-                  label="Gain"
-                  value={controls.gain}
-                  onChange={controls.setGain}
-                  min={0}
-                  max={2}
-                  step={0.01}
-                  formatValue={(v) => v.toFixed(2)}
-                />
-                <ModUISlider
-                  label="Pitch (Oct)"
-                  value={controls.pitch}
-                  onChange={controls.setPitch}
-                  min={-4}
-                  max={4}
-                  step={0.1}
-                  formatValue={(v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)} oct`}
-                />
-                <ModUISlider
-                  label="Start"
-                  value={controls.startTime}
-                  onChange={controls.setStartTime}
-                  min={0}
-                  max={controls.duration || 1}
-                  step={0.01}
-                  formatValue={(v) => `${v.toFixed(2)}s`}
-                />
-                <ModUISlider
-                  label="End"
-                  value={controls.endTime > 0 ? controls.endTime : controls.duration}
-                  onChange={controls.setEndTime}
-                  min={0}
-                  max={controls.duration || 1}
-                  step={0.01}
-                  formatValue={(v) => `${v.toFixed(2)}s`}
-                />
-                <div style={{display: 'flex', gap: '8px', justifyContent: 'center'}}>
-                  <ModUIButton
-                    icon={controls.isPlaying ? <Pause size={16}/> : <Play size={16}/>}
-                    active={controls.isPlaying}
-                    onClick={controls.isPlaying ? controls.pause : controls.play}
-                    variant="success"
-                    title={controls.isPlaying ? 'Pause' : 'Play'}
-                    disabled={!hasAudio}
+                {(() => {
+                  const sampleRate = controls.sampleRate || 44100;
+                  const totalSamples = controls.duration > 0 ? Math.max(1, Math.round(controls.duration * sampleRate)) : 1;
+                  const startSample = Math.max(0, Math.round(controls.startTime * sampleRate));
+                  const endSample = controls.endTime > 0 ? Math.round(controls.endTime * sampleRate) : totalSamples;
+                  return (
+                    <div style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
+                      <ModUISlider
+                        label="Start (smp)"
+                        value={Math.min(startSample, totalSamples)}
+                        onChange={(value) => controls.setStartTime(value / sampleRate)}
+                        min={0}
+                        max={totalSamples}
+                        step={1}
+                        formatValue={(v) => `${Math.round(v)} smp`}
+                      />
+                      <ModUISlider
+                        label="End (smp)"
+                        value={Math.min(endSample, totalSamples)}
+                        onChange={(value) => controls.setEndTime(value / sampleRate)}
+                        min={0}
+                        max={totalSamples}
+                        step={1}
+                        formatValue={(v) => `${Math.round(v)} smp`}
+                      />
+                    </div>
+                  );
+                })()}
+                <div style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
+                  <ModUISelect
+                    value={controls.playbackMode}
+                    onChange={(value) => controls.setPlaybackMode(value as any)}
+                    options={[
+                      {value: 'one-shot', label: 'One Shot'},
+                      {value: 'gate', label: 'Gate'},
+                      {value: 'loop', label: 'Loop'},
+                    ]}
+                    placeholder="Mode"
                   />
-                  <ModUIButton
-                    icon={<Square size={16}/>}
-                    onClick={controls.stop}
-                    title="Stop"
-                    disabled={!hasAudio}
+                  <ModUISlider
+                    label="Gain"
+                    value={controls.gain}
+                    onChange={controls.setGain}
+                    min={0}
+                    max={2}
+                    step={0.01}
+                    formatValue={(v) => v.toFixed(2)}
+                  />
+                  <ModUISlider
+                    label="Pitch"
+                    value={controls.pitch}
+                    onChange={controls.setPitch}
+                    min={-4}
+                    max={4}
+                    step={0.1}
+                    formatValue={(v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)} oct`}
                   />
                 </div>
-                <ModUIProgressBar
-                  value={controls.currentTime}
-                  onChange={(value) => controls.seek(value)}
-                  min={0}
-                  max={controls.duration || 100}
-                  step={0.1}
-                  disabled={!hasAudio}
-                  showValue={true}
-                  formatValue={() => hasAudio ? `${formatTime(controls.currentTime)} / ${formatTime(controls.duration)}` : '0:00 / 0:00'}
-                />
               </div>
             );
           }}

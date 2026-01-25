@@ -54,7 +54,7 @@ Generate control voltage signals. Have `output` prop, connect to `cv` inputs of 
 
 | Component | Purpose | Key Props |
 |-----------|---------|-----------|
-| [LFO](/api/cv/lfo) | Cyclic modulation | frequency (Hz), waveform, amplitude |
+| [LFO](/api/cv/lfo) | Cyclic modulation | frequency (Hz), waveform, amplitude (oct) |
 | [ADSR](/api/cv/adsr) | Envelopes | attack, decay, sustain, release |
 | [Sequencer](/api/cv/sequencer) | Step patterns | steps (step[]), clock, division, swing |
 | [Clock](/api/cv/clock) | Tempo sync | bpm, start/stop |
@@ -852,7 +852,7 @@ Generates control voltage signals for modulation.
 - `onFrequencyChange: (frequency: number) => void` - Frequency change callback
 - `waveform: 'sine' | 'square' | 'sawtooth' | 'triangle'` - Waveform (default: 'sine')
 - `onWaveformChange: (waveform: OscillatorType) => void` - Waveform change callback
-- `amplitude: number` - Modulation depth 0-1 (default: 1)
+- `amplitude: number` - Modulation depth in octaves 0-4 (default: 1)
 - `onAmplitudeChange: (amplitude: number) => void` - Amplitude change callback
 - `label: string` - Component label
 

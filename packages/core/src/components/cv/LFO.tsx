@@ -53,6 +53,7 @@ export const LFO = React.forwardRef<LFOHandle, LFOProps>(({
   const [frequency, setFrequency] = useControlledState(controlledFrequency, 1, onFrequencyChange);
   const [amplitude, setAmplitude] = useControlledState(controlledAmplitude, 1, onAmplitudeChange);
   const [waveform, setWaveform] = useControlledState<LFOWaveform>(controlledWaveform, 'sine', onWaveformChange);
+  const clampAmplitude = (value: number) => Math.max(0, Math.min(4, value));
 
   // Regular LFO nodes
   const oscillatorRef = useRef<OscillatorNode | null>(null);
@@ -101,7 +102,7 @@ export const LFO = React.forwardRef<LFOHandle, LFOProps>(({
 
       // Gain node (amplitude control) shared by both modes
       const gainNode = audioContext.createGain();
-      gainNode.gain.value = amplitude;
+      gainNode.gain.value = clampAmplitude(amplitude);
       gainNodeRef.current = gainNode;
 
 
@@ -158,10 +159,11 @@ export const LFO = React.forwardRef<LFOHandle, LFOProps>(({
 
   // Update amplitude when it changes
   useEffect(() => {
+    const safeAmplitude = clampAmplitude(amplitude);
     if (gainNodeRef.current && waveform !== 'saw down') {
-      gainNodeRef.current.gain.value = amplitude;
+      gainNodeRef.current.gain.value = safeAmplitude;
     } else if (gainNodeRef.current && waveform === 'saw down') {
-      gainNodeRef.current.gain.value = -amplitude;
+      gainNodeRef.current.gain.value = -safeAmplitude;
     }
   }, [amplitude, waveform]);
 

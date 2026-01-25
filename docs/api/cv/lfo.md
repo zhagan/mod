@@ -10,7 +10,7 @@ The `LFO` (Low Frequency Oscillator) component generates slow-moving control vol
 | `label` | `string` | `'lfo'` | Label for the component in metadata |
 | `frequency` | `number` | `1` | Frequency in Hz (controlled or initial value), typically 0.1-20 Hz |
 | `onFrequencyChange` | `(frequency: number) => void` | - | Callback when frequency changes |
-| `amplitude` | `number` | `1` | Amplitude 0-1 (controlled or initial value) |
+| `amplitude` | `number` | `1` | Output depth in octaves (0-4) |
 | `onAmplitudeChange` | `(amplitude: number) => void` | - | Callback when amplitude changes |
 | `waveform` | `LFOWaveform` | `'sine'` | Waveform type (controlled or initial value): `'sine'`, `'square'`, `'sawtooth'`, or `'triangle'` |
 | `onWaveformChange` | `(waveform: LFOWaveform) => void` | - | Callback when waveform changes |
@@ -24,7 +24,7 @@ When using the `children` render prop, the following controls are provided:
 |----------|------|-------------|
 | `frequency` | `number` | Current frequency in Hz (typically 0.1-20 Hz) |
 | `setFrequency` | `(value: number) => void` | Update the frequency |
-| `amplitude` | `number` | Current amplitude (0-1) |
+| `amplitude` | `number` | Current depth in octaves (0-4) |
 | `setAmplitude` | `(value: number) => void` | Update the amplitude |
 | `waveform` | `LFOWaveform` | Current waveform type |
 | `setWaveform` | `(value: LFOWaveform) => void` | Update the waveform |
@@ -90,7 +90,7 @@ function App() {
           </div>
 
           <div>
-            <label>Amplitude: {amplitude.toFixed(2)}</label>
+            <label>Amplitude: {amplitude.toFixed(2)} oct</label>
             <input
               type="range"
               min="0"
@@ -228,7 +228,7 @@ function App() {
       </div>
 
       <div>
-        <label>Depth: {amplitude.toFixed(2)}</label>
+        <label>Depth: {amplitude.toFixed(2)} oct</label>
         <input
           type="range"
           min="0"
@@ -302,7 +302,7 @@ function App() {
 
 ### Modulation Depth
 
-- The `amplitude` parameter controls the output level of the CV signal
+- The `amplitude` parameter controls the CV depth in octaves (0-4)
 - The receiving module's `cvAmount` parameter scales this further
 - Together, these control the depth of modulation
 

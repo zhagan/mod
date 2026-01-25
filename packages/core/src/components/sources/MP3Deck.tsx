@@ -139,6 +139,7 @@ export interface MP3DeckRenderProps {
   trigger: () => void;
   currentTime: number;
   duration: number;
+  sampleRate: number;
   seek: (time: number) => void;
   isActive: boolean;
   isReady: boolean;
@@ -240,8 +241,92 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
   const playbackModeRef = useRef<PlaybackMode>(playbackMode);
   const startTimeRef = useRef(startTime);
   const endTimeRef = useRef(endTime);
+  const pendingAutoplayRef = useRef(false);
+  const unlockListenerRef = useRef<(() => void) | null>(null);
 
   const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+  const FADE_IN_TIME = 0.001;
+  const FADE_OUT_TIME = 0.045;
+
+  const fadeGainTo = (target: number, fadeTime: number) => {
+    if (!audioContext || !gainNodeRef.current) return;
+    const now = audioContext.currentTime;
+    const param = gainNodeRef.current.gain;
+    param.cancelScheduledValues(now);
+    param.setValueAtTime(param.value, now);
+    param.setTargetAtTime(target, now, Math.max(0.001, fadeTime / 3));
+  };
+
+  const fadeIn = () => {
+    if (!audioContext || !gainNodeRef.current) return;
+    const now = audioContext.currentTime;
+    const param = gainNodeRef.current.gain;
+    param.cancelScheduledValues(now);
+    param.setValueAtTime(param.value, now);
+    param.setTargetAtTime(gain, now, Math.max(0.001, FADE_IN_TIME / 3));
+  };
+
+  const pauseWithFade = (resetToStart: boolean) => {
+    if (!audioElementRef.current) return;
+    if (!audioContext || !gainNodeRef.current) {
+      audioElementRef.current.pause();
+      if (resetToStart) seekToStart();
+      return;
+    }
+    fadeGainTo(0, FADE_OUT_TIME);
+    setTimeout(() => {
+      if (!audioElementRef.current) return;
+      audioElementRef.current.pause();
+      if (resetToStart) seekToStart();
+      if (gainNodeRef.current && audioContext) {
+        const now = audioContext.currentTime;
+        gainNodeRef.current.gain.cancelScheduledValues(now);
+        gainNodeRef.current.gain.setValueAtTime(gain, now);
+      }
+    }, FADE_OUT_TIME * 1000);
+  };
+
+  const ensureUserGesturePlayback = () => {
+    if (unlockListenerRef.current) return;
+    const onUnlock = async () => {
+      unlockListenerRef.current = null;
+      window.removeEventListener('pointerdown', onUnlock);
+      window.removeEventListener('keydown', onUnlock);
+      if (!pendingAutoplayRef.current) return;
+      pendingAutoplayRef.current = false;
+      if (!audioContext) return;
+      try {
+        await audioContext.resume();
+      } catch {
+        return;
+      }
+      const mode = playbackModeRef.current;
+      if ((mode === 'gate' || mode === 'loop') && !gateStateRef.current) return;
+      triggerPlayback();
+    };
+    unlockListenerRef.current = onUnlock;
+    window.addEventListener('pointerdown', onUnlock);
+    window.addEventListener('keydown', onUnlock);
+  };
+
+  const handleAutoplayBlocked = () => {
+    pendingAutoplayRef.current = true;
+    setError(null);
+    ensureUserGesturePlayback();
+  };
+
+  const isAutoplayError = (err: any) => {
+    if (pendingAutoplayRef.current) return true;
+    if (audioContext && audioContext.state !== 'running') return true;
+    if (err?.name === 'NotAllowedError') return true;
+    const message = typeof err?.message === 'string' ? err.message.toLowerCase() : '';
+    return message.includes('user interaction') || message.includes('gesture') || message.includes('notallowed');
+  };
+
+  const isIgnorablePlayError = (err: any) => {
+    if (isAutoplayError(err)) return true;
+    return err?.name === 'AbortError';
+  };
 
   const getEffectiveStart = () => {
     if (!duration) return 0;
@@ -259,10 +344,19 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
     const cvValue = Number.isFinite(pitchCvValueRef.current) ? pitchCvValueRef.current : 0;
     const semitones = clamp(cvValue, -24, 24);
     const baseOctaves = Number.isFinite(pitchRef.current) ? pitchRef.current : 0;
-    const rate = clamp(Math.pow(2, baseOctaves + semitones / 12), 0.01, 32);
+    const targetRate = Math.pow(2, baseOctaves + semitones / 12);
+    const rate = clamp(targetRate, 0.25, 4);
     const element = audioElementRef.current;
-    element.playbackRate = rate;
-    element.defaultPlaybackRate = rate;
+    try {
+      element.playbackRate = rate;
+      element.defaultPlaybackRate = rate;
+    } catch (err) {
+      // Ignore unsupported rate errors and keep the last valid rate.
+      const errorName = (err as Error | null)?.name;
+      if (errorName !== 'NotSupportedError') {
+        throw err;
+      }
+    }
     if ('preservesPitch' in element) {
       element.preservesPitch = false;
     }
@@ -281,12 +375,15 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
 
   const stopAtStart = () => {
     if (!audioElementRef.current) return;
-    audioElementRef.current.pause();
-    seekToStart();
+    pauseWithFade(true);
   };
 
   const triggerPlayback = async () => {
     if (!audioElementRef.current) return;
+    if (audioContext && audioContext.state !== 'running') {
+      handleAutoplayBlocked();
+      return;
+    }
     seekToStart();
     await play();
   };
@@ -421,7 +518,11 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
             if (playbackModeRef.current === 'loop') {
               audioElement!.currentTime = regionStart;
               if (!audioElement!.paused) {
-                audioElement!.play().catch(() => {
+                audioElement!.play().catch((err) => {
+                  if (isIgnorablePlayError(err)) {
+                    handleAutoplayBlocked();
+                    return;
+                  }
                   setError('Playback failed. User interaction may be required.');
                 });
               }
@@ -553,6 +654,41 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
     return () => clearInterval(interval);
   }, [isPlaying]);
 
+  // Cleanup any pending unlock listeners
+  useEffect(() => {
+    return () => {
+      if (unlockListenerRef.current) {
+        window.removeEventListener('pointerdown', unlockListenerRef.current);
+        window.removeEventListener('keydown', unlockListenerRef.current);
+        unlockListenerRef.current = null;
+      }
+    };
+  }, []);
+
+  // Tighter loop watcher for short regions (timeupdate is too coarse for tiny loops).
+  useEffect(() => {
+    if (!isPlaying || playbackModeRef.current !== 'loop') return;
+    const interval = setInterval(() => {
+      const element = audioElementRef.current;
+      if (!element) return;
+      const regionStart = getEffectiveStart();
+      const regionEnd = getEffectiveEnd();
+      if (regionEnd > 0 && element.currentTime >= regionEnd) {
+        element.currentTime = regionStart;
+        if (!element.paused) {
+          element.play().catch((err) => {
+            if (isIgnorablePlayError(err)) {
+              handleAutoplayBlocked();
+              return;
+            }
+            setError('Playback failed. User interaction may be required.');
+          });
+        }
+      }
+    }, 10);
+    return () => clearInterval(interval);
+  }, [isPlaying, playbackMode, startTime, endTime, duration]);
+
   // Set up CV/trigger worklets
   useEffect(() => {
     if (!audioContext) return;
@@ -568,13 +704,16 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
           channelCount: 1,
         });
         triggerNode.port.onmessage = (event) => {
+          const mode = playbackModeRef.current;
           if (event.data?.type === 'gate-on') {
             gateStateRef.current = true;
-            triggerPlayback();
+            if (mode === 'gate' || mode === 'loop' || mode === 'one-shot') {
+              triggerPlayback();
+            }
           }
           if (event.data?.type === 'gate-off') {
             gateStateRef.current = false;
-            if (playbackMode === 'gate') {
+            if (mode === 'gate' || mode === 'loop') {
               stopAtStart();
             }
           }
@@ -615,7 +754,7 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
       }
       setIsWorkletReady(false);
     };
-  }, [audioContext, playbackMode]);
+  }, [audioContext]);
 
   const triggerKey = triggerInput?.current?.audioNode ? String(triggerInput.current.audioNode) : 'null';
   useEffect(() => {
@@ -644,30 +783,40 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
   // Playback controls
   const play = async () => {
     if (audioElementRef.current && audioContext) {
+      fadeIn();
       // Resume audio context if suspended
-      if (audioContext.state === 'suspended') {
-        await audioContext.resume();
+      if (audioContext.state !== 'running') {
+        try {
+          await audioContext.resume();
+        } catch {
+          handleAutoplayBlocked();
+          return;
+        }
+      }
+      const isRunning = audioContext.state === 'running';
+      if (!isRunning) {
+        handleAutoplayBlocked();
+        return;
       }
       if (audioElementRef.current.currentTime < getEffectiveStart()) {
         seekToStart();
       }
-      audioElementRef.current.play().catch(() => {
+      audioElementRef.current.play().catch((err) => {
+        if (isIgnorablePlayError(err)) {
+          handleAutoplayBlocked();
+          return;
+        }
         setError('Playback failed. User interaction may be required.');
       });
     }
   };
 
   const pause = () => {
-    if (audioElementRef.current) {
-      audioElementRef.current.pause();
-    }
+    pauseWithFade(false);
   };
 
   const stop = () => {
-    if (audioElementRef.current) {
-      audioElementRef.current.pause();
-      seekToStart();
-    }
+    pauseWithFade(true);
   };
 
   const seek = (time: number) => {
@@ -755,6 +904,7 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
       trigger: triggerPlaybackCommand,
       currentTime,
       duration,
+      sampleRate: audioContext?.sampleRate ?? 44100,
       seek,
       isActive: !!output.current,
       isReady,

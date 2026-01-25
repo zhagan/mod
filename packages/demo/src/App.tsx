@@ -3,6 +3,7 @@ import { flushSync } from 'react-dom';
 import '@mode-7/mod/dist/index.css';
 import {
   AudioProvider,
+  useAudioContext,
   // Sources
   ToneGenerator,
   NoiseGenerator,
@@ -94,11 +95,13 @@ interface SketchData {
 }
 
 function ModularSynth() {
+  const audioContext = useAudioContext();
   const [modules, setModules] = useState<ModuleData[]>([]);
   const [connections, setConnections] = useState<Connection[]>([]);
   const [moduleParams, setModuleParams] = useState<Record<string, Record<string, any>>>({});
   const [layoutVersion, setLayoutVersion] = useState(0);
   const [contentSize, setContentSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+  const [requiresUserGesture, setRequiresUserGesture] = useState(false);
   const [draggingConnection, setDraggingConnection] = useState<{
     from: { moduleId: string; portId: string };
     mousePos: Position;
@@ -490,15 +493,33 @@ function ModularSynth() {
           to: connection.to,
         }));
 
-      streamRefs.current = new Map();
+      // Preserve existing refs for matching port ids so modules keep their outputs wired.
+      streamRefs.current.forEach((_, portId) => {
+        if (!portIdSet.has(portId)) {
+          streamRefs.current.delete(portId);
+        }
+      });
       clearPortPositionCache();
       setModules(nextModules);
       setConnections(nextConnections);
       setModuleParams(nextModuleParams);
+      setRequiresUserGesture(true);
     } catch (error) {
       console.error('Failed to load sketch.', error);
       alert('Failed to load sketch. Please check the file and try again.');
     }
+  };
+
+  const handleUnlockAudio = async () => {
+    if (!requiresUserGesture) return;
+    if (audioContext && audioContext.state !== 'running') {
+      try {
+        await audioContext.resume();
+      } catch {
+        // Ignore; try again on the next gesture.
+      }
+    }
+    setRequiresUserGesture(false);
   };
 
   const handleSketchFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -594,6 +615,7 @@ function ModularSynth() {
         onMouseUp={handleCanvasMouseUp}
         onDragOver={handleCanvasDragOver}
         onDrop={handleCanvasDrop as any}
+        onPointerDown={handleUnlockAudio}
       >
         <div
           ref={contentRef}
@@ -687,6 +709,7 @@ function ModularSynth() {
             // Get connected input streams for each input port (excluding CV)
             const inputStreams = inputPorts.map(port => {
               const connection = connections.find(c => c.to.portId === port.id);
+              if (requiresUserGesture) return null;
               return connection ? getStreamRef(connection.from.portId) : null;
             });
 
@@ -695,7 +718,7 @@ function ModularSynth() {
             cvPorts.forEach(port => {
               const connection = connections.find(c => c.to.portId === port.id);
               const key = port.id.split('-').slice(-2).join('-'); // Extract 'cv-freq', 'cv-gain', etc.
-              cvInputStreams[key] = connection ? getStreamRef(connection.from.portId) : null;
+              cvInputStreams[key] = requiresUserGesture ? null : (connection ? getStreamRef(connection.from.portId) : null);
             });
 
             // Get output stream refs for each output port
