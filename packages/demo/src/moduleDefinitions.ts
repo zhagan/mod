@@ -53,6 +53,23 @@ export const MODULE_DEFINITIONS: Record<string, ModuleDefinition> = {
       pitch: 0,
     },
   },
+  MidiSynth: {
+    type: 'MidiSynth',
+    label: 'MIDI Synth',
+    category: 'source',
+    color: '#66bbff',
+    inputs: 0,
+    outputs: 1,
+    defaultParams: {
+      wasmBaseUrl: '/mod/playground/js-synthesizer/',
+      soundFontUrl: '',
+      soundFontFileName: '',
+      soundFontFileDataUrl: '',
+      midiFileName: '',
+      midiFileDataUrl: '',
+      gain: 1.0,
+    },
+  },
   StreamingAudioDeck: {
     type: 'StreamingAudioDeck',
     label: 'Stream Deck',

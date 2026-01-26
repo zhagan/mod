@@ -5,6 +5,7 @@ import {
   NoiseGenerator,
   Microphone,
   MP3Deck,
+  MidiSynth,
   StreamingAudioDeck,
   // CV
   LFO,
@@ -1604,6 +1605,98 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
             );
           }}
         </MP3Deck>
+      ) : null;
+
+    case 'MidiSynth':
+      return output ? (
+        <MidiSynth
+          output={output}
+          wasmBaseUrl={params.wasmBaseUrl}
+          onWasmBaseUrlChange={(value) => setParam('wasmBaseUrl', value)}
+          soundFontUrl={params.soundFontUrl}
+          onSoundFontUrlChange={(value) => setParam('soundFontUrl', value)}
+          soundFontFileName={params.soundFontFileName}
+          onSoundFontFileNameChange={(value) => setParam('soundFontFileName', value)}
+          soundFontFileDataUrl={params.soundFontFileDataUrl}
+          onSoundFontFileDataUrlChange={(value) => setParam('soundFontFileDataUrl', value)}
+          midiFileName={params.midiFileName}
+          onMidiFileNameChange={(value) => setParam('midiFileName', value)}
+          midiFileDataUrl={params.midiFileDataUrl}
+          onMidiFileDataUrlChange={(value) => setParam('midiFileDataUrl', value)}
+          gain={params.gain}
+          onGainChange={(value) => setParam('gain', value)}
+        >
+          {(controls) => (
+            <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+              <ModUITextInput
+                value={controls.wasmBaseUrl}
+                onChange={controls.setWasmBaseUrl}
+                label="WASM Base URL"
+                placeholder="/mod/playground/js-synthesizer/"
+              />
+              <ModUITextInput
+                value={controls.soundFontUrl}
+                onChange={controls.setSoundFontUrl}
+                label="SoundFont URL"
+                placeholder="https://.../soundfont.sf2"
+              />
+              <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
+                <ModUIFilePicker
+                  onFileSelect={(file) => controls.loadSoundFontFile(file)}
+                  accept=".sf2,application/octet-stream"
+                  label="Load SF2"
+                  icon={<Upload size={14}/>}
+                />
+                <div style={{fontSize: '10px', color: 'rgba(255,255,255,0.7)'}}>
+                  {controls.soundFontFileName ? controls.soundFontFileName : 'No SoundFont loaded'}
+                </div>
+              </div>
+              <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
+                <ModUIFilePicker
+                  onFileSelect={(file) => controls.loadMidiFile(file)}
+                  accept=".mid,.midi,audio/midi"
+                  label="Load MIDI"
+                  icon={<Upload size={14}/>}
+                />
+                <div style={{fontSize: '10px', color: 'rgba(255,255,255,0.7)'}}>
+                  {controls.midiFileName ? controls.midiFileName : 'No MIDI loaded'}
+                </div>
+              </div>
+              <div style={{display: 'flex', gap: '8px'}}>
+                <ModUIButton
+                  icon={<Play size={16}/>}
+                  onClick={controls.play}
+                  variant="success"
+                  title="Play"
+                  disabled={!controls.isReady}
+                />
+                <ModUIButton
+                  icon={<Square size={16}/>}
+                  onClick={controls.stop}
+                  title="Stop"
+                  disabled={!controls.isReady}
+                />
+              </div>
+              <div style={{fontSize: '10px', color: 'rgba(255,255,255,0.7)'}}>
+                SoundFont: {controls.isSoundFontLoaded ? 'Loaded' : 'Missing'} · MIDI: {controls.isMidiLoaded ? 'Loaded' : 'Missing'}
+              </div>
+              {controls.error && (
+                <div style={{fontSize: '10px', color: '#ff6b6b'}}>
+                  {controls.error}
+                </div>
+              )}
+              <ModUISlider
+                label="Gain"
+                value={controls.gain}
+                onChange={controls.setGain}
+                min={0}
+                max={2}
+                step={0.01}
+                formatValue={(v) => v.toFixed(2)}
+              />
+            </div>
+          )}
+        </MidiSynth>
       ) : null;
 
     case 'StreamingAudioDeck':

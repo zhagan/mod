@@ -555,6 +555,7 @@ function ModularSynth() {
           {renderModuleButton('NoiseGenerator')}
           {renderModuleButton('Microphone')}
           {renderModuleButton('MP3Deck')}
+          {renderModuleButton('MidiSynth')}
           {renderModuleButton('StreamingAudioDeck')}
         </div>
 
