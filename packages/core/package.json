@@ -60,6 +60,7 @@
     "react-dom": "^18.0.0"
   },
   "dependencies": {
+    "@tonejs/midi": "^2.0.28",
     "js-synthesizer": "^1.7.4"
   },
   "devDependencies": {

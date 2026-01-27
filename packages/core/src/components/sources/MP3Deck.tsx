@@ -774,6 +774,7 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
   useEffect(() => {
     if (!triggerInput?.current || !triggerNodeRef.current || !isWorkletReady) return;
     const inGain = triggerInput.current.gain;
+    if (!inGain) return;
     const listener = triggerNodeRef.current;
     inGain.connect(listener);
     return () => {
@@ -785,6 +786,7 @@ export const MP3Deck = React.forwardRef<MP3DeckHandle, MP3DeckProps>(({
   useEffect(() => {
     if (!pitchCv?.current || !pitchCvNodeRef.current || !isWorkletReady) return;
     const inGain = pitchCv.current.gain;
+    if (!inGain) return;
     const listener = pitchCvNodeRef.current;
     inGain.connect(listener);
     return () => {

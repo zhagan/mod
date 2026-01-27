@@ -8,6 +8,7 @@ const destRoot = path.join(rootDir, 'packages', 'demo', 'public', 'js-synthesize
 
 const assets = [
   path.join(srcRoot, 'dist', 'js-synthesizer.js'),
+  path.join(srcRoot, 'dist', 'js-synthesizer.worklet.js'),
   path.join(srcRoot, 'externals', 'libfluidsynth-2.4.6.js'),
 ];
 

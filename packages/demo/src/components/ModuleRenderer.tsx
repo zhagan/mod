@@ -5,7 +5,8 @@ import {
   NoiseGenerator,
   Microphone,
   MP3Deck,
-  MidiSynth,
+  Fluidsynth,
+  MidiPlayer,
   StreamingAudioDeck,
   // CV
   LFO,
@@ -1443,10 +1444,12 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
 
     case 'Clock':
       const startOutput = outputStreams[1] || null;
+      const stopOutput = outputStreams[2] || null;
       return output ? (
         <Clock
           output={output}
           startOutput={startOutput}
+          stopOutput={stopOutput}
           bpm={params.bpm}
           onBpmChange={(value) => setParam('bpm', value)}
         >
@@ -1607,10 +1610,11 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
         </MP3Deck>
       ) : null;
 
-    case 'MidiSynth':
+    case 'Fluidsynth':
       return output ? (
-        <MidiSynth
+        <Fluidsynth
           output={output}
+          midiInput={inputStreams[0] || null}
           wasmBaseUrl={params.wasmBaseUrl}
           onWasmBaseUrlChange={(value) => setParam('wasmBaseUrl', value)}
           soundFontUrl={params.soundFontUrl}
@@ -1619,10 +1623,6 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
           onSoundFontFileNameChange={(value) => setParam('soundFontFileName', value)}
           soundFontFileDataUrl={params.soundFontFileDataUrl}
           onSoundFontFileDataUrlChange={(value) => setParam('soundFontFileDataUrl', value)}
-          midiFileName={params.midiFileName}
-          onMidiFileNameChange={(value) => setParam('midiFileName', value)}
-          midiFileDataUrl={params.midiFileDataUrl}
-          onMidiFileDataUrlChange={(value) => setParam('midiFileDataUrl', value)}
           gain={params.gain}
           onGainChange={(value) => setParam('gain', value)}
         >
@@ -1651,40 +1651,23 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                   {controls.soundFontFileName ? controls.soundFontFileName : 'No SoundFont loaded'}
                 </div>
               </div>
-              <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
-                <ModUIFilePicker
-                  onFileSelect={(file) => controls.loadMidiFile(file)}
-                  accept=".mid,.midi,audio/midi"
-                  label="Load MIDI"
-                  icon={<Upload size={14}/>}
-                />
-                <div style={{fontSize: '10px', color: 'rgba(255,255,255,0.7)'}}>
-                  {controls.midiFileName ? controls.midiFileName : 'No MIDI loaded'}
-                </div>
-              </div>
-              <div style={{display: 'flex', gap: '8px'}}>
-                <ModUIButton
-                  icon={<Play size={16}/>}
-                  onClick={controls.play}
-                  variant="success"
-                  title="Play"
-                  disabled={!controls.isReady}
-                />
-                <ModUIButton
-                  icon={<Square size={16}/>}
-                  onClick={controls.stop}
-                  title="Stop"
-                  disabled={!controls.isReady}
-                />
-              </div>
               <div style={{fontSize: '10px', color: 'rgba(255,255,255,0.7)'}}>
-                SoundFont: {controls.isSoundFontLoaded ? 'Loaded' : 'Missing'} · MIDI: {controls.isMidiLoaded ? 'Loaded' : 'Missing'}
+                SoundFont: {controls.isSoundFontLoaded ? 'Loaded' : 'Missing'}
               </div>
               {controls.error && (
                 <div style={{fontSize: '10px', color: '#ff6b6b'}}>
                   {controls.error}
                 </div>
               )}
+              <div style={{display: 'flex', gap: '8px'}}>
+                <ModUIButton
+                  icon={<Square size={14}/>}
+                  onClick={controls.allNotesOff}
+                  title="All Notes Off"
+                >
+                  All Notes Off
+                </ModUIButton>
+              </div>
               <ModUISlider
                 label="Gain"
                 value={controls.gain}
@@ -1696,7 +1679,96 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
               />
             </div>
           )}
-        </MidiSynth>
+        </Fluidsynth>
+      ) : null;
+
+    case 'MidiPlayer':
+      return output ? (
+        <MidiPlayer
+          output={output}
+          triggerInput={triggerInput}
+          stopInput={cvInputStreams['cv-stop'] || undefined}
+          midiUrl={params.midiUrl}
+          onMidiUrlChange={(value) => setParam('midiUrl', value)}
+          midiFileName={params.midiFileName}
+          onMidiFileNameChange={(value) => setParam('midiFileName', value)}
+          midiFileDataUrl={params.midiFileDataUrl}
+          onMidiFileDataUrlChange={(value) => setParam('midiFileDataUrl', value)}
+          bpm={params.bpm}
+          onBpmChange={(value) => setParam('bpm', value)}
+        >
+          {(controls) => (
+            <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+              <ModUITextInput
+                value={controls.midiUrl}
+                onChange={controls.setMidiUrl}
+                label="MIDI URL"
+                placeholder="https://.../file.mid"
+              />
+              <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
+                <ModUIFilePicker
+                  onFileSelect={(file) => controls.loadMidiFile(file)}
+                  accept=".mid,.midi,audio/midi"
+                  label="Load MIDI"
+                  icon={<Upload size={14}/>}
+                />
+                <div style={{fontSize: '10px', color: 'rgba(255,255,255,0.7)'}}>
+                  {controls.midiFileName ? controls.midiFileName : 'No MIDI loaded'}
+                </div>
+              </div>
+              <ModUISlider
+                label="BPM"
+                value={controls.bpm}
+                onChange={controls.setBpm}
+                min={30}
+                max={240}
+                step={1}
+                formatValue={(v) => `${v.toFixed(0)} bpm`}
+              />
+              <div style={{display: 'flex', gap: '8px'}}>
+                <ModUIButton
+                  icon={<Play size={16}/>}
+                  onClick={controls.play}
+                  variant="success"
+                  title="Play"
+                  disabled={!controls.isLoaded}
+                />
+                <ModUIButton
+                  icon={<Pause size={16}/>}
+                  onClick={controls.pause}
+                  title="Pause"
+                  disabled={!controls.isLoaded || !controls.isPlaying}
+                />
+                <ModUIButton
+                  icon={<Square size={16}/>}
+                  onClick={controls.stop}
+                  title="Stop"
+                  disabled={!controls.isLoaded}
+                />
+              </div>
+              <ModUISlider
+                label="Position"
+                value={controls.position}
+                onChange={controls.setPosition}
+                min={0}
+                max={controls.duration || 1}
+                step={0.01}
+                formatValue={(v) => `${v.toFixed(2)} s`}
+                disabled={!controls.isLoaded}
+              />
+              <div style={{fontSize: '10px', color: 'rgba(255,255,255,0.7)'}}>
+                {controls.metadata
+                  ? `Name: ${controls.metadata.name || 'Untitled'} · Tracks: ${controls.metadata.tracks} · Length: ${controls.metadata.duration.toFixed(2)}s · PPQ: ${controls.metadata.ppq} · Tempo: ${controls.metadata.tempo.toFixed(0)}`
+                  : 'No metadata'}
+              </div>
+              {controls.error && (
+                <div style={{fontSize: '10px', color: '#ff6b6b'}}>
+                  {controls.error}
+                </div>
+              )}
+            </div>
+          )}
+        </MidiPlayer>
       ) : null;
 
     case 'StreamingAudioDeck':

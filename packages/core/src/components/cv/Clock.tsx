@@ -119,6 +119,7 @@ export interface ClockRenderProps {
 export interface ClockProps {
   output: ModStreamRef;
   startOutput?: ModStreamRef;
+  stopOutput?: ModStreamRef;
   label?: string;
   // Controlled props
   bpm?: number;
@@ -132,6 +133,7 @@ export interface ClockProps {
 export const Clock = React.forwardRef<ClockHandle, ClockProps>(({
   output,
   startOutput,
+  stopOutput,
   label = 'clock',
   bpm: controlledBpm,
   onBpmChange,
@@ -146,6 +148,8 @@ export const Clock = React.forwardRef<ClockHandle, ClockProps>(({
   const gainNodeRef = useRef<GainNode | null>(null);
   const startSourceRef = useRef<ConstantSourceNode | null>(null);
   const startGainRef = useRef<GainNode | null>(null);
+  const stopSourceRef = useRef<ConstantSourceNode | null>(null);
+  const stopGainRef = useRef<GainNode | null>(null);
   const bpmRef = useRef(bpm);
   const isRunningRef = useRef(isRunning);
   const workletNodeRef = useRef<AudioWorkletNode | null>(null);
@@ -201,6 +205,29 @@ export const Clock = React.forwardRef<ClockHandle, ClockProps>(({
       };
     }
 
+    if (stopOutput) {
+      const stopSource = audioContext.createConstantSource();
+      stopSource.offset.value = 0;
+      stopSourceRef.current = stopSource;
+
+      const stopGain = audioContext.createGain();
+      stopGain.gain.value = 1.0;
+      stopGainRef.current = stopGain;
+
+      stopSource.connect(stopGain);
+      stopSource.start(0);
+
+      stopOutput.current = {
+        audioNode: stopSource,
+        gain: stopGain,
+        context: audioContext,
+        metadata: {
+          label: `${label}-stop`,
+          sourceType: 'cv',
+        },
+      };
+    }
+
     if (!audioContext.audioWorklet || typeof AudioWorkletNode === 'undefined') {
       console.error('AudioWorklet not supported in this environment.');
     } else {
@@ -244,14 +271,29 @@ export const Clock = React.forwardRef<ClockHandle, ClockProps>(({
       if (startOutput) {
         startOutput.current = null;
       }
+      if (stopSourceRef.current) {
+        stopSourceRef.current.stop();
+        stopSourceRef.current.disconnect();
+        stopSourceRef.current = null;
+      }
+      if (stopGainRef.current) {
+        stopGainRef.current.disconnect();
+        stopGainRef.current = null;
+      }
+      if (stopOutput) {
+        stopOutput.current = null;
+      }
     };
-  }, [audioContext, label, startOutput]);
+  }, [audioContext, label, startOutput, stopOutput]);
 
   const start = () => {
     if (isRunning || !audioContext || !constantSourceRef.current) return;
     setIsRunning(true);
     if (startSourceRef.current) {
       startSourceRef.current.offset.setValueAtTime(1, audioContext.currentTime);
+    }
+    if (stopSourceRef.current) {
+      stopSourceRef.current.offset.setValueAtTime(0, audioContext.currentTime);
     }
     const runningParam = workletNodeRef.current?.parameters.get('running');
     runningParam?.setValueAtTime(1, audioContext.currentTime);
@@ -267,6 +309,11 @@ export const Clock = React.forwardRef<ClockHandle, ClockProps>(({
     }
     if (startSourceRef.current && audioContext) {
       startSourceRef.current.offset.setValueAtTime(0, audioContext.currentTime);
+    }
+    if (stopSourceRef.current && audioContext) {
+      const now = audioContext.currentTime;
+      stopSourceRef.current.offset.setValueAtTime(1, now);
+      stopSourceRef.current.offset.setValueAtTime(0, now + 0.01);
     }
     const runningParam = workletNodeRef.current?.parameters.get('running');
     runningParam?.setValueAtTime(0, audioContext.currentTime);

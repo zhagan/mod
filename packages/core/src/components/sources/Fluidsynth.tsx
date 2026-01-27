@@ -1,6 +1,7 @@
 import React, { ReactNode, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { useAudioContext } from '../../context/AudioContext';
 import { ModStreamRef } from '../../types/ModStream';
+import { MidiEvent } from '../../types/Midi';
 import { useControlledState } from '../../hooks/useControlledState';
 
 type AnySynth = {
@@ -19,6 +20,13 @@ type AnySynth = {
   stop?: () => void;
   pause?: () => void;
   reset?: () => void;
+  midiNoteOn?: (chan: number, key: number, vel: number) => void;
+  midiNoteOff?: (chan: number, key: number) => void;
+  midiProgramChange?: (chan: number, prognum: number) => void;
+  midiControl?: (chan: number, ctrl: number, val: number) => void;
+  midiPitchBend?: (chan: number, val: number) => void;
+  midiAllNotesOff?: (chan?: number) => void;
+  midiAllSoundsOff?: (chan?: number) => void;
   createAudioNode?: (context: AudioContext) => Promise<AudioNode> | AudioNode;
   createWebAudioNode?: (context: AudioContext) => Promise<AudioNode> | AudioNode;
   getAudioNode?: () => AudioNode | null;
@@ -35,14 +43,11 @@ const dataUrlToArrayBuffer = async (dataUrl: string) => {
   return response.arrayBuffer();
 };
 
-export interface MidiSynthHandle {
-  play: () => void;
-  stop: () => void;
-  loadMidiFile: (file: File) => void;
+export interface FluidsynthHandle {
   loadSoundFontFile: (file: File) => void;
 }
 
-export interface MidiSynthRenderProps {
+export interface FluidsynthRenderProps {
   wasmBaseUrl: string;
   setWasmBaseUrl: (url: string) => void;
   soundFontUrl: string;
@@ -52,24 +57,17 @@ export interface MidiSynthRenderProps {
   soundFontFileDataUrl: string;
   setSoundFontFileDataUrl: (dataUrl: string) => void;
   loadSoundFontFile: (file: File) => void;
-  midiFileName: string;
-  setMidiFileName: (name: string) => void;
-  midiFileDataUrl: string;
-  setMidiFileDataUrl: (dataUrl: string) => void;
-  loadMidiFile: (file: File) => void;
   gain: number;
   setGain: (value: number) => void;
-  isPlaying: boolean;
   isReady: boolean;
   isSoundFontLoaded: boolean;
-  isMidiLoaded: boolean;
-  play: () => void;
-  stop: () => void;
   error: string | null;
+  allNotesOff: () => void;
 }
 
-export interface MidiSynthProps {
+export interface FluidsynthProps {
   output: ModStreamRef;
+  midiInput?: ModStreamRef;
   label?: string;
   wasmBaseUrl?: string;
   onWasmBaseUrlChange?: (url: string) => void;
@@ -79,20 +77,17 @@ export interface MidiSynthProps {
   onSoundFontFileNameChange?: (name: string) => void;
   soundFontFileDataUrl?: string;
   onSoundFontFileDataUrlChange?: (dataUrl: string) => void;
-  midiFileName?: string;
-  onMidiFileNameChange?: (name: string) => void;
-  midiFileDataUrl?: string;
-  onMidiFileDataUrlChange?: (dataUrl: string) => void;
   gain?: number;
   onGainChange?: (value: number) => void;
-  children?: (props: MidiSynthRenderProps) => ReactNode;
+  children?: (props: FluidsynthRenderProps) => ReactNode;
 }
 
 const DEFAULT_SOUNDFONT_URL = '';
 
-export const MidiSynth = React.forwardRef<MidiSynthHandle, MidiSynthProps>(({
+export const Fluidsynth = React.forwardRef<FluidsynthHandle, FluidsynthProps>(({
   output,
-  label = 'midi-synth',
+  midiInput,
+  label = 'fluidsynth',
   wasmBaseUrl: controlledWasmBaseUrl,
   onWasmBaseUrlChange,
   soundFontUrl: controlledSoundFontUrl,
@@ -101,10 +96,6 @@ export const MidiSynth = React.forwardRef<MidiSynthHandle, MidiSynthProps>(({
   onSoundFontFileNameChange,
   soundFontFileDataUrl: controlledSoundFontFileDataUrl,
   onSoundFontFileDataUrlChange,
-  midiFileName: controlledMidiFileName,
-  onMidiFileNameChange,
-  midiFileDataUrl: controlledMidiFileDataUrl,
-  onMidiFileDataUrlChange,
   gain: controlledGain,
   onGainChange,
   children,
@@ -130,20 +121,8 @@ export const MidiSynth = React.forwardRef<MidiSynthHandle, MidiSynthProps>(({
     '',
     onSoundFontFileDataUrlChange
   );
-  const [midiFileName, setMidiFileName] = useControlledState(
-    controlledMidiFileName,
-    '',
-    onMidiFileNameChange
-  );
-  const [midiFileDataUrl, setMidiFileDataUrl] = useControlledState(
-    controlledMidiFileDataUrl,
-    '',
-    onMidiFileDataUrlChange
-  );
   const [gain, setGain] = useControlledState(controlledGain, 1.0, onGainChange);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [isSoundFontLoaded, setIsSoundFontLoaded] = useState(false);
-  const [isMidiLoaded, setIsMidiLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const synthRef = useRef<AnySynth | null>(null);
@@ -151,7 +130,7 @@ export const MidiSynth = React.forwardRef<MidiSynthHandle, MidiSynthProps>(({
   const synthNodeRef = useRef<AudioNode | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
 
-  const isReady = isSoundFontLoaded && isMidiLoaded;
+  const isReady = isSoundFontLoaded;
 
   const resolveAudioNode = async (synth: AnySynth) => {
     if (synth.createAudioNode) {
@@ -217,6 +196,7 @@ export const MidiSynth = React.forwardRef<MidiSynthHandle, MidiSynthProps>(({
         }
         const fluidsynthUrl = `${base}libfluidsynth-2.4.6.js`;
         const synthUrl = `${base}js-synthesizer.js`;
+        const synthWorkletUrl = `${base}js-synthesizer.worklet.js`;
         await loadScript(fluidsynthUrl);
         await loadScript(synthUrl);
         const JSSynth = (globalThis as any).JSSynth;
@@ -229,7 +209,19 @@ export const MidiSynth = React.forwardRef<MidiSynthHandle, MidiSynthProps>(({
         if (JSSynth.waitForReady) {
           await JSSynth.waitForReady();
         }
-        const synth: AnySynth = new JSSynth.Synthesizer();
+        let useWorklet = false;
+        if (audioContext.audioWorklet && JSSynth.AudioWorkletNodeSynthesizer) {
+          try {
+            await audioContext.audioWorklet.addModule(fluidsynthUrl);
+            await audioContext.audioWorklet.addModule(synthWorkletUrl);
+            useWorklet = true;
+          } catch {
+            useWorklet = false;
+          }
+        }
+        const synth: AnySynth = useWorklet
+          ? new JSSynth.AudioWorkletNodeSynthesizer()
+          : new JSSynth.Synthesizer();
         if (synth.init) {
           await synth.init(audioContext.sampleRate);
         }
@@ -258,70 +250,6 @@ export const MidiSynth = React.forwardRef<MidiSynthHandle, MidiSynthProps>(({
       throw new Error('SoundFont loading is not supported by the synthesizer');
     }
     setIsSoundFontLoaded(true);
-  };
-
-  const loadMidiData = async (buffer: ArrayBuffer) => {
-    const synth = await ensureSynth();
-    if (synth.loadMIDI) {
-      await synth.loadMIDI(buffer);
-    } else if (synth.loadMidiFile) {
-      await synth.loadMidiFile(buffer);
-    } else if (synth.addSMFDataToPlayer) {
-      await synth.addSMFDataToPlayer(buffer);
-    } else {
-      throw new Error('MIDI loading is not supported by the synthesizer');
-    }
-    setIsMidiLoaded(true);
-  };
-
-  const play = async () => {
-    try {
-      const synth = await ensureSynth();
-      if (audioContext && audioContext.state !== 'running') {
-        await audioContext.resume();
-      }
-      if (synth.playPlayer) {
-        await synth.playPlayer();
-      } else if (synth.play) {
-        await synth.play();
-      } else if (synth.start) {
-        await synth.start();
-      }
-      setIsPlaying(synth.isPlayerPlaying ? synth.isPlayerPlaying() : true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to play MIDI');
-    }
-  };
-
-  const stop = () => {
-    const synth = synthRef.current;
-    if (!synth) return;
-    if (synth.stopPlayer) synth.stopPlayer();
-    else if (synth.stop) synth.stop();
-    else if (synth.pause) synth.pause();
-    else if (synth.reset) synth.reset();
-    setIsPlaying(false);
-  };
-
-  const loadMidiFile = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = async () => {
-      try {
-        const dataUrl = typeof reader.result === 'string' ? reader.result : '';
-        if (dataUrl) {
-          setMidiFileName(file.name);
-          setMidiFileDataUrl(dataUrl);
-          const buffer = await dataUrlToArrayBuffer(dataUrl);
-          await loadMidiData(buffer);
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load MIDI');
-      }
-    };
-    reader.onerror = () => {
-      setError('Failed to read MIDI file');
-    };
-    reader.readAsDataURL(file);
   };
 
   const loadSoundFontFile = (file: File) => {
@@ -377,22 +305,67 @@ export const MidiSynth = React.forwardRef<MidiSynthHandle, MidiSynthProps>(({
   }, [audioContext, label]);
 
   useEffect(() => {
+    if (!audioContext || !midiInput) return;
+    let unsubscribe: (() => void) | null = null;
+    let cancelled = false;
+    const attach = async () => {
+      try {
+        const synth = await ensureSynth();
+        if (cancelled) return;
+        const bus = midiInput.current?.midi;
+        if (!bus) return;
+        unsubscribe = bus.subscribe((event: MidiEvent) => {
+          if (!isSoundFontLoaded) return;
+          switch (event.type) {
+            case 'noteOn':
+              synth.midiNoteOn?.(event.channel, event.note, event.velocity);
+              break;
+            case 'noteOff':
+              synth.midiNoteOff?.(event.channel, event.note);
+              break;
+            case 'program':
+              synth.midiProgramChange?.(event.channel, event.program);
+              break;
+            case 'cc':
+              synth.midiControl?.(event.channel, event.controller, event.value);
+              break;
+            case 'pitchBend':
+              synth.midiPitchBend?.(event.channel, event.value);
+              break;
+            case 'allNotesOff':
+              synth.midiAllNotesOff?.(event.channel);
+              break;
+            case 'allSoundsOff':
+              synth.midiAllSoundsOff?.(event.channel);
+              break;
+          }
+        });
+      } catch {
+        // Ignore MIDI attach failures.
+      }
+    };
+    attach();
+    return () => {
+      cancelled = true;
+      if (unsubscribe) unsubscribe();
+    };
+  }, [audioContext, midiInput, isSoundFontLoaded]);
+
+  const allNotesOff = async () => {
+    try {
+      const synth = await ensureSynth();
+      synth.midiAllNotesOff?.();
+      synth.midiAllSoundsOff?.();
+    } catch {
+      // Ignore.
+    }
+  };
+
+  useEffect(() => {
     if (gainNodeRef.current) {
       gainNodeRef.current.gain.value = gain;
     }
   }, [gain]);
-
-  useEffect(() => {
-    if (!isPlaying || !isReady) return;
-    const synth = synthRef.current;
-    if (!synth?.isPlayerPlaying) return;
-    const interval = window.setInterval(() => {
-      if (synth.isPlayerPlaying && !synth.isPlayerPlaying()) {
-        setIsPlaying(false);
-      }
-    }, 200);
-    return () => clearInterval(interval);
-  }, [isPlaying, isReady]);
 
   useEffect(() => {
     setIsSoundFontLoaded(false);
@@ -428,27 +401,9 @@ export const MidiSynth = React.forwardRef<MidiSynthHandle, MidiSynthProps>(({
     load();
   }, [soundFontFileDataUrl]);
 
-  useEffect(() => {
-    setIsMidiLoaded(false);
-    if (!midiFileDataUrl) return;
-    const load = async () => {
-      try {
-        setError(null);
-        const buffer = await dataUrlToArrayBuffer(midiFileDataUrl);
-        await loadMidiData(buffer);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load MIDI');
-      }
-    };
-    load();
-  }, [midiFileDataUrl]);
-
   useImperativeHandle(ref, () => ({
-    play,
-    stop,
-    loadMidiFile,
     loadSoundFontFile,
-  }), [play, stop]);
+  }), []);
 
   if (children) {
     return (
@@ -463,20 +418,12 @@ export const MidiSynth = React.forwardRef<MidiSynthHandle, MidiSynthProps>(({
           soundFontFileDataUrl,
           setSoundFontFileDataUrl,
           loadSoundFontFile,
-          midiFileName,
-          setMidiFileName,
-          midiFileDataUrl,
-          setMidiFileDataUrl,
-          loadMidiFile,
           gain,
           setGain,
-          isPlaying,
           isReady,
           isSoundFontLoaded,
-          isMidiLoaded,
-          play,
-          stop,
           error,
+          allNotesOff,
         })}
       </>
     );
@@ -485,4 +432,4 @@ export const MidiSynth = React.forwardRef<MidiSynthHandle, MidiSynthProps>(({
   return null;
 });
 
-MidiSynth.displayName = 'MidiSynth';
+Fluidsynth.displayName = 'Fluidsynth';
