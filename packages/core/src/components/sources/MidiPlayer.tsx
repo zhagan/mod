@@ -136,7 +136,7 @@ class MidiEventScheduler extends AudioWorkletProcessor {
       const evt = this._events[this._eventIndex];
       const eventTime = this._startTime + evt.time * this._scale;
       if (eventTime > quantumEnd) break;
-      this.port.postMessage({ type: 'event', event: evt });
+      this.port.postMessage({ type: 'event', event: evt, time: eventTime });
       this._eventIndex += 1;
     }
     if (this._eventIndex >= this._events.length) {
@@ -286,7 +286,7 @@ export const MidiPlayer = React.forwardRef<MidiPlayerHandle, MidiPlayerProps>(({
   const playStartTimeRef = useRef<number | null>(null);
   const positionRef = useRef(0);
   const eventIndexRef = useRef(0);
-  const schedulerRef = useRef<number | null>(null);
+  const pendingTimeoutsRef = useRef<Set<number>>(new Set());
   const midiBusRef = useRef<MidiBus | null>(null);
   const triggerNodeRef = useRef<AudioWorkletNode | null>(null);
   const stopNodeRef = useRef<AudioWorkletNode | null>(null);
@@ -308,11 +308,9 @@ export const MidiPlayer = React.forwardRef<MidiPlayerHandle, MidiPlayerProps>(({
     });
   }, [scale]);
 
-  const clearScheduler = () => {
-    if (schedulerRef.current !== null) {
-      window.clearInterval(schedulerRef.current);
-      schedulerRef.current = null;
-    }
+  const clearPendingTimeouts = () => {
+    pendingTimeoutsRef.current.forEach((id) => window.clearTimeout(id));
+    pendingTimeoutsRef.current.clear();
   };
 
   const emitEvent = (event: MidiEvent) => {
@@ -383,7 +381,7 @@ export const MidiPlayer = React.forwardRef<MidiPlayerHandle, MidiPlayerProps>(({
     playStartTimeRef.current = null;
     setPosition(newPosition);
     setIsPlaying(false);
-    clearScheduler();
+    clearPendingTimeouts();
     eventSchedulerRef.current?.port.postMessage({ type: 'stop' });
   };
 
@@ -392,7 +390,7 @@ export const MidiPlayer = React.forwardRef<MidiPlayerHandle, MidiPlayerProps>(({
     setPosition(0);
     positionRef.current = 0;
     setIsPlaying(false);
-    clearScheduler();
+    clearPendingTimeouts();
     emitAllNotesOff();
     eventSchedulerRef.current?.port.postMessage({ type: 'stop' });
   };
@@ -515,7 +513,17 @@ export const MidiPlayer = React.forwardRef<MidiPlayerHandle, MidiPlayerProps>(({
       eventSchedulerRef.current = node;
       node.port.onmessage = (event) => {
         if (event.data?.type === 'event') {
-          emitEvent(event.data.event as MidiEvent);
+          const scheduledTime = typeof event.data.time === 'number' ? event.data.time : audioContext.currentTime;
+          const delayMs = Math.max(0, (scheduledTime - audioContext.currentTime) * 1000);
+          if (delayMs <= 1) {
+            emitEvent(event.data.event as MidiEvent);
+          } else {
+            const timeoutId = window.setTimeout(() => {
+              pendingTimeoutsRef.current.delete(timeoutId);
+              emitEvent(event.data.event as MidiEvent);
+            }, delayMs);
+            pendingTimeoutsRef.current.add(timeoutId);
+          }
         } else if (event.data?.type === 'end') {
           setIsPlaying(false);
           emitAllNotesOff();
@@ -524,6 +532,7 @@ export const MidiPlayer = React.forwardRef<MidiPlayerHandle, MidiPlayerProps>(({
     }).catch(() => {});
     return () => {
       cancelled = true;
+      clearPendingTimeouts();
       if (eventSchedulerRef.current) {
         eventSchedulerRef.current.port.onmessage = null;
         try { eventSchedulerRef.current.disconnect(); } catch (e) {}
