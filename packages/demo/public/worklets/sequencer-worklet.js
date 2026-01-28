@@ -56,7 +56,7 @@ class SequencerProcessor extends AudioWorkletProcessor {
             this.steps.push(normalizeStep({ active: false, value: 0, lengthPct: 80, slide: false, accent: false }));
           }
           if (this.currentStep >= this.steps.length) {
-            this.currentStep = 0;
+            this.currentStep = this.steps.length > 0 ? (this.currentStep % this.steps.length) : 0;
           }
         }
         if (Number.isFinite(data.division)) {
@@ -72,8 +72,29 @@ class SequencerProcessor extends AudioWorkletProcessor {
         if (Number.isFinite(data.baseGateSeconds)) {
           this.baseGateSeconds = Math.max(0.005, data.baseGateSeconds);
         }
-      }
-      if (data.type === 'reset') {
+      } else if (data.type === 'steps') {
+        if (Array.isArray(data.steps)) {
+          const nextSteps = data.steps.map(normalizeStep);
+          this.steps = nextSteps.length ? nextSteps : this.steps;
+          this.length = Math.max(1, Math.min(32, data.length ?? this.steps.length));
+          this.steps = this.steps.slice(0, this.length);
+          while (this.steps.length < this.length) {
+            this.steps.push(normalizeStep({ active: false, value: 0, lengthPct: 80, slide: false, accent: false }));
+          }
+          if (this.currentStep >= this.steps.length) {
+            this.currentStep = this.steps.length > 0 ? (this.currentStep % this.steps.length) : 0;
+          }
+        }
+      } else if (data.type === 'division') {
+        if (Number.isFinite(data.value)) {
+          this.division = data.value;
+          this.pulseAccumulator = 0;
+        }
+      } else if (data.type === 'swing') {
+        if (Number.isFinite(data.value)) {
+          this.swing = clamp(data.value, -50, 50);
+        }
+      } else if (data.type === 'reset') {
         this._resetSequence();
       }
     };

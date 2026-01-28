@@ -64,9 +64,10 @@ export const MODULE_DEFINITIONS: Record<string, ModuleDefinition> = {
     outputs: 1,
     defaultParams: {
       wasmBaseUrl: '/mod/playground/js-synthesizer/',
-      soundFontUrl: '',
+      soundFontUrl: 'sf2/microgm.sf2',
       soundFontFileName: '',
       soundFontFileDataUrl: '',
+      keepSoundFontInSketch: false,
       gain: 1.0,
     },
   },

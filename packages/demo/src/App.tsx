@@ -438,7 +438,13 @@ function ModularSynth() {
           if (module.type === 'MP3Deck' && typeof params.src === 'string' && params.src.startsWith('blob:')) {
             delete params.src;
           }
-          // Keep embedded data URLs for Fluidsynth/MidiPlayer so sketches can restore local files.
+          // Keep embedded data URLs for MidiPlayer, and conditionally for Fluidsynth.
+          if (module.type === 'Fluidsynth') {
+            const keepSf2 = params.keepSoundFontInSketch === true;
+            if (!keepSf2 && typeof params.soundFontFileDataUrl === 'string' && params.soundFontFileDataUrl.startsWith('data:')) {
+              delete params.soundFontFileDataUrl;
+            }
+          }
           return params;
         })(),
       })),

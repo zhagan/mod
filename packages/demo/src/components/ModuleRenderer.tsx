@@ -1647,13 +1647,26 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                   label="Load SF2"
                   icon={<Upload size={14}/>}
                 />
+                <ModUIButton
+                  onClick={() => setParam('keepSoundFontInSketch', !(params.keepSoundFontInSketch === true))}
+                  title="Keep SF2 in sketch"
+                  variant={params.keepSoundFontInSketch ? 'success' : 'default'}
+                >
+                  Keep SF2
+                </ModUIButton>
                 <div style={{fontSize: '10px', color: 'rgba(255,255,255,0.7)'}}>
-                  {controls.soundFontFileName ? controls.soundFontFileName : 'No SoundFont loaded'}
+                  {controls.soundFontFileName
+                    ? controls.soundFontFileName
+                    : (controls.soundFontUrl ? controls.soundFontUrl.split('/').pop() || 'SoundFont URL' : 'No SoundFont loaded')}
                 </div>
               </div>
+              {controls.soundFontFileDataUrl && !params.keepSoundFontInSketch && (
+                <div style={{fontSize: '10px', color: '#ff6b6b'}}>
+                  Local SF2 will not be saved in sketches (toggle “Keep SF2” to embed).
+                </div>
+              )}
               <div style={{fontSize: '10px', color: 'rgba(255,255,255,0.7)'}}>
-                SoundFont: {controls.isSoundFontLoaded ? 'Loaded' : 'Missing'}
-                {controls.isSoundFontLoading ? ' (Loading...)' : ''}
+                SoundFont: {controls.isSoundFontLoading ? 'Loading...' : (controls.isSoundFontLoaded ? 'Loaded' : 'Missing')}
               </div>
               {controls.error && (
                 <div style={{fontSize: '10px', color: '#ff6b6b'}}>

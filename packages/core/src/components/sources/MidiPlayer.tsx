@@ -323,7 +323,6 @@ export const MidiPlayer = React.forwardRef<MidiPlayerHandle, MidiPlayerProps>(({
         if (dataUrl) {
           setMidiFileName(file.name);
           setMidiFileDataUrl(dataUrl);
-          setMidiUrl('');
           const buffer = await dataUrlToArrayBuffer(dataUrl);
           loadMidiData(buffer);
         }

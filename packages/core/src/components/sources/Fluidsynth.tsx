@@ -264,7 +264,6 @@ export const Fluidsynth = React.forwardRef<FluidsynthHandle, FluidsynthProps>(({
         if (dataUrl) {
           setSoundFontFileName(file.name);
           setSoundFontFileDataUrl(dataUrl);
-          setSoundFontUrl('');
           const buffer = await dataUrlToArrayBuffer(dataUrl);
           await loadSoundFont(buffer);
         }

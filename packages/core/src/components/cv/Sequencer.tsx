@@ -154,7 +154,7 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
       setSteps(normalized);
     }
     if (currentStep >= normalized.length) {
-      const nextStep = Math.max(0, normalized.length - 1);
+      const nextStep = normalized.length > 0 ? (currentStep % normalized.length) : 0;
       setCurrentStep(nextStep);
     }
   }, [length, steps, setSteps, currentStep]);
@@ -277,13 +277,27 @@ export const Sequencer = React.forwardRef<SequencerHandle, SequencerProps>(({
   useEffect(() => {
     if (!workletRef.current) return;
     workletRef.current.port.postMessage({
-      type: 'state',
+      type: 'steps',
       steps: normalizeSteps(length, steps),
       length,
-      division,
-      swing,
     });
-  }, [steps, length, division, swing]);
+  }, [steps, length]);
+
+  useEffect(() => {
+    if (!workletRef.current) return;
+    workletRef.current.port.postMessage({
+      type: 'division',
+      value: division,
+    });
+  }, [division]);
+
+  useEffect(() => {
+    if (!workletRef.current) return;
+    workletRef.current.port.postMessage({
+      type: 'swing',
+      value: swing,
+    });
+  }, [swing]);
 
   const clockKey = clock?.current?.audioNode ? String(clock.current.audioNode) : 'null';
   useEffect(() => {
