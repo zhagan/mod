@@ -4,6 +4,7 @@ import { useAudioContext } from '../../context/AudioContext';
 import { ModStreamRef } from '../../types/ModStream';
 import { MidiBus, MidiEvent } from '../../types/Midi';
 import { useControlledState } from '../../hooks/useControlledState';
+import { getWorkletUrl } from '../../workletUrl';
 
 type MidiMetadata = {
   name: string;
@@ -14,167 +15,31 @@ type MidiMetadata = {
   tempo: number;
 };
 
-const CLOCK_DETECTOR_WORKLET = `
-class ClockDetector extends AudioWorkletProcessor {
-  constructor() {
-    super();
-    this._last = 0;
-    this._cooldown = 0;
-  }
-  process(inputs) {
-    const input = inputs[0];
-    if (!input || input.length === 0) return true;
-    const channel = input[0];
-    if (!channel) return true;
-    for (let i = 0; i < channel.length; i++) {
-      const value = channel[i];
-      if (this._cooldown > 0) {
-        this._cooldown--;
-        this._last = value;
-        continue;
-      }
-      if (this._last <= 0.5 && value > 0.5) {
-        const pulseTime = currentTime + i / sampleRate;
-        this.port.postMessage({ type: 'pulse', time: pulseTime });
-        this._cooldown = 32;
-      }
-      this._last = value;
-    }
-    return true;
-  }
-}
-registerProcessor('midi-clock-detector', ClockDetector);
-`;
-
 const clockDetectorLoaders = new WeakMap<AudioContext, Promise<void>>();
-const clockDetectorUrls = new WeakMap<AudioContext, string>();
-
-const loadClockDetectorWorklet = (audioContext: AudioContext) => {
-  let loader = clockDetectorLoaders.get(audioContext);
-  if (!loader) {
-    const blob = new Blob([CLOCK_DETECTOR_WORKLET], { type: 'application/javascript' });
-    const url = URL.createObjectURL(blob);
-    clockDetectorUrls.set(audioContext, url);
-    loader = audioContext.audioWorklet.addModule(url).then(() => {
-      const loadedUrl = clockDetectorUrls.get(audioContext);
-      if (loadedUrl) {
-        URL.revokeObjectURL(loadedUrl);
-        clockDetectorUrls.delete(audioContext);
-      }
-    }).catch((err) => {
-      const loadedUrl = clockDetectorUrls.get(audioContext);
-      if (loadedUrl) {
-        URL.revokeObjectURL(loadedUrl);
-        clockDetectorUrls.delete(audioContext);
-      }
-      clockDetectorLoaders.delete(audioContext);
-      throw err;
-    });
-    clockDetectorLoaders.set(audioContext, loader);
-  }
-  return loader;
-};
-
-const MIDI_EVENT_SCHEDULER_WORKLET = `
-class MidiEventScheduler extends AudioWorkletProcessor {
-  constructor() {
-    super();
-    this._events = [];
-    this._eventIndex = 0;
-    this._playing = false;
-    this._startTime = 0;
-    this._scale = 1;
-    this.port.onmessage = (event) => {
-      const data = event.data;
-      if (!data || !data.type) return;
-      if (data.type === 'events') {
-        this._events = Array.isArray(data.events) ? data.events : [];
-        this._eventIndex = 0;
-      } else if (data.type === 'scale') {
-        this._scale = data.value || 1;
-      } else if (data.type === 'play') {
-        this._playing = true;
-        this._startTime = data.startTime || 0;
-        const position = data.position || 0;
-        if (typeof data.scale === 'number') {
-          this._scale = data.scale;
-        }
-        this._eventIndex = this._findEventIndex(position);
-      } else if (data.type === 'stop') {
-        this._playing = false;
-      } else if (data.type === 'seek') {
-        const position = data.position || 0;
-        this._eventIndex = this._findEventIndex(position);
-      } else if (data.type === 'reset') {
-        this._playing = false;
-        this._eventIndex = 0;
-        this._startTime = 0;
-      }
-    };
-  }
-
-  _findEventIndex(position) {
-    for (let i = 0; i < this._events.length; i++) {
-      if (this._events[i].time >= position) return i;
-    }
-    return this._events.length;
-  }
-
-  process(inputs, outputs) {
-    const output = outputs[0];
-    if (output && output.length > 0) {
-      const channel = output[0];
-      if (channel) {
-        for (let i = 0; i < channel.length; i++) {
-          channel[i] = 0;
-        }
-      }
-    }
-    if (!this._playing || this._events.length === 0) return true;
-    const quantumEnd = currentTime + 128 / sampleRate;
-    while (this._eventIndex < this._events.length) {
-      const evt = this._events[this._eventIndex];
-      const eventTime = this._startTime + evt.time * this._scale;
-      if (eventTime > quantumEnd) break;
-      this.port.postMessage({ type: 'event', event: evt, time: eventTime });
-      this._eventIndex += 1;
-    }
-    if (this._eventIndex >= this._events.length) {
-      this._playing = false;
-      this.port.postMessage({ type: 'end' });
-    }
-    return true;
-  }
-}
-
-registerProcessor('midi-event-scheduler', MidiEventScheduler);
-`;
-
 const eventSchedulerLoaders = new WeakMap<AudioContext, Promise<void>>();
-const eventSchedulerUrls = new WeakMap<AudioContext, string>();
 
 const loadEventSchedulerWorklet = (audioContext: AudioContext) => {
   let loader = eventSchedulerLoaders.get(audioContext);
   if (!loader) {
-    const blob = new Blob([MIDI_EVENT_SCHEDULER_WORKLET], { type: 'application/javascript' });
-    const url = URL.createObjectURL(blob);
-    eventSchedulerUrls.set(audioContext, url);
-    loader = audioContext.audioWorklet.addModule(url).then(() => {
-      const loadedUrl = eventSchedulerUrls.get(audioContext);
-      if (loadedUrl) {
-        URL.revokeObjectURL(loadedUrl);
-        eventSchedulerUrls.delete(audioContext);
-      }
-    }).catch((err) => {
-      const loadedUrl = eventSchedulerUrls.get(audioContext);
-      if (loadedUrl) {
-        URL.revokeObjectURL(loadedUrl);
-        eventSchedulerUrls.delete(audioContext);
-      }
+    const url = getWorkletUrl('midi-event-scheduler.js');
+    loader = audioContext.audioWorklet.addModule(url).catch((err) => {
       eventSchedulerLoaders.delete(audioContext);
       throw err;
     });
     eventSchedulerLoaders.set(audioContext, loader);
+  }
+  return loader;
+};
+
+const loadClockDetectorWorklet = (audioContext: AudioContext) => {
+  let loader = clockDetectorLoaders.get(audioContext);
+  if (!loader) {
+    const url = getWorkletUrl('midi-clock-detector.js');
+    loader = audioContext.audioWorklet.addModule(url).catch((err) => {
+      clockDetectorLoaders.delete(audioContext);
+      throw err;
+    });
+    clockDetectorLoaders.set(audioContext, loader);
   }
   return loader;
 };
@@ -511,6 +376,18 @@ export const MidiPlayer = React.forwardRef<MidiPlayerHandle, MidiPlayerProps>(({
       silentGain.connect(audioContext.destination);
       schedulerGainRef.current = silentGain;
       eventSchedulerRef.current = node;
+      if (midiEventsRef.current.length > 0) {
+        startScheduler();
+        if (isPlaying && playStartTimeRef.current !== null) {
+          const baseTime = positionRef.current / scaleRef.current;
+          node.port.postMessage({
+            type: 'play',
+            startTime: playStartTimeRef.current,
+            position: baseTime,
+            scale: scaleRef.current,
+          });
+        }
+      }
       node.port.onmessage = (event) => {
         if (event.data?.type === 'event') {
           const scheduledTime = typeof event.data.time === 'number' ? event.data.time : audioContext.currentTime;

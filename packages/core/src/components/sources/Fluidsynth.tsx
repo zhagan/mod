@@ -61,6 +61,7 @@ export interface FluidsynthRenderProps {
   setGain: (value: number) => void;
   isReady: boolean;
   isSoundFontLoaded: boolean;
+  isSoundFontLoading: boolean;
   error: string | null;
   allNotesOff: () => void;
 }
@@ -82,7 +83,9 @@ export interface FluidsynthProps {
   children?: (props: FluidsynthRenderProps) => ReactNode;
 }
 
-const DEFAULT_SOUNDFONT_URL = '';
+const DEFAULT_SOUNDFONT_URL = typeof document === 'undefined'
+  ? '/sf2/microgm.sf2'
+  : new URL('sf2/microgm.sf2', document.baseURI || window.location.href).toString();
 
 export const Fluidsynth = React.forwardRef<FluidsynthHandle, FluidsynthProps>(({
   output,
@@ -123,6 +126,7 @@ export const Fluidsynth = React.forwardRef<FluidsynthHandle, FluidsynthProps>(({
   );
   const [gain, setGain] = useControlledState(controlledGain, 1.0, onGainChange);
   const [isSoundFontLoaded, setIsSoundFontLoaded] = useState(false);
+  const [isSoundFontLoading, setIsSoundFontLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const synthRef = useRef<AnySynth | null>(null);
@@ -372,6 +376,7 @@ export const Fluidsynth = React.forwardRef<FluidsynthHandle, FluidsynthProps>(({
     if (!soundFontUrl || soundFontFileDataUrl) return;
     const load = async () => {
       try {
+        setIsSoundFontLoading(true);
         setError(null);
         const response = await fetch(soundFontUrl);
         if (!response.ok) {
@@ -381,6 +386,8 @@ export const Fluidsynth = React.forwardRef<FluidsynthHandle, FluidsynthProps>(({
         await loadSoundFont(buffer);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load SoundFont');
+      } finally {
+        setIsSoundFontLoading(false);
       }
     };
     load();
@@ -391,11 +398,14 @@ export const Fluidsynth = React.forwardRef<FluidsynthHandle, FluidsynthProps>(({
     if (!soundFontFileDataUrl) return;
     const load = async () => {
       try {
+        setIsSoundFontLoading(true);
         setError(null);
         const buffer = await dataUrlToArrayBuffer(soundFontFileDataUrl);
         await loadSoundFont(buffer);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load SoundFont');
+      } finally {
+        setIsSoundFontLoading(false);
       }
     };
     load();
@@ -422,6 +432,7 @@ export const Fluidsynth = React.forwardRef<FluidsynthHandle, FluidsynthProps>(({
           setGain,
           isReady,
           isSoundFontLoaded,
+          isSoundFontLoading,
           error,
           allNotesOff,
         })}
