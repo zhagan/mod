@@ -81,8 +81,14 @@ export interface MidiPlayerRenderProps {
   setBpm: (value: number) => void;
   isPlaying: boolean;
   isLoaded: boolean;
+  isClockConnected: boolean;
+  isStartConnected: boolean;
+  isStopConnected: boolean;
   position: number;
   duration: number;
+  positionUnit: 'seconds' | 'ticks';
+  positionStep: number;
+  positionMax: number;
   setPosition: (seconds: number) => void;
   metadata: MidiMetadata | null;
   play: () => void;
@@ -93,8 +99,9 @@ export interface MidiPlayerRenderProps {
 
 export interface MidiPlayerProps {
   output: ModStreamRef;
-  triggerInput?: ModStreamRef;
+  startInput?: ModStreamRef;
   stopInput?: ModStreamRef;
+  clockInput?: ModStreamRef;
   label?: string;
   midiFileName?: string;
   onMidiFileNameChange?: (name: string) => void;
@@ -109,8 +116,9 @@ export interface MidiPlayerProps {
 
 export const MidiPlayer = React.forwardRef<MidiPlayerHandle, MidiPlayerProps>(({
   output,
-  triggerInput,
+  startInput,
   stopInput,
+  clockInput,
   label = 'midi-player',
   midiFileName: controlledMidiFileName,
   onMidiFileNameChange,
@@ -145,20 +153,32 @@ export const MidiPlayer = React.forwardRef<MidiPlayerHandle, MidiPlayerProps>(({
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
   const [metadata, setMetadata] = useState<MidiMetadata | null>(null);
+  const isClockConnected = Boolean(clockInput?.current?.audioNode);
   const [error, setError] = useState<string | null>(null);
 
   const midiEventsRef = useRef<MidiEvent[]>([]);
+  const midiEventsTicksRef = useRef<Array<{ tick: number; event: MidiEvent }>>([]);
   const playStartTimeRef = useRef<number | null>(null);
-  const positionRef = useRef(0);
+  const positionSecondsRef = useRef(0);
+  const positionTicksRef = useRef(0);
   const eventIndexRef = useRef(0);
+  const clockEventIndexRef = useRef(0);
+  const clockTicksPerPulseRef = useRef(0);
+  const clockPlayingRef = useRef(false);
+  const ppqRef = useRef(480);
   const pendingTimeoutsRef = useRef<Set<number>>(new Set());
   const midiBusRef = useRef<MidiBus | null>(null);
-  const triggerNodeRef = useRef<AudioWorkletNode | null>(null);
+  const startNodeRef = useRef<AudioWorkletNode | null>(null);
   const stopNodeRef = useRef<AudioWorkletNode | null>(null);
+  const clockNodeRef = useRef<AudioWorkletNode | null>(null);
   const eventSchedulerRef = useRef<AudioWorkletNode | null>(null);
   const schedulerGainRef = useRef<GainNode | null>(null);
 
-  positionRef.current = position;
+  if (clockPlayingRef.current) {
+    positionTicksRef.current = position;
+  } else {
+    positionSecondsRef.current = position;
+  }
 
   const scale = useMemo(() => {
     return baseTempo / Math.max(1, bpm);
@@ -202,13 +222,18 @@ export const MidiPlayer = React.forwardRef<MidiPlayerHandle, MidiPlayerProps>(({
 
   const play = () => {
     if (!audioContext || !isLoaded) return;
+    if (isClockConnectedRef.current) {
+      clockPlayingRef.current = true;
+      setIsPlaying(true);
+      return;
+    }
     if (audioContext.state !== 'running') {
       audioContext.resume().catch(() => {});
     }
-    const start = audioContext.currentTime - positionRef.current;
+    const start = audioContext.currentTime - positionSecondsRef.current;
     playStartTimeRef.current = start;
     const events = midiEventsRef.current;
-    const baseTime = positionRef.current / scaleRef.current;
+    const baseTime = positionSecondsRef.current / scaleRef.current;
     eventIndexRef.current = events.findIndex((event) => event.time >= baseTime);
     if (eventIndexRef.current < 0) eventIndexRef.current = events.length;
     setIsPlaying(true);
@@ -221,11 +246,20 @@ export const MidiPlayer = React.forwardRef<MidiPlayerHandle, MidiPlayerProps>(({
     });
   };
 
-  const setTransportPosition = (seconds: number) => {
+  const setTransportPosition = (value: number) => {
+    if (isClockConnectedRef.current) {
+      const maxTicks = metadata?.ticks ?? 0;
+      const next = Math.max(0, Math.min(value, maxTicks));
+      setPosition(next);
+      positionTicksRef.current = next;
+      const nextIndex = midiEventsTicksRef.current.findIndex((entry) => entry.tick >= next);
+      clockEventIndexRef.current = nextIndex < 0 ? midiEventsTicksRef.current.length : nextIndex;
+      return;
+    }
     const maxDuration = duration * scaleRef.current || 0;
-    const next = Math.max(0, Math.min(seconds, maxDuration));
+    const next = Math.max(0, Math.min(value, maxDuration));
     setPosition(next);
-    positionRef.current = next;
+    positionSecondsRef.current = next;
     if (!audioContext || !isPlaying || !playStartTimeRef.current) return;
     const now = audioContext.currentTime;
     playStartTimeRef.current = now - next;
@@ -240,6 +274,12 @@ export const MidiPlayer = React.forwardRef<MidiPlayerHandle, MidiPlayerProps>(({
   };
 
   const pause = () => {
+    if (isClockConnectedRef.current) {
+      if (!isPlaying) return;
+      clockPlayingRef.current = false;
+      setIsPlaying(false);
+      return;
+    }
     if (!audioContext || !isPlaying || !playStartTimeRef.current) return;
     const now = audioContext.currentTime;
     const newPosition = Math.max(0, now - playStartTimeRef.current);
@@ -253,8 +293,11 @@ export const MidiPlayer = React.forwardRef<MidiPlayerHandle, MidiPlayerProps>(({
   const stop = () => {
     playStartTimeRef.current = null;
     setPosition(0);
-    positionRef.current = 0;
+    positionSecondsRef.current = 0;
+    positionTicksRef.current = 0;
+    clockEventIndexRef.current = 0;
     setIsPlaying(false);
+    clockPlayingRef.current = false;
     clearPendingTimeouts();
     emitAllNotesOff();
     eventSchedulerRef.current?.port.postMessage({ type: 'stop' });
@@ -267,6 +310,7 @@ export const MidiPlayer = React.forwardRef<MidiPlayerHandle, MidiPlayerProps>(({
       setBaseTempo(tempo);
       setBpm(tempo);
       const events: MidiEvent[] = [];
+      const eventsTicks: Array<{ tick: number; event: MidiEvent }> = [];
       midi.tracks.forEach((track, trackIndex) => {
         track.notes.forEach((note) => {
           const channel = (track.channel ?? 0) | 0;
@@ -286,6 +330,8 @@ export const MidiPlayer = React.forwardRef<MidiPlayerHandle, MidiPlayerProps>(({
             velocity: 0,
           };
           events.push(noteOn, noteOff);
+          eventsTicks.push({ tick: note.ticks, event: noteOn });
+          eventsTicks.push({ tick: note.ticks + note.durationTicks, event: noteOff });
         });
         if (track.instrument?.number !== undefined) {
           const programEvent: MidiEvent = {
@@ -295,11 +341,16 @@ export const MidiPlayer = React.forwardRef<MidiPlayerHandle, MidiPlayerProps>(({
             program: track.instrument.number,
           };
           events.push(programEvent);
+          eventsTicks.push({ tick: 0, event: programEvent });
         }
       });
       events.sort((a, b) => a.time - b.time);
+      eventsTicks.sort((a, b) => a.tick - b.tick);
       midiEventsRef.current = events;
+      midiEventsTicksRef.current = eventsTicks;
       setDuration(midi.duration);
+      ppqRef.current = midi.header.ppq;
+      clockTicksPerPulseRef.current = midi.header.ppq / 16;
       setMetadata({
         name: midi.name || '',
         tracks: midi.tracks.length,
@@ -378,7 +429,7 @@ export const MidiPlayer = React.forwardRef<MidiPlayerHandle, MidiPlayerProps>(({
       if (midiEventsRef.current.length > 0) {
         startScheduler();
         if (isPlaying && playStartTimeRef.current !== null) {
-          const baseTime = positionRef.current / scaleRef.current;
+          const baseTime = positionSecondsRef.current / scaleRef.current;
           node.port.postMessage({
             type: 'play',
             startTime: playStartTimeRef.current,
@@ -421,9 +472,9 @@ export const MidiPlayer = React.forwardRef<MidiPlayerHandle, MidiPlayerProps>(({
     };
   }, [audioContext]);
 
-  const triggerKey = triggerInput?.current?.audioNode ? String(triggerInput.current.audioNode) : 'null';
+  const startKey = startInput?.current?.audioNode ? String(startInput.current.audioNode) : 'null';
   useEffect(() => {
-    if (!audioContext || !triggerInput?.current) return;
+    if (!audioContext || !startInput?.current) return;
     let cancelled = false;
     loadClockDetectorWorklet(audioContext).then(() => {
       if (cancelled) return;
@@ -432,27 +483,32 @@ export const MidiPlayer = React.forwardRef<MidiPlayerHandle, MidiPlayerProps>(({
         numberOfOutputs: 0,
         channelCount: 1,
       });
-      triggerNodeRef.current = node;
+      startNodeRef.current = node;
       node.port.onmessage = (event) => {
         if (event.data?.type !== 'pulse') return;
         if (!isLoaded) return;
         stop();
+        if (isClockConnectedRef.current) {
+          clockPlayingRef.current = true;
+          setIsPlaying(true);
+          return;
+        }
         play();
       };
-      const inGain = triggerInput.current?.gain;
+      const inGain = startInput.current?.gain;
       if (inGain) {
         inGain.connect(node);
       }
     }).catch(() => {});
     return () => {
       cancelled = true;
-      if (triggerNodeRef.current) {
-        triggerNodeRef.current.port.onmessage = null;
-        try { triggerNodeRef.current.disconnect(); } catch (e) {}
-        triggerNodeRef.current = null;
+      if (startNodeRef.current) {
+        startNodeRef.current.port.onmessage = null;
+        try { startNodeRef.current.disconnect(); } catch (e) {}
+        startNodeRef.current = null;
       }
     };
-  }, [audioContext, triggerKey, isLoaded]);
+  }, [audioContext, startKey, isLoaded]);
 
   const stopKey = stopInput?.current?.audioNode ? String(stopInput.current.audioNode) : 'null';
   useEffect(() => {
@@ -485,6 +541,70 @@ export const MidiPlayer = React.forwardRef<MidiPlayerHandle, MidiPlayerProps>(({
       }
     };
   }, [audioContext, stopKey]);
+
+  const isClockConnectedRef = useRef(false);
+  const clockKey = clockInput?.current?.audioNode ? String(clockInput.current.audioNode) : 'null';
+  useEffect(() => {
+    isClockConnectedRef.current = Boolean(clockInput?.current?.audioNode);
+  }, [clockKey]);
+
+  useEffect(() => {
+    if (!audioContext || !clockInput?.current) return;
+    let cancelled = false;
+    loadClockDetectorWorklet(audioContext).then(() => {
+      if (cancelled) return;
+      const node = new AudioWorkletNode(audioContext, 'midi-clock-detector', {
+        numberOfInputs: 1,
+        numberOfOutputs: 0,
+        channelCount: 1,
+      });
+      clockNodeRef.current = node;
+      node.port.onmessage = (event) => {
+        if (event.data?.type !== 'pulse') return;
+        if (!isLoaded || !clockPlayingRef.current) return;
+        const ticksPerPulse = clockTicksPerPulseRef.current;
+        if (!ticksPerPulse) return;
+        const nextTick = positionTicksRef.current + ticksPerPulse;
+        positionTicksRef.current = nextTick;
+        setPosition(nextTick);
+        while (clockEventIndexRef.current < midiEventsTicksRef.current.length) {
+          const entry = midiEventsTicksRef.current[clockEventIndexRef.current];
+          if (entry.tick > nextTick + 1e-6) break;
+          emitEvent(entry.event);
+          clockEventIndexRef.current += 1;
+        }
+        if (metadata?.ticks && nextTick >= metadata.ticks) {
+          clockPlayingRef.current = false;
+          setIsPlaying(false);
+          emitAllNotesOff();
+        }
+      };
+      const inGain = clockInput.current?.gain;
+      if (inGain) {
+        inGain.connect(node);
+      }
+    }).catch(() => {});
+    return () => {
+      cancelled = true;
+      if (clockNodeRef.current) {
+        clockNodeRef.current.port.onmessage = null;
+        try { clockNodeRef.current.disconnect(); } catch (e) {}
+        clockNodeRef.current = null;
+      }
+    };
+  }, [audioContext, clockKey, isLoaded, metadata?.ticks]);
+
+  useEffect(() => {
+    if (!isClockConnected) return;
+    playStartTimeRef.current = null;
+    clockPlayingRef.current = false;
+    clearPendingTimeouts();
+    eventSchedulerRef.current?.port.postMessage({ type: 'stop' });
+    setIsPlaying(false);
+    setPosition(0);
+    positionTicksRef.current = 0;
+    clockEventIndexRef.current = 0;
+  }, [isClockConnected]);
 
   useEffect(() => {
     setIsLoaded(false);
@@ -528,6 +648,7 @@ export const MidiPlayer = React.forwardRef<MidiPlayerHandle, MidiPlayerProps>(({
 
   useEffect(() => {
     if (!isPlaying || !audioContext || !playStartTimeRef.current) return;
+    if (isClockConnectedRef.current) return;
     const id = window.setInterval(() => {
       const now = audioContext.currentTime;
       const newPosition = Math.max(0, now - playStartTimeRef.current!);
@@ -539,10 +660,10 @@ export const MidiPlayer = React.forwardRef<MidiPlayerHandle, MidiPlayerProps>(({
   useEffect(() => {
     const prevScale = scaleRef.current;
     if (prevScale === scale) return;
-    if (!isPlaying || !audioContext) return;
+    if (!isPlaying || !audioContext || isClockConnectedRef.current) return;
     const now = audioContext.currentTime;
-    const baseTime = positionRef.current / prevScale;
-    playStartTimeRef.current = now - positionRef.current;
+    const baseTime = positionSecondsRef.current / prevScale;
+    playStartTimeRef.current = now - positionSecondsRef.current;
     const events = midiEventsRef.current;
     const nextIndex = events.findIndex((event) => event.time >= baseTime);
     eventIndexRef.current = nextIndex < 0 ? events.length : nextIndex;
@@ -584,8 +705,14 @@ export const MidiPlayer = React.forwardRef<MidiPlayerHandle, MidiPlayerProps>(({
           setBpm,
           isPlaying,
           isLoaded,
+          isClockConnected,
+          isStartConnected: Boolean(startInput?.current?.audioNode),
+          isStopConnected: Boolean(stopInput?.current?.audioNode),
           position,
           duration: duration * scale,
+          positionUnit: isClockConnected ? 'ticks' : 'seconds',
+          positionStep: isClockConnected ? Math.max(1, Math.round(ppqRef.current / 16)) : 0.01,
+          positionMax: isClockConnected ? (metadata?.ticks ?? 1) : (duration * scale || 1),
           setPosition: setTransportPosition,
           metadata,
           play,

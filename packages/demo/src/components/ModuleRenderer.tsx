@@ -1700,8 +1700,9 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
       return output ? (
         <MidiPlayer
           output={output}
-          triggerInput={triggerInput}
+          startInput={triggerInput}
           stopInput={cvInputStreams['cv-stop'] || undefined}
+          clockInput={cvInputStreams['cv-clock'] || undefined}
           midiUrl={params.midiUrl}
           onMidiUrlChange={(value) => setParam('midiUrl', value)}
           midiFileName={params.midiFileName}
@@ -1738,6 +1739,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 max={240}
                 step={1}
                 formatValue={(v) => `${v.toFixed(0)} bpm`}
+                disabled={controls.isClockConnected}
               />
               <div style={{display: 'flex', gap: '8px'}}>
                 <ModUIButton
@@ -1745,7 +1747,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                   onClick={controls.play}
                   variant="success"
                   title="Play"
-                  disabled={!controls.isLoaded}
+                  disabled={!controls.isLoaded || controls.isStartConnected}
                 />
                 <ModUIButton
                   icon={<Pause size={16}/>}
@@ -1757,17 +1759,17 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                   icon={<Square size={16}/>}
                   onClick={controls.stop}
                   title="Stop"
-                  disabled={!controls.isLoaded}
+                  disabled={!controls.isLoaded || controls.isStopConnected}
                 />
               </div>
               <ModUISlider
-                label="Position"
+                label={controls.positionUnit === 'ticks' ? 'Position (ticks)' : 'Position (s)'}
                 value={controls.position}
                 onChange={controls.setPosition}
                 min={0}
-                max={controls.duration || 1}
-                step={0.01}
-                formatValue={(v) => `${v.toFixed(2)} s`}
+                max={controls.positionMax || 1}
+                step={controls.positionStep}
+                formatValue={(v) => controls.positionUnit === 'ticks' ? `${Math.round(v)} ticks` : `${v.toFixed(2)} s`}
                 disabled={!controls.isLoaded}
               />
               <div style={{fontSize: '10px', color: 'rgba(255,255,255,0.7)'}}>

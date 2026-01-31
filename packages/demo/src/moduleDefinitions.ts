@@ -76,9 +76,9 @@ export const MODULE_DEFINITIONS: Record<string, ModuleDefinition> = {
     label: 'MIDI Player',
     category: 'source',
     color: '#80c7ff',
-    inputs: 2,
-    inputLabels: ['Trigger', 'Stop'],
-    inputIds: ['cv-trigger', 'cv-stop'],
+    inputs: 3,
+    inputLabels: ['Clock', 'Start', 'Stop'],
+    inputIds: ['cv-clock', 'cv-trigger', 'cv-stop'],
     outputs: 1,
     outputLabels: ['MIDI'],
     defaultParams: {

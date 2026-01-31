@@ -716,7 +716,7 @@ function ModularSynth() {
             const outputPorts = module.ports.filter(p => p.type === 'output');
             const cvPorts = module.ports.filter(p =>
               p.type === 'input'
-              && (p.label === 'CV' || p.label === 'Gate' || p.label === 'Clock' || p.label === 'Reset' || p.label === 'Trigger' || p.label === 'Pitch' || p.label === 'Stop')
+              && (p.label === 'CV' || p.label === 'Gate' || p.label === 'Clock' || p.label === 'Reset' || p.label === 'Trigger' || p.label === 'Start' || p.label === 'Pitch' || p.label === 'Stop')
             );
 
             // Get connected input streams for each input port (excluding CV)
