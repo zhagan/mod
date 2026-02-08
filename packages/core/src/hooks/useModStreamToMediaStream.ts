@@ -61,6 +61,10 @@ export function useModStreamToMediaStream(modStreamRef: ModStreamRef): MediaStre
 
     // Connect the ModStream to the destination
     // Audio will flow through this connection automatically
+    if (!modStreamRef.current.gain) {
+      setMediaStream(null);
+      return;
+    }
     modStreamRef.current.gain.connect(destination);
 
     // The destination.stream is a MediaStream that can be used with:
@@ -70,7 +74,7 @@ export function useModStreamToMediaStream(modStreamRef: ModStreamRef): MediaStre
     setMediaStream(destination.stream);
 
     return () => {
-      if (modStreamRef.current && destinationRef.current) {
+      if (modStreamRef.current && modStreamRef.current.gain && destinationRef.current) {
         try {
           modStreamRef.current.gain.disconnect(destinationRef.current);
         } catch (e) {

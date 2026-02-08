@@ -431,9 +431,19 @@ function ModularSynth() {
         position: module.position,
         enabled: module.enabled ?? true,
         params: (() => {
-          const params = moduleParams[module.id] ? cloneParams(moduleParams[module.id]) : getDefaultParams(module.type);
+          const rawParams = moduleParams[module.id] ? moduleParams[module.id] : getDefaultParams(module.type);
+          const params = module.type === 'Fluidsynth' || module.type === 'MidiPlayer'
+            ? { ...rawParams }
+            : cloneParams(rawParams);
           if (module.type === 'MP3Deck' && typeof params.src === 'string' && params.src.startsWith('blob:')) {
             delete params.src;
+          }
+          // Keep embedded data URLs for MidiPlayer, and conditionally for Fluidsynth.
+          if (module.type === 'Fluidsynth') {
+            const keepSf2 = params.keepSoundFontInSketch === true;
+            if (!keepSf2 && typeof params.soundFontFileDataUrl === 'string' && params.soundFontFileDataUrl.startsWith('data:')) {
+              delete params.soundFontFileDataUrl;
+            }
           }
           return params;
         })(),
@@ -555,6 +565,8 @@ function ModularSynth() {
           {renderModuleButton('NoiseGenerator')}
           {renderModuleButton('Microphone')}
           {renderModuleButton('MP3Deck')}
+          {renderModuleButton('Fluidsynth')}
+          {renderModuleButton('MidiPlayer')}
           {renderModuleButton('StreamingAudioDeck')}
         </div>
 
@@ -699,11 +711,12 @@ function ModularSynth() {
               && p.label !== 'Reset'
               && p.label !== 'Trigger'
               && p.label !== 'Pitch'
+              && p.label !== 'Stop'
             );
             const outputPorts = module.ports.filter(p => p.type === 'output');
             const cvPorts = module.ports.filter(p =>
               p.type === 'input'
-              && (p.label === 'CV' || p.label === 'Gate' || p.label === 'Clock' || p.label === 'Reset' || p.label === 'Trigger' || p.label === 'Pitch')
+              && (p.label === 'CV' || p.label === 'Gate' || p.label === 'Clock' || p.label === 'Reset' || p.label === 'Trigger' || p.label === 'Start' || p.label === 'Pitch' || p.label === 'Stop')
             );
 
             // Get connected input streams for each input port (excluding CV)
