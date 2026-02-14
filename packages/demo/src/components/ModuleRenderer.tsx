@@ -60,7 +60,8 @@ import {
   Upload,
   Zap,
   X,
-  RotateCcw
+  RotateCcw,
+  Repeat
 } from 'lucide-react';
 import {
   OscilloscopeCanvas,
@@ -1614,7 +1615,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
       return output ? (
         <Fluidsynth
           output={output}
-          midiInput={inputStreams[0] || null}
+          midiInput={inputStreams[0] || undefined}
           wasmBaseUrl={params.wasmBaseUrl}
           onWasmBaseUrlChange={(value) => setParam('wasmBaseUrl', value)}
           soundFontUrl={params.soundFontUrl}
