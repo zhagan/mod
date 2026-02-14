@@ -3,6 +3,36 @@ import { act, waitFor } from '@testing-library/react';
 import { render, createMockStreamRef } from './test-utils';
 import { Clock, ClockHandle } from '../components/cv/Clock';
 
+const mockWorkletNode = {
+  connect: jest.fn(),
+  disconnect: jest.fn(),
+};
+
+const mockTransport = {
+  getNode: jest.fn(() => mockWorkletNode),
+  start: jest.fn(),
+  stop: jest.fn(),
+  setTempo: jest.fn(),
+  dispose: jest.fn(),
+} as unknown;
+
+const mockBus = {
+  on: jest.fn(),
+  off: jest.fn(),
+  emit: jest.fn(),
+};
+
+jest.mock('../transportRegistry', () => ({
+  acquireSharedTransport: jest.fn(() => Promise.resolve({ transport: mockTransport, bus: mockBus })),
+  releaseSharedTransport: jest.fn(),
+}));
+
+const waitForClockReady = async (output: ReturnType<typeof createMockStreamRef>) => {
+  await waitFor(() => {
+    expect(output.current?.transport).toBeDefined();
+  });
+};
+
 describe('Clock', () => {
   describe('Render Props Pattern', () => {
     it('should render with default values', () => {
@@ -61,6 +91,8 @@ describe('Clock', () => {
 
       const button = getByRole('button', { name: /start/i });
 
+      await waitForClockReady(output);
+
       act(() => {
         button.click();
       });
@@ -86,6 +118,8 @@ describe('Clock', () => {
 
       const startButton = getByRole('button', { name: /start/i });
       const stopButton = getByRole('button', { name: /stop/i });
+
+      await waitForClockReady(output);
 
       act(() => {
         startButton.click();
@@ -120,6 +154,8 @@ describe('Clock', () => {
 
       const startButton = getByRole('button', { name: /start/i });
       const resetButton = getByRole('button', { name: /reset/i });
+
+      await waitForClockReady(output);
 
       act(() => {
         startButton.click();
@@ -208,6 +244,8 @@ describe('Clock', () => {
         </Clock>
       );
 
+      await waitForClockReady(output);
+
       act(() => {
         getByRole('button').click();
       });
@@ -237,6 +275,8 @@ describe('Clock', () => {
 
       const startButton = getByRole('button', { name: /start/i });
       const stopButton = getByRole('button', { name: /stop/i });
+
+      await waitForClockReady(output);
 
       act(() => {
         startButton.click();
@@ -437,6 +477,8 @@ describe('Clock', () => {
 
       const startButton = getByRole('button', { name: /start/i });
 
+      await waitForClockReady(output);
+
       act(() => {
         startButton.click();
       });
@@ -485,6 +527,18 @@ describe('Clock', () => {
       expect(output.current?.metadata?.sourceType).toBe('cv');
     });
 
+    it('should set startOutput ref when provided', () => {
+      const output = createMockStreamRef();
+      const startOutput = createMockStreamRef();
+
+      render(<Clock output={output} startOutput={startOutput} />);
+
+      expect(startOutput.current).toBeDefined();
+      expect(startOutput.current?.audioNode).toBeDefined();
+      expect(startOutput.current?.metadata?.label).toBe('clock-start');
+      expect(startOutput.current?.metadata?.sourceType).toBe('cv');
+    });
+
     it('should cleanup on unmount', () => {
       const output = createMockStreamRef();
 
@@ -504,7 +558,7 @@ describe('Clock', () => {
       expect(gain?.disconnect).toHaveBeenCalled();
     });
 
-    it('should clear interval on unmount when running', () => {
+    it('should cleanup worklet on unmount when running', () => {
       const output = createMockStreamRef();
 
       const { unmount } = render(
@@ -577,6 +631,8 @@ describe('Clock', () => {
 
       const button = getByRole('button');
 
+      await waitForClockReady(output);
+
       act(() => {
         button.click();
       });
@@ -640,6 +696,8 @@ describe('Clock', () => {
       const startButton = getByRole('button', { name: /start/i });
       const changeBpmButton = getByRole('button', { name: /change bpm/i });
 
+      await waitForClockReady(output);
+
       act(() => {
         startButton.click();
       });
@@ -677,6 +735,8 @@ describe('Clock', () => {
 
       const startButton = getByRole('button', { name: /start/i });
       const stopButton = getByRole('button', { name: /stop/i });
+
+      await waitForClockReady(output);
 
       act(() => {
         startButton.click();

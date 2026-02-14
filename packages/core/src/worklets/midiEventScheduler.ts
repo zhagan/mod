@@ -1,3 +1,4 @@
+export const midiEventSchedulerWorklet = `
 class MidiEventScheduler extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -70,3 +71,5 @@ class MidiEventScheduler extends AudioWorkletProcessor {
 }
 
 registerProcessor('midi-event-scheduler', MidiEventScheduler);
+
+`;

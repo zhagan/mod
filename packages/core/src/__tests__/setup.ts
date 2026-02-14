@@ -220,37 +220,6 @@ class MockAudioContext {
   }
 }
 
-class MockAudioWorkletNode {
-  parameters: Map<string, AudioParam>;
-  constructor(_context: AudioContext, _name: string, _options?: AudioWorkletNodeOptions) {
-    this.parameters = new Map<string, AudioParam>([
-      ['bpm', {
-        value: 120,
-        setValueAtTime: jest.fn(),
-        linearRampToValueAtTime: jest.fn(),
-        exponentialRampToValueAtTime: jest.fn(),
-        setTargetAtTime: jest.fn(),
-        setValueCurveAtTime: jest.fn(),
-        cancelScheduledValues: jest.fn(),
-        cancelAndHoldAtTime: jest.fn(),
-      } as unknown as AudioParam],
-      ['running', {
-        value: 0,
-        setValueAtTime: jest.fn(),
-        linearRampToValueAtTime: jest.fn(),
-        exponentialRampToValueAtTime: jest.fn(),
-        setTargetAtTime: jest.fn(),
-        setValueCurveAtTime: jest.fn(),
-        cancelScheduledValues: jest.fn(),
-        cancelAndHoldAtTime: jest.fn(),
-      } as unknown as AudioParam],
-    ]);
-  }
-
-  connect = jest.fn();
-  disconnect = jest.fn();
-}
-
 // Mock MediaStream API
 class MockMediaStream {
   id: string = 'mock-stream-id';
@@ -305,10 +274,59 @@ class MockMediaDevices {
   }
 }
 
+// Mock AudioWorkletNode for Clock worklet testing
+class MockAudioWorkletNode {
+  parameters: Map<string, AudioParam>;
+  port: {
+    onmessage: ((event: { data: unknown }) => void) | null;
+    postMessage: jest.Mock;
+  };
+
+  constructor(_context: AudioContext, _name: string, _options?: AudioWorkletNodeOptions) {
+    this.parameters = new Map<string, AudioParam>([
+      ['bpm', {
+        value: 120,
+        setValueAtTime: jest.fn(),
+        linearRampToValueAtTime: jest.fn(),
+        exponentialRampToValueAtTime: jest.fn(),
+        setTargetAtTime: jest.fn(),
+        setValueCurveAtTime: jest.fn(),
+        cancelScheduledValues: jest.fn(),
+        cancelAndHoldAtTime: jest.fn(),
+      } as unknown as AudioParam],
+      ['running', {
+        value: 0,
+        setValueAtTime: jest.fn(),
+        linearRampToValueAtTime: jest.fn(),
+        exponentialRampToValueAtTime: jest.fn(),
+        setTargetAtTime: jest.fn(),
+        setValueCurveAtTime: jest.fn(),
+        cancelScheduledValues: jest.fn(),
+        cancelAndHoldAtTime: jest.fn(),
+      } as unknown as AudioParam],
+    ]);
+    this.port = {
+      onmessage: null,
+      postMessage: jest.fn(),
+    };
+  }
+
+  connect = jest.fn();
+  disconnect = jest.fn();
+}
+
 // Install mocks
-global.AudioContext = MockAudioContext as any;
-global.webkitAudioContext = MockAudioContext as any;
-global.AudioWorkletNode = MockAudioWorkletNode as any;
+(global as any).AudioContext = MockAudioContext;
+(global as any).webkitAudioContext = MockAudioContext;
+(global as any).AudioWorkletNode = MockAudioWorkletNode;
+
+// Mock URL.createObjectURL and revokeObjectURL for AudioWorklet blob loading
+if (typeof URL.createObjectURL === 'undefined') {
+  URL.createObjectURL = jest.fn(() => 'blob:mock-url');
+}
+if (typeof URL.revokeObjectURL === 'undefined') {
+  URL.revokeObjectURL = jest.fn();
+}
 
 if (typeof navigator !== 'undefined') {
   Object.defineProperty(navigator, 'mediaDevices', {

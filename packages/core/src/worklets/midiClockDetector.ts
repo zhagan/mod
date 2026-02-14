@@ -1,3 +1,4 @@
+export const midiClockDetectorWorklet = `
 class ClockDetector extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -12,7 +13,7 @@ class ClockDetector extends AudioWorkletProcessor {
     for (let i = 0; i < channel.length; i++) {
       const value = channel[i];
       if (this._cooldown > 0) {
-        this._cooldown--;
+        this._cooldown -= 1;
         this._last = value;
         continue;
       }
@@ -28,3 +29,5 @@ class ClockDetector extends AudioWorkletProcessor {
 }
 
 registerProcessor('midi-clock-detector', ClockDetector);
+
+`;

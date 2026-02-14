@@ -4,7 +4,7 @@ import { useAudioContext } from '../../context/AudioContext';
 import { ModStreamRef } from '../../types/ModStream';
 import { MidiBus, MidiEvent } from '../../types/Midi';
 import { useControlledState } from '../../hooks/useControlledState';
-import { getWorkletUrl } from '../../workletUrl';
+import { midiClockDetectorWorklet, midiEventSchedulerWorklet } from '../../worklets';
 
 type MidiMetadata = {
   name: string;
@@ -16,13 +16,28 @@ type MidiMetadata = {
 };
 
 const clockDetectorLoaders = new WeakMap<AudioContext, Promise<void>>();
+const clockDetectorUrls = new WeakMap<AudioContext, string>();
 const eventSchedulerLoaders = new WeakMap<AudioContext, Promise<void>>();
+const eventSchedulerUrls = new WeakMap<AudioContext, string>();
 
 const loadEventSchedulerWorklet = (audioContext: AudioContext) => {
   let loader = eventSchedulerLoaders.get(audioContext);
   if (!loader) {
-    const url = getWorkletUrl('midi-event-scheduler.js');
-    loader = audioContext.audioWorklet.addModule(url).catch((err) => {
+    const blob = new Blob([midiEventSchedulerWorklet], { type: 'application/javascript' });
+    const url = URL.createObjectURL(blob);
+    eventSchedulerUrls.set(audioContext, url);
+    loader = audioContext.audioWorklet.addModule(url).then(() => {
+      const loadedUrl = eventSchedulerUrls.get(audioContext);
+      if (loadedUrl) {
+        URL.revokeObjectURL(loadedUrl);
+        eventSchedulerUrls.delete(audioContext);
+      }
+    }).catch((err) => {
+      const loadedUrl = eventSchedulerUrls.get(audioContext);
+      if (loadedUrl) {
+        URL.revokeObjectURL(loadedUrl);
+        eventSchedulerUrls.delete(audioContext);
+      }
       eventSchedulerLoaders.delete(audioContext);
       throw err;
     });
@@ -34,8 +49,21 @@ const loadEventSchedulerWorklet = (audioContext: AudioContext) => {
 const loadClockDetectorWorklet = (audioContext: AudioContext) => {
   let loader = clockDetectorLoaders.get(audioContext);
   if (!loader) {
-    const url = getWorkletUrl('midi-clock-detector.js');
-    loader = audioContext.audioWorklet.addModule(url).catch((err) => {
+    const blob = new Blob([midiClockDetectorWorklet], { type: 'application/javascript' });
+    const url = URL.createObjectURL(blob);
+    clockDetectorUrls.set(audioContext, url);
+    loader = audioContext.audioWorklet.addModule(url).then(() => {
+      const loadedUrl = clockDetectorUrls.get(audioContext);
+      if (loadedUrl) {
+        URL.revokeObjectURL(loadedUrl);
+        clockDetectorUrls.delete(audioContext);
+      }
+    }).catch((err) => {
+      const loadedUrl = clockDetectorUrls.get(audioContext);
+      if (loadedUrl) {
+        URL.revokeObjectURL(loadedUrl);
+        clockDetectorUrls.delete(audioContext);
+      }
       clockDetectorLoaders.delete(audioContext);
       throw err;
     });
