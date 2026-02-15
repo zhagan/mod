@@ -30,6 +30,10 @@ textarea,
   overflow: hidden;
 }
 
+.app.mobile-view {
+  flex-direction: column;
+}
+
 /* Sidebar */
 .sidebar {
   width: 250px;
@@ -37,6 +41,32 @@ textarea,
   border-right: 1px solid #2e2e32;
   padding: 20px;
   overflow-y: auto;
+}
+
+.sidebar.open {
+  opacity: 1;
+}
+
+.app.mobile-view .sidebar {
+  position: absolute;
+  inset: 0 0 auto 0;
+  width: 280px;
+  max-width: 85%;
+  height: 100%;
+  z-index: 25;
+  transform: translateX(-110%);
+  box-shadow: 8px 0 30px rgba(0, 0, 0, 0.6);
+  overflow-y: auto;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+
+.app.mobile-view.sidebar-open .sidebar {
+  transform: translateX(0);
+}
+
+.sidebar {
+  transition: transform 0.25s ease, opacity 0.25s ease;
 }
 
 .sidebar-header {
@@ -186,6 +216,7 @@ textarea,
       rgba(255, 255, 255, 0.05) 21px
     );
   background-size: 20px 20px;
+  touch-action: pan-x pan-y;
 }
 
 .canvas-content {
@@ -194,13 +225,88 @@ textarea,
   min-height: 100%;
 }
 
+.canvas-scale {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.canvas-controls {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 5;
+}
+
+.sidebar-toggle {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid #2e2e32;
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: rgba(255, 255, 245, 0.9);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.sidebar-toggle:hover {
+  background: rgba(255, 255, 255, 0.12);
+  transform: translateY(-1px);
+}
+
+.zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.07);
+  padding: 6px 12px;
+  border-radius: 10px;
+  border: 1px solid #2e2e32;
+}
+
+.zoom-controls button {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.zoom-controls button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.zoom-controls button:not(:disabled):hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.zoom-label {
+  font-size: 13px;
+  width: 48px;
+  text-align: center;
+  font-weight: 600;
+}
+
+.app.mobile-view .canvas-controls {
+  left: 16px;
+  right: auto;
+}
+
 /* Wires SVG */
 .wires-svg {
   position: absolute;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
+  width: 400%;
+  height: 400%;
   pointer-events: none;
   z-index: 1;
 }
@@ -238,4 +344,49 @@ textarea,
 
 .module-body {
   padding: 16px;
+}
+
+/* Backdrop behind the sidebar */
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 999;               /* below sidebar */
+  background: rgba(0, 0, 0, 0.35);
+  touch-action: none;
+}
+
+/* Mobile drawer sidebar (adjust selector to match yours) */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: min(340px, 86vw);
+  z-index: 1000;
+  transform: translateX(-100%);
+  transition: transform 180ms ease;
+  will-change: transform;
+}
+
+.sidebar.open {
+  transform: translateX(0);
+}
+
+/* Optional: prevent the page from scrolling when drawer is open */
+body.sidebar-open {
+  overflow: hidden;
+}
+
+/* Desktop: sidebar behaves normally; no backdrop */
+@media (min-width: 768px) {
+  .sidebar-backdrop {
+    display: none;
+  }
+  .sidebar {
+    position: relative;
+    transform: none;
+    height: auto;
+    z-index: auto;
+    transition: none;
+  }
 }

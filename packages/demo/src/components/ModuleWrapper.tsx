@@ -66,15 +66,15 @@ export const ModuleWrapper = React.memo<ModuleWrapperProps>(({
   children,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
-  const [dragOffset, setDragOffset] = useState<Position>({ x: 0, y: 0 });
   const moduleRef = useRef<HTMLDivElement>(null);
+  const dragOffsetRef = useRef<Position>({ x: 0, y: 0 });
 
   const inputPorts = ports.filter(p => p.type === 'input');
   const outputPorts = ports.filter(p => p.type === 'output');
 
   const textColor = isLightColor(color) ? '#2a2a2a' : '#ffffff';
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     // Don't start dragging if clicking on a port or control
     if ((e.target as HTMLElement).closest('.port') ||
         (e.target as HTMLElement).closest('input') ||
@@ -86,36 +86,36 @@ export const ModuleWrapper = React.memo<ModuleWrapperProps>(({
       return;
     }
 
-    setIsDragging(true);
-    setDragOffset({
+    e.preventDefault();
+    dragOffsetRef.current = {
       x: e.clientX - position.x,
       y: e.clientY - position.y,
-    });
-  };
-
-  const handleMouseMove = (e: MouseEvent) => {
-    if (isDragging) {
-      onMove(id, {
-        x: e.clientX - dragOffset.x,
-        y: e.clientY - dragOffset.y,
-      });
-    }
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
+    };
+    setIsDragging(true);
   };
 
   useEffect(() => {
-    if (isDragging) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
-      return () => {
-        window.removeEventListener('mousemove', handleMouseMove);
-        window.removeEventListener('mouseup', handleMouseUp);
-      };
-    }
-  }, [isDragging, dragOffset]);
+    if (!isDragging) return undefined;
+
+    const handlePointerMove = (e: PointerEvent) => {
+      onMove(id, {
+        x: e.clientX - dragOffsetRef.current.x,
+        y: e.clientY - dragOffsetRef.current.y,
+      });
+    };
+
+    const stopDragging = () => setIsDragging(false);
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', stopDragging);
+    window.addEventListener('pointercancel', stopDragging);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', stopDragging);
+      window.removeEventListener('pointercancel', stopDragging);
+    };
+  }, [isDragging, id, onMove]);
 
   return (
     <div
@@ -126,7 +126,7 @@ export const ModuleWrapper = React.memo<ModuleWrapperProps>(({
         top: position.y,
         borderColor: color,
       }}
-      onMouseDown={handleMouseDown}
+      onPointerDown={handlePointerDown}
     >
       <div className="module-wrapper-header" style={{ backgroundColor: color, color: textColor }}>
         <span className="module-wrapper-title">{type}</span>
