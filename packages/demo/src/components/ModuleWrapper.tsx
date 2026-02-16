@@ -20,7 +20,7 @@ interface ModuleWrapperProps {
   color?: string;
   onMove: (id: string, position: Position) => void;
   onDelete: (id: string) => void;
-  onPortMouseDown?: (moduleId: string, portId: string, portType: 'input' | 'output', event: React.MouseEvent) => void;
+  onPortMouseDown?: (moduleId: string, portId: string, portType: 'input' | 'output', event: React.PointerEvent<HTMLDivElement>) => void;
   onPortMouseEnter?: (moduleId: string, portId: string) => void;
   onPortMouseLeave?: () => void;
   isPortConnected?: (portId: string) => boolean;
@@ -74,6 +74,7 @@ export const ModuleWrapper = React.memo<ModuleWrapperProps>(({
 
   const textColor = isLightColor(color) ? '#2a2a2a' : '#ffffff';
 
+<<<<<<< Updated upstream
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     // Don't start dragging if clicking on a port or control
     if ((e.target as HTMLElement).closest('.port') ||
@@ -83,6 +84,45 @@ export const ModuleWrapper = React.memo<ModuleWrapperProps>(({
         (e.target as HTMLElement).closest('.select-trigger') ||
         (e.target as HTMLElement).closest('.select-content') ||
         (e.target as HTMLElement).closest('.select-item')) {
+=======
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    const controlSelectors = [
+      '.port',
+      'input',
+      'button',
+      'select',
+      '.modui-knob',
+      '.modui-knob-control',
+      '.modui-knob-center',
+      '.modui-knob-wrapper',
+      '.modui-knob-svg',
+      '.modui-knob-track',
+      '.modui-knob-value-arc',
+      '.modui-knob-indicator',
+      '.modui-knob-button',
+      '.modui-knob-button-left',
+      '.modui-knob-button-right',
+      '.modui-slider',
+      '.modui-slider-control',
+      '.modui-slider-input',
+      '.modui-slider-button',
+      '.modui-slider-button-left',
+      '.modui-slider-button-right',
+      '.modui-button',
+      '.modui-select',
+      '.select-trigger',
+      '.select-content',
+      '.select-item',
+      '.modui-text-input',
+      'svg',
+      'path',
+      'circle',
+      'line',
+    ];
+
+    if (controlSelectors.some(selector => Boolean(target.closest(selector)))) {
+>>>>>>> Stashed changes
       return;
     }
 
@@ -175,12 +215,14 @@ export const ModuleWrapper = React.memo<ModuleWrapperProps>(({
                   className={`port port-input ${connected ? 'port-connected' : ''} ${hovered ? 'port-hovered' : ''}`}
                   data-module-id={id}
                   data-port-id={port.id}
-                  onMouseDown={(e) => {
+                  onPointerDown={(e) => {
                     e.stopPropagation();
                     onPortMouseDown?.(id, port.id, 'input', e);
                   }}
                   onMouseEnter={() => onPortMouseEnter?.(id, port.id)}
                   onMouseLeave={() => onPortMouseLeave?.()}
+                  onPointerEnter={() => onPortMouseEnter?.(id, port.id)}
+                  onPointerLeave={() => onPortMouseLeave?.()}
                   title={port.label}
                 >
                   <div className="port-dot" />
@@ -208,12 +250,14 @@ export const ModuleWrapper = React.memo<ModuleWrapperProps>(({
                   className={`port port-output ${connected ? 'port-connected' : ''} ${hovered ? 'port-hovered' : ''}`}
                   data-module-id={id}
                   data-port-id={port.id}
-                  onMouseDown={(e) => {
+                  onPointerDown={(e) => {
                     e.stopPropagation();
                     onPortMouseDown?.(id, port.id, 'output', e);
                   }}
                   onMouseEnter={() => onPortMouseEnter?.(id, port.id)}
                   onMouseLeave={() => onPortMouseLeave?.()}
+                  onPointerEnter={() => onPortMouseEnter?.(id, port.id)}
+                  onPointerLeave={() => onPortMouseLeave?.()}
                   title={port.label}
                 >
                   <div className="port-dot" />

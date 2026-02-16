@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo, useLayoutEffect } from 'react';
+import React, { useState, useRef, useMemo, useLayoutEffect, useEffect, useCallback } from 'react';
 import { flushSync } from 'react-dom';
 import '@mode-7/mod/dist/index.css';
 import {
@@ -47,6 +47,7 @@ import { ModuleRenderer } from './components/ModuleRenderer';
 import { MODULE_DEFINITIONS } from './moduleDefinitions';
 import logo from '../assets/logo.png';
 import './App.css';
+import { SidebarIcon } from 'lucide-react';
 
 interface Position {
   x: number;
@@ -105,8 +106,28 @@ function ModularSynth() {
   const [draggingConnection, setDraggingConnection] = useState<{
     from: { moduleId: string; portId: string };
     mousePos: Position;
+    startPortType: 'input' | 'output';
   } | null>(null);
   const [hoveredPort, setHoveredPort] = useState<{ moduleId: string; portId: string } | null>(null);
+  const [sidebarDragModule, setSidebarDragModule] = useState<{
+    moduleType: string;
+  } | null>(null);
+  const [sidebarDragPoint, setSidebarDragPoint] = useState<Position | null>(null);
+  const pendingSidebarDragRef = useRef<{ moduleType: string; startX: number; startY: number } | null>(null);
+  const [isSidebarDragActive, setSidebarDragActive] = useState(false);
+  const sidebarDragModuleRef = useRef(sidebarDragModule);
+  const getIsMobileView = () => (typeof window !== 'undefined' ? window.innerWidth < 900 : false);
+  const lastIsMobileRef = useRef(getIsMobileView());
+  const [isMobileView, setIsMobileView] = useState(getIsMobileView);
+  const [isSidebarOpen, setSidebarOpen] = useState(() => !getIsMobileView());
+  const [zoom, setZoom] = useState(0.6);
+  const zoomRef = useRef(0.6);
+  const zoomStep = 0.05;
+  const minZoom = 0.25;
+  const maxZoom = 1;
+  const pinchSensitivity = 600;
+  const lastPinchDistanceRef = useRef<number | null>(null);
+  const DRAG_THRESHOLD = 8;
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -123,6 +144,75 @@ function ModularSynth() {
     }
     return streamRefs.current.get(portId);
   };
+
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
+
+  const clampZoom = (value: number) => Math.min(maxZoom, Math.max(minZoom, value));
+  // const handleZoomChange = (value: number) => setZoom(() => clampZoom(value));
+  const zoomIn = () => setZoom(prev => clampZoom(prev + zoomStep));
+  const zoomOut = () => setZoom(prev => clampZoom(prev - zoomStep));
+  const getPinchDistance = (touches: React.TouchList): number => {
+    if (touches.length < 2) return 0;
+    const [touchA, touchB] = [touches[0], touches[1]];
+    const dx = touchA.clientX - touchB.clientX;
+    const dy = touchA.clientY - touchB.clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  const handleCanvasTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (event.touches.length === 2) {
+      lastPinchDistanceRef.current = getPinchDistance(event.touches);
+      // event.preventDefault();
+    }
+  };
+
+  const handleCanvasTouchMove = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (event.touches.length === 2 && lastPinchDistanceRef.current !== null) {
+      const nextDistance = getPinchDistance(event.touches);
+      const zoomDelta = (nextDistance - lastPinchDistanceRef.current) / pinchSensitivity;
+      setZoom(prev => clampZoom(prev + zoomDelta));
+      lastPinchDistanceRef.current = nextDistance;
+      event.preventDefault();
+    }
+  };
+
+  const handleCanvasTouchEnd = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (event.touches.length < 2) {
+      lastPinchDistanceRef.current = null;
+    }
+  };
+
+  const toggleSidebar = () => setSidebarOpen(prev => !prev);
+
+  const toCanvasPoint = (clientX: number, clientY: number) => {
+    const contentRect = contentRef.current?.getBoundingClientRect();
+    const currentZoom = zoomRef.current || 1;
+    if (!contentRect || currentZoom === 0) return null;
+    return {
+      x: (clientX - contentRect.left) / currentZoom,
+      y: (clientY - contentRect.top) / currentZoom,
+    };
+  };
+
+  const isPointOverCanvas = useCallback((clientX: number, clientY: number) => {
+    const canvasRect = contentRef.current?.getBoundingClientRect();
+    if (!canvasRect) return false;
+    return clientX >= canvasRect.left
+      && clientX <= canvasRect.right
+      && clientY >= canvasRect.top
+      && clientY <= canvasRect.bottom;
+  }, []);
+
+  const updateSidebarDragPoint = useCallback((clientX: number, clientY: number) => {
+    if (!isPointOverCanvas(clientX, clientY)) {
+      setSidebarDragPoint(null);
+      return;
+    }
+    const point = toCanvasPoint(clientX, clientY);
+    setSidebarDragPoint(point);
+  }, [isPointOverCanvas]);
 
   const cloneParams = (params: Record<string, any>) => {
     try {
@@ -180,7 +270,7 @@ function ModularSynth() {
     return newModule;
   };
 
-  const addModule = (type: string, position?: Position) => {
+  const addModule = useCallback((type: string, position?: Position) => {
     const defaultPosition = position || { x: 100 + modules.length * 20, y: 100 + modules.length * 20 };
     const newModule = createModuleData(type, defaultPosition);
     if (!newModule) return;
@@ -189,7 +279,62 @@ function ModularSynth() {
       ...prev,
       [newModule.id]: getDefaultParams(type),
     }));
+  }, [modules]);
+
+  const handleAddModule = (type: string, position?: Position) => {
+    addModule(type, position);
   };
+
+  useEffect(() => {
+    sidebarDragModuleRef.current = sidebarDragModule;
+  }, [sidebarDragModule]);
+
+  useEffect(() => {
+    if (!isSidebarDragActive) return;
+
+    const handlePointerMove = (event: PointerEvent) => {
+      event.preventDefault();
+      const pending = pendingSidebarDragRef.current;
+
+      if (pending && !sidebarDragModuleRef.current) {
+        const dx = event.clientX - pending.startX;
+        const dy = event.clientY - pending.startY;
+        if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) {
+          const moduleState = { moduleType: pending.moduleType };
+          sidebarDragModuleRef.current = moduleState;
+          setSidebarDragModule(moduleState);
+        }
+      }
+
+      if (sidebarDragModuleRef.current) {
+        updateSidebarDragPoint(event.clientX, event.clientY);
+      }
+    };
+
+    const handlePointerEnd = (event: PointerEvent) => {
+      event.preventDefault();
+      if (sidebarDragModuleRef.current && isPointOverCanvas(event.clientX, event.clientY)) {
+        const point = toCanvasPoint(event.clientX, event.clientY);
+        if (point) {
+          addModule(sidebarDragModuleRef.current.moduleType, point);
+        }
+      }
+      setSidebarDragModule(null);
+      setSidebarDragPoint(null);
+      pendingSidebarDragRef.current = null;
+      setSidebarDragActive(false);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove, { passive: false });
+    window.addEventListener('pointerup', handlePointerEnd);
+    window.addEventListener('pointercancel', handlePointerEnd);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerEnd);
+      window.removeEventListener('pointercancel', handlePointerEnd);
+    };
+  }, [isSidebarDragActive, addModule, updateSidebarDragPoint, isPointOverCanvas]);
 
   const moveModule = (id: string, position: Position) => {
     setModules(prev => prev.map(m => m.id === id ? { ...m, position } : m));
@@ -277,87 +422,169 @@ function ModularSynth() {
   };
 
   // Handle starting to drag a connection
-  const handlePortMouseDown = (moduleId: string, portId: string, portType: 'input' | 'output', event: React.MouseEvent) => {
+  const handlePortMouseDown = (
+    moduleId: string,
+    portId: string,
+    portType: 'input' | 'output',
+    event: React.PointerEvent<HTMLDivElement>,
+  ) => {
     event.stopPropagation();
 
-    // Only allow dragging from output ports
-    if (portType !== 'output') return;
-
-    const contentRect = contentRef.current?.getBoundingClientRect();
-    if (!contentRect) return;
+    const point = toCanvasPoint(event.clientX, event.clientY);
+    if (!point) return;
 
     setDraggingConnection({
       from: { moduleId, portId },
-      mousePos: {
-        x: event.clientX - contentRect.left,
-        y: event.clientY - contentRect.top,
-      },
+      mousePos: point,
+      startPortType: portType,
     });
   };
 
   // Handle mouse move while dragging - use RAF for smooth updates
-  const handleCanvasMouseMove = (e: React.MouseEvent) => {
-    if (!draggingConnection || !canvasRef.current) return;
-
-    const contentRect = contentRef.current.getBoundingClientRect();
-    mousePosRef.current = {
-      x: e.clientX - contentRect.left,
-      y: e.clientY - contentRect.top,
-    };
-
-    // Throttle state updates with requestAnimationFrame
-    if (rafIdRef.current === null) {
-      rafIdRef.current = requestAnimationFrame(() => {
-        setDraggingConnection({
-          ...draggingConnection,
-          mousePos: mousePosRef.current,
-        });
-        rafIdRef.current = null;
-      });
+  const updateHoveredPortFromPoint = (clientX: number, clientY: number) => {
+    if (clientX == null || clientY == null) {
+      setHoveredPort(null);
+      return;
+    }
+    const element = document.elementFromPoint(clientX, clientY) as HTMLElement | null;
+    const portEl = element?.closest('.port') as HTMLElement | null;
+    if (portEl && portEl.dataset.moduleId && portEl.dataset.portId) {
+      setHoveredPort({ moduleId: portEl.dataset.moduleId, portId: portEl.dataset.portId });
+    } else {
+      setHoveredPort(null);
     }
   };
 
+  const updateDraggingConnectionPosition = (clientX: number, clientY: number) => {
+    if (!draggingConnection || !canvasRef.current) return;
+
+    const point = toCanvasPoint(clientX, clientY);
+    if (!point) return;
+    mousePosRef.current = point;
+
+    if (rafIdRef.current === null) {
+      rafIdRef.current = requestAnimationFrame(() => {
+        setDraggingConnection(prev => (prev ? { ...prev, mousePos: mousePosRef.current } : null));
+        rafIdRef.current = null;
+      });
+    }
+    updateHoveredPortFromPoint(clientX, clientY);
+  };
+
+  const handleCanvasMouseMove = (e: React.MouseEvent) => {
+    updateDraggingConnectionPosition(e.clientX, e.clientY);
+  };
+
   // Handle mouse up to complete connection
-  const handleCanvasMouseUp = (e: React.MouseEvent) => {
+  const handleCanvasPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    updateDraggingConnectionPosition(event.clientX, event.clientY);
+
+    if (!isCanvasPanningRef.current) return;
+
+    const canvasEl = canvasRef.current;
+    if (!canvasEl) return;
+
+    const deltaX = event.clientX - panStartRef.current.x;
+    const deltaY = event.clientY - panStartRef.current.y;
+    canvasEl.scrollLeft = panStartRef.current.scrollLeft - deltaX;
+    canvasEl.scrollTop = panStartRef.current.scrollTop - deltaY;
+    event.preventDefault();
+  };
+
+  const stopCanvasPan = () => {
+    if (!isCanvasPanningRef.current) return;
+    const canvasEl = canvasRef.current;
+    if (canvasEl && panStartRef.current.pointerId) {
+      canvasEl.releasePointerCapture(panStartRef.current.pointerId);
+    }
+    isCanvasPanningRef.current = false;
+  };
+
+  const handleCanvasPointerUp = () => {
+    finalizeConnection();
+    stopCanvasPan();
+  };
+
+  const handleCanvasPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    handleUnlockAudio();
+    if (!canvasRef.current) return;
+    if (sidebarDragModule) {
+      event.preventDefault();
+      return;
+    }
+
+    const target = event.target as HTMLElement;
+    const isValidPanTarget = !target.closest('.module-wrapper')
+      && !target.closest('.port')
+      && !target.closest('.canvas-controls')
+      && !target.closest('.sidebar')
+      && !target.closest('.sidebar-toggle')
+      && !target.closest('.wires-svg');
+
+    if (!isValidPanTarget) return;
+
+    isCanvasPanningRef.current = true;
+    panStartRef.current = {
+      x: event.clientX,
+      y: event.clientY,
+      scrollLeft: canvasRef.current.scrollLeft,
+      scrollTop: canvasRef.current.scrollTop,
+      pointerId: event.pointerId,
+    };
+    canvasRef.current.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  };
+
+  const finalizeConnection = () => {
     if (!draggingConnection) return;
 
-    // Cancel any pending RAF updates
     if (rafIdRef.current !== null) {
       cancelAnimationFrame(rafIdRef.current);
       rafIdRef.current = null;
     }
 
-    // Use hoveredPort if available (more reliable than target detection)
     if (hoveredPort) {
       const module = modules.find(m => m.id === hoveredPort.moduleId);
       const port = module?.ports.find(p => p.id === hoveredPort.portId);
 
-      // Check if it's an input port and not from the same module
-      if (port?.type === 'input' && hoveredPort.moduleId !== draggingConnection.from.moduleId) {
-        // Find and delete any existing connection to this input port first
-        const existingConnection = connections.find(c => c.to.portId === hoveredPort.portId);
-        if (existingConnection) {
-          // Remove the old connection first (this will trigger cleanup in the components)
-          // Use flushSync to force this update to complete before the next one
-          flushSync(() => {
-            setConnections(prev => prev.filter(c => c.id !== existingConnection.id));
-          });
+      if (port && hoveredPort.moduleId !== draggingConnection.from.moduleId) {
+        let fromPort = null;
+        let toPort = null;
+        const startedOnOutput = draggingConnection.startPortType === 'output';
+
+        if (startedOnOutput && port.type === 'input') {
+          fromPort = draggingConnection.from;
+          toPort = hoveredPort;
+        } else if (!startedOnOutput && port.type === 'output') {
+          fromPort = hoveredPort;
+          toPort = draggingConnection.from;
         }
 
-        // Create the new connection
-        const newConnection: Connection = {
-          id: `conn-${Date.now()}`,
-          from: draggingConnection.from,
-          to: { moduleId: hoveredPort.moduleId, portId: hoveredPort.portId },
-        };
+        if (fromPort && toPort) {
+          const existingConnection = connections.find(c => c.to.portId === toPort.portId);
+          if (existingConnection) {
+            flushSync(() => {
+              setConnections(prev => prev.filter(c => c.id !== existingConnection.id));
+            });
+          }
 
-        // Add the new connection
-        setConnections(prev => [...prev, newConnection]);
+          const newConnection: Connection = {
+            id: `conn-${Date.now()}`,
+            from: { moduleId: fromPort.moduleId, portId: fromPort.portId },
+            to: { moduleId: toPort.moduleId, portId: toPort.portId },
+          };
+
+          setConnections(prev => [...prev, newConnection]);
+        }
       }
     }
 
     setDraggingConnection(null);
     setHoveredPort(null);
+  };
+
+  const handleCanvasMouseUp = () => {
+    finalizeConnection();
   };
 
   // Handle clicking on a wire to delete it
@@ -400,12 +627,45 @@ function ModularSynth() {
   };
 
   // Helper to render a draggable module button
+  const startSidebarDrag = (type: string) => (event: React.PointerEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    pendingSidebarDragRef.current = {
+      moduleType: type,
+      startX: event.clientX,
+      startY: event.clientY,
+    };
+    setSidebarDragModule(null);
+    setSidebarDragPoint(null);
+    setSidebarDragActive(true);
+  };
+
+  const startSidebarTouchDrag = (type: string) => (event: React.TouchEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    if (!event.touches.length) return;
+    pendingSidebarDragRef.current = {
+      moduleType: type,
+      startX: event.touches[0].clientX,
+      startY: event.touches[0].clientY,
+    };
+    setSidebarDragModule(null);
+    setSidebarDragPoint(null);
+    setSidebarDragActive(true);
+  };
+
   const renderModuleButton = (type: string) => (
     <button
       key={type}
-      onClick={() => addModule(type)}
+      onClick={() => {
+        // console.log('Add module:', type);
+        if (!isMobileView) {
+          handleAddModule(type);
+        }
+      }}
       draggable
       onDragStart={(e) => e.dataTransfer.setData('moduleType', type)}
+      onPointerDown={startSidebarDrag(type)}
+      onTouchStart={startSidebarTouchDrag(type)}
       style={{ borderLeft: `4px solid ${MODULE_DEFINITIONS[type].color}`, cursor: 'grab' }}
     >
       {MODULE_DEFINITIONS[type].label}
@@ -618,7 +878,7 @@ function ModularSynth() {
           {renderModuleButton('LevelMeter')}
         </div>
       </div>
-
+     
       {/* Canvas */}
       <div
         ref={canvasRef}
@@ -627,8 +887,37 @@ function ModularSynth() {
         onMouseUp={handleCanvasMouseUp}
         onDragOver={handleCanvasDragOver}
         onDrop={handleCanvasDrop as any}
-        onPointerDown={handleUnlockAudio}
+        onPointerDown={handleCanvasPointerDown}
+        onPointerMove={handleCanvasPointerMove}
+        onPointerUp={handleCanvasPointerUp}
+        onPointerCancel={handleCanvasPointerUp}
+        onTouchStart={handleCanvasTouchStart}
+        onTouchMove={handleCanvasTouchMove}
+        onTouchEnd={handleCanvasTouchEnd}
+        onTouchCancel={handleCanvasTouchEnd}
       >
+        <div className="canvas-controls">
+          <div className="zoom-controls">
+            <button type="button" onClick={zoomOut} disabled={zoom <= minZoom} aria-label="Zoom out">
+              −
+            </button>
+            <span className="zoom-label">{zoomPercent}%</span>
+            <button type="button" onClick={zoomIn} disabled={zoom >= maxZoom} aria-label="Zoom in">
+              +
+            </button>
+          </div>
+        {isMobileView && (
+          <button
+            type="button"
+            className="sidebar-toggle"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={toggleSidebar}
+            aria-label="Toggle module list"
+          >
+            <SidebarIcon />
+            </button>
+          )}
+        </div>
         <div
           ref={contentRef}
           className="canvas-content"
@@ -654,15 +943,16 @@ function ModularSynth() {
               return (
                 <g key={conn.id}>
                   {/* Invisible thick path for easier clicking */}
-                  <path
-                    d={path}
-                    stroke="transparent"
-                    strokeWidth="12"
-                    fill="none"
-                    strokeLinecap="round"
-                    style={{ cursor: 'pointer' }}
-                    onClick={(e) => handleWireClick(conn.id, e)}
-                  />
+                <path
+                  d={path}
+                  stroke="transparent"
+                  strokeWidth="12"
+                  fill="none"
+                  strokeLinecap="round"
+                  style={{ cursor: 'pointer' }}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onClick={(e) => handleWireClick(conn.id, e)}
+                />
                   {/* Visible wire */}
                   <path
                     d={path}
@@ -700,6 +990,17 @@ function ModularSynth() {
                 />
               );
             })()}
+            {sidebarDragPoint && sidebarDragModule && (
+              <div
+                className="sidebar-drag-preview"
+                style={{
+                  left: sidebarDragPoint.x - 16,
+                  top: sidebarDragPoint.y - 16,
+                }}
+              >
+                {MODULE_DEFINITIONS[sidebarDragModule.moduleType]?.label || 'Module'}
+              </div>
+            )}
           </svg>
 
           {modules.map((module) => {

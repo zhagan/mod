@@ -53,19 +53,8 @@ export const Knob: React.FC<KnobProps> = ({
 
   const angle = valueToAngle(value);
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (disabled) return;
-    setIsDragging(true);
-    setStartY(e.clientY);
-    setStartValue(value);
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
-  const handleMouseMove = (e: MouseEvent) => {
-    if (!isDragging) return;
-
-    const deltaY = startY - e.clientY; // Inverted: up = increase
+  const calculateValueFromY = (clientY: number) => {
+    const deltaY = startY - clientY; // Inverted: up = increase
     const sensitivity = 0.5; // Pixels per step
     const steps = Math.round(deltaY / sensitivity);
     const delta = steps * step;
@@ -81,7 +70,44 @@ export const Knob: React.FC<KnobProps> = ({
     }
   };
 
-  const handleMouseUp = () => {
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (disabled) return;
+    setIsDragging(true);
+    setStartY(e.clientY);
+    setStartValue(value);
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('knob pointerdown', e.pointerType, e.clientX, e.clientY);
+  };
+
+  const handlePointerMove = (e: PointerEvent) => {
+    if (!isDragging) return;
+    console.log('knob pointermove', e.pointerType, e.clientX, e.clientY);
+
+    calculateValueFromY(e.clientY);
+  };
+
+  const handlePointerUp = () => {
+    setIsDragging(false);
+    console.log('knob pointerup');
+  };
+ 
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (disabled || e.touches.length === 0) return;
+    setIsDragging(true);
+    setStartY(e.touches[0].clientY);
+    setStartValue(value);
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('knob touchstart', e.touches[0].clientX, e.touches[0].clientY);
+  };
+
+  const handleTouchMove = (e: TouchEvent) => {
+    if (!isDragging || e.touches.length === 0) return;
+    calculateValueFromY(e.touches[0].clientY);
+  };
+
+  const handleTouchEnd = () => {
     setIsDragging(false);
   };
 
@@ -100,15 +126,22 @@ export const Knob: React.FC<KnobProps> = ({
   };
 
   useEffect(() => {
-    if (isDragging) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
-      return () => {
-        window.removeEventListener('mousemove', handleMouseMove);
-        window.removeEventListener('mouseup', handleMouseUp);
-      };
-    }
-  }, [isDragging, startY, startValue, value]);
+    if (!isDragging) return;
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('touchmove', handleTouchMove);
+    window.addEventListener('touchend', handleTouchEnd);
+    window.addEventListener('touchcancel', handleTouchEnd);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleTouchEnd);
+      window.removeEventListener('touchcancel', handleTouchEnd);
+    };
+  }, [isDragging, startY, startValue, value, step, min, max]);
 
   // Default styles
   const defaultStyles = {
@@ -136,10 +169,11 @@ export const Knob: React.FC<KnobProps> = ({
             −
           </button>
         )}
-        <div
-          ref={knobRef}
-          className={defaultStyles.knob}
-          onMouseDown={handleMouseDown}
+          <div
+            ref={knobRef}
+            className={defaultStyles.knob}
+            onPointerDown={handlePointerDown}
+            onTouchStart={handleTouchStart}
           style={{
             width: size,
             height: size,
