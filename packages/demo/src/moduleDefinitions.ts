@@ -2,6 +2,42 @@ import { DiodeFilter } from '@mode-7/mod';
 import { ModuleDefinition } from './types';
 
 export const MODULE_DEFINITIONS: Record<string, ModuleDefinition> = {
+  SubSketch: {
+    type: 'SubSketch',
+    label: 'Sub-Sketch',
+    category: 'sketch',
+    color: '#9f7aea',
+    inputs: 0,
+    outputs: 1,
+    outputLabels: ['Audio'],
+    defaultParams: {
+      storageMode: 'reference',
+      referenceUrl: '',
+      interface: {
+        inputs: [],
+        outputs: [{ id: 'audio', label: 'Audio', signalType: 'audio' }],
+      },
+      embeddedSketch: { version: 1, modules: [], connections: [] },
+    },
+  },
+  SketchIn: {
+    type: 'SketchIn',
+    label: 'Sketch In',
+    category: 'sketch',
+    color: '#4c51bf',
+    inputs: 0,
+    outputs: 0,
+    defaultParams: {},
+  },
+  SketchOut: {
+    type: 'SketchOut',
+    label: 'Sketch Out',
+    category: 'sketch',
+    color: '#4c51bf',
+    inputs: 0,
+    outputs: 0,
+    defaultParams: {},
+  },
   ToneGenerator: {
     type: 'ToneGenerator',
     label: 'Tone Generator',
@@ -142,7 +178,7 @@ export const MODULE_DEFINITIONS: Record<string, ModuleDefinition> = {
     inputs: 0,
     outputs: 3,
     outputLabels: ['Clock', 'Start', 'Stop'],
-    defaultParams: { bpm: 120 },
+    defaultParams: { bpm: 120, isRunning: false },
   },
   Delay: {
     type: 'Delay',

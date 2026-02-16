@@ -81,6 +81,8 @@ interface ModuleRendererProps {
   enabled?: boolean;
   params: Record<string, any>;
   onParamChange: (moduleId: string, key: string, value: any) => void;
+  onRequestOpenSubSketch?: (moduleId: string) => void;
+  onUpdateSubSketchInterface?: (moduleId: string, value: any) => void;
 }
 
 export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
@@ -92,12 +94,22 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                                                                 enabled = true,
                                                                 params,
                                                                 onParamChange,
+                                                                onRequestOpenSubSketch,
+                                                                onUpdateSubSketchInterface,
                                                               }) => {
   const [selectedStepIndex, setSelectedStepIndex] = React.useState(0);
+  const clockHandleRef = React.useRef<any>(null);
   const input = inputStreams[0];
   const input2 = inputStreams[1];
   const output = outputStreams[0];
   const setParam = (key: string, value: any) => onParamChange(moduleId, key, value);
+  const updateSubSketchInterface = (value: any) => {
+    if (onUpdateSubSketchInterface) {
+      onUpdateSubSketchInterface(moduleId, value);
+      return;
+    }
+    setParam('interface', value);
+  };
 
   // Get CV input (just get the first one since each component only has one CV port)
   const cv = Object.values(cvInputStreams).find(stream => stream !== null) || undefined;
@@ -119,7 +131,318 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
     }
   }, [moduleType, params?.steps?.length, selectedStepIndex]);
 
+  React.useEffect(() => {
+    if (moduleType !== 'Clock') return;
+    const handle = clockHandleRef.current;
+    if (!handle) return;
+    const desired = params?.isRunning === true;
+    const actual = typeof handle.getState === 'function' ? Boolean(handle.getState()?.isRunning) : null;
+    if (actual === null) {
+      if (desired) handle.start?.();
+      else handle.stop?.();
+      return;
+    }
+    if (desired && !actual) handle.start?.();
+    if (!desired && actual) handle.stop?.();
+  }, [moduleType, params?.isRunning]);
+
   switch (moduleType) {
+    case 'SubSketch': {
+      const storageMode = (params.storageMode === 'embed' || params.storageMode === 'reference')
+        ? params.storageMode
+        : 'reference';
+      const subSketchInterface = params.interface && typeof params.interface === 'object'
+        ? params.interface
+        : { inputs: [], outputs: [] };
+      const inputs = Array.isArray(subSketchInterface.inputs) ? subSketchInterface.inputs : [];
+      const outputs = Array.isArray(subSketchInterface.outputs) ? subSketchInterface.outputs : [];
+
+      const sanitizePortId = (raw: string) => raw.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+      const dedupePortId = (candidate: string, existing: string[]) => {
+        const base = candidate || 'port';
+        if (!existing.includes(base)) return base;
+        let i = 2;
+        while (existing.includes(`${base}-${i}`)) i += 1;
+        return `${base}-${i}`;
+      };
+
+      const updatePort = (direction: 'inputs' | 'outputs', index: number, patch: { id?: string; label?: string }) => {
+        const current = direction === 'inputs' ? inputs : outputs;
+        const next = current.map((p: any, i: number) => (i === index ? { ...p, ...patch } : p));
+        const nextInterface = {
+          inputs: direction === 'inputs' ? next : inputs,
+          outputs: direction === 'outputs' ? next : outputs,
+        };
+        updateSubSketchInterface(nextInterface);
+      };
+
+      const removePort = (direction: 'inputs' | 'outputs', index: number) => {
+        const current = direction === 'inputs' ? inputs : outputs;
+        const next = current.filter((_: any, i: number) => i !== index);
+        const nextInterface = {
+          inputs: direction === 'inputs' ? next : inputs,
+          outputs: direction === 'outputs' ? next : outputs,
+        };
+        updateSubSketchInterface(nextInterface);
+      };
+
+      const addPort = (direction: 'inputs' | 'outputs') => {
+        const current = direction === 'inputs' ? inputs : outputs;
+        const existingIds = current.map((p: any) => String(p?.id ?? ''));
+        const id = dedupePortId('port', existingIds);
+        const next = [...current, {
+          id,
+          label: direction === 'inputs' ? 'In' : 'Out',
+          signalType: direction === 'inputs' ? 'cv' : 'audio',
+        }];
+        const nextInterface = {
+          inputs: direction === 'inputs' ? next : inputs,
+          outputs: direction === 'outputs' ? next : outputs,
+        };
+        updateSubSketchInterface(nextInterface);
+      };
+
+      const normalizePortId = (direction: 'inputs' | 'outputs', index: number) => {
+        const current = direction === 'inputs' ? inputs : outputs;
+        const existingIds = current
+          .filter((_: any, i: number) => i !== index)
+          .map((p: any) => String(p?.id ?? ''));
+        const raw = String(current[index]?.id ?? '');
+        const sanitized = sanitizePortId(raw);
+        const deduped = dedupePortId(sanitized || 'port', existingIds);
+        if (deduped !== raw) {
+          updatePort(direction, index, { id: deduped });
+        }
+      };
+
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <span style={{ fontSize: '12px', opacity: 0.8 }}>Storage</span>
+              <select
+                value={storageMode}
+                onChange={(e) => setParam('storageMode', e.target.value)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid #2e2e32',
+                  borderRadius: '8px',
+                  color: 'rgba(255, 255, 245, 0.9)',
+                  padding: '6px 8px',
+                }}
+              >
+                <option value="reference">Reference (default)</option>
+                <option value="embed">Embed</option>
+              </select>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => onRequestOpenSubSketch?.(moduleId)}
+              style={{
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid #2e2e32',
+                borderRadius: '8px',
+                padding: '6px 10px',
+                color: 'rgba(255, 255, 245, 0.9)',
+                cursor: 'pointer',
+              }}
+            >
+              Open
+            </button>
+          </div>
+
+          {storageMode === 'reference' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <ModUITextInput
+                label="Sub-sketch URL"
+                value={params.referenceUrl || ''}
+                onChange={(value) => setParam('referenceUrl', value)}
+                placeholder="https://…/my-subsketch.json"
+              />
+              <div style={{ fontSize: '12px', opacity: 0.7 }}>
+                Saved parent sketch will store the URL only (not the embedded JSON).
+              </div>
+            </div>
+          )}
+
+          {storageMode === 'embed' && (
+            <div style={{ fontSize: '12px', opacity: 0.7 }}>
+              Saved parent sketch will include the sub-sketch JSON.
+            </div>
+          )}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: '12px', opacity: 0.8 }}>Interface</div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => addPort('inputs')}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.06)',
+                    border: '1px solid #2e2e32',
+                    borderRadius: '8px',
+                    padding: '6px 8px',
+                    color: 'rgba(255, 255, 245, 0.9)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  + In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => addPort('outputs')}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.06)',
+                    border: '1px solid #2e2e32',
+                    borderRadius: '8px',
+                    padding: '6px 8px',
+                    color: 'rgba(255, 255, 245, 0.9)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  + Out
+                </button>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ fontSize: '12px', opacity: 0.7 }}>Inputs</div>
+              {inputs.length === 0 && <div style={{ fontSize: '12px', opacity: 0.55 }}>No inputs</div>}
+              {inputs.map((p: any, i: number) => (
+                <div key={`in-${i}`} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 96px auto', gap: '8px' }}>
+                  <input
+                    value={String(p?.label ?? '')}
+                    onChange={(e) => updatePort('inputs', i, { label: e.target.value })}
+                    placeholder="Label (e.g. Clock)"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.06)',
+                      border: '1px solid #2e2e32',
+                      borderRadius: '8px',
+                      color: 'rgba(255, 255, 245, 0.9)',
+                      padding: '6px 8px',
+                    }}
+                  />
+                  <select
+                    value={p?.signalType === 'audio' ? 'audio' : 'cv'}
+                    onChange={(e) => updatePort('inputs', i, { signalType: e.target.value })}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.06)',
+                      border: '1px solid #2e2e32',
+                      borderRadius: '8px',
+                      color: 'rgba(255, 255, 245, 0.9)',
+                      padding: '6px 8px',
+                    }}
+                    title="Signal type"
+                    aria-label="Input signal type"
+                  >
+                    <option value="cv">CV</option>
+                    <option value="audio">Audio</option>
+                  </select>
+                  <input
+                    value={String(p?.id ?? '')}
+                    onChange={(e) => updatePort('inputs', i, { id: e.target.value })}
+                    onBlur={() => normalizePortId('inputs', i)}
+                    placeholder="id (e.g. clock)"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.06)',
+                      border: '1px solid #2e2e32',
+                      borderRadius: '8px',
+                      color: 'rgba(255, 255, 245, 0.9)',
+                      padding: '6px 8px',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removePort('inputs', i)}
+                    style={{
+                      background: 'rgba(255, 80, 80, 0.18)',
+                      border: '1px solid rgba(255, 80, 80, 0.28)',
+                      borderRadius: '8px',
+                      padding: '6px 10px',
+                      color: 'rgba(255, 255, 245, 0.9)',
+                      cursor: 'pointer',
+                    }}
+                    aria-label="Remove input"
+                    title="Remove input"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ fontSize: '12px', opacity: 0.7 }}>Outputs</div>
+              {outputs.length === 0 && <div style={{ fontSize: '12px', opacity: 0.55 }}>No outputs</div>}
+              {outputs.map((p: any, i: number) => (
+                <div key={`out-${i}`} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 96px auto', gap: '8px' }}>
+                  <input
+                    value={String(p?.label ?? '')}
+                    onChange={(e) => updatePort('outputs', i, { label: e.target.value })}
+                    placeholder="Label (e.g. Audio)"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.06)',
+                      border: '1px solid #2e2e32',
+                      borderRadius: '8px',
+                      color: 'rgba(255, 255, 245, 0.9)',
+                      padding: '6px 8px',
+                    }}
+                  />
+                  <select
+                    value={p?.signalType === 'cv' ? 'cv' : 'audio'}
+                    onChange={(e) => updatePort('outputs', i, { signalType: e.target.value })}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.06)',
+                      border: '1px solid #2e2e32',
+                      borderRadius: '8px',
+                      color: 'rgba(255, 255, 245, 0.9)',
+                      padding: '6px 8px',
+                    }}
+                    title="Signal type"
+                    aria-label="Output signal type"
+                  >
+                    <option value="audio">Audio</option>
+                    <option value="cv">CV</option>
+                  </select>
+                  <input
+                    value={String(p?.id ?? '')}
+                    onChange={(e) => updatePort('outputs', i, { id: e.target.value })}
+                    onBlur={() => normalizePortId('outputs', i)}
+                    placeholder="id (e.g. audio)"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.06)',
+                      border: '1px solid #2e2e32',
+                      borderRadius: '8px',
+                      color: 'rgba(255, 255, 245, 0.9)',
+                      padding: '6px 8px',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removePort('outputs', i)}
+                    style={{
+                      background: 'rgba(255, 80, 80, 0.18)',
+                      border: '1px solid rgba(255, 80, 80, 0.28)',
+                      borderRadius: '8px',
+                      padding: '6px 10px',
+                      color: 'rgba(255, 255, 245, 0.9)',
+                      cursor: 'pointer',
+                    }}
+                    aria-label="Remove output"
+                    title="Remove output"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     case 'ToneGenerator':
       return output ? (
         <ToneGenerator
@@ -1448,11 +1771,16 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
       const stopOutput = outputStreams[2] || null;
       return output ? (
         <Clock
+          ref={clockHandleRef}
           output={output}
           startOutput={startOutput}
           stopOutput={stopOutput}
           bpm={params.bpm}
           onBpmChange={(value) => setParam('bpm', value)}
+          onRunningChange={(value) => {
+            if (params?.isRunning === value) return;
+            setParam('isRunning', value);
+          }}
         >
           {(controls) => (
             <div style={{display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center'}}>

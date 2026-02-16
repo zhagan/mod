@@ -61,6 +61,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       <div className="module-category">
+        <h3>Sub-Sketch</h3>
+        {renderModuleButton('SubSketch')}
+      </div>
+
+      <div className="module-category">
         <h3>Sources</h3>
         {renderModuleButton('ToneGenerator')}
         {renderModuleButton('NoiseGenerator')}

@@ -39,6 +39,8 @@ interface CanvasAreaProps {
   isMobileView: boolean;
   toggleSidebar: () => void;
   handleUnlockAudio: () => void;
+  breadcrumb?: string;
+  onBack?: () => void;
   children: React.ReactNode;
 }
 
@@ -73,6 +75,8 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
   isMobileView,
   toggleSidebar,
   handleUnlockAudio,
+  breadcrumb,
+  onBack,
   children,
 }) => {
   const renderedConnections = useMemo(() => connections.map((conn) => {
@@ -107,6 +111,21 @@ export const CanvasArea: React.FC<CanvasAreaProps> = ({
       onTouchCancel={handleCanvasTouchEnd}
     >
       <div className="canvas-controls">
+        {(onBack || breadcrumb) && (
+          <div className="breadcrumb">
+            {onBack && (
+              <button
+                type="button"
+                className="breadcrumb-back"
+                onClick={onBack}
+                onPointerDown={(event) => event.stopPropagation()}
+              >
+                ← Back
+              </button>
+            )}
+            {breadcrumb && <span className="breadcrumb-label">{breadcrumb}</span>}
+          </div>
+        )}
         <div className="zoom-controls">
           <button type="button" onClick={zoomOut} disabled={zoom <= minZoom} aria-label="Zoom out">
             −
