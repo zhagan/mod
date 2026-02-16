@@ -49,7 +49,6 @@ textarea,
 .app.mobile-view .sidebar {
   position: absolute;
   inset: 0 0 auto 0;
-  width: 280px;
   max-width: 85%;
   height: 100%;
   z-index: 25;
@@ -231,9 +230,9 @@ textarea,
 }
 
 .canvas-controls {
-  position: absolute;
-  top: 16px;
-  right: 16px;
+  position: relative;
+  /* top: 16px;
+  right: 16px; */
   display: flex;
   align-items: center;
   gap: 12px;
@@ -254,6 +253,23 @@ textarea,
 .sidebar-toggle:hover {
   background: rgba(255, 255, 255, 0.12);
   transform: translateY(-1px);
+}
+
+.sidebar-drag-preview {
+  position: absolute;
+  width: 120px;
+  height: 32px;
+  background: rgba(76, 175, 80, 0.95);
+  color: #fff;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  pointer-events: none;
+  z-index: 50;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .zoom-controls {
@@ -360,7 +376,7 @@ textarea,
   top: 0;
   left: 0;
   height: 100vh;
-  width: min(340px, 86vw);
+  width: min(160px, 46vw);
   z-index: 1000;
   transform: translateX(-100%);
   transition: transform 180ms ease;
