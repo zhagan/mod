@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo, useLayoutEffect, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useLayoutEffect, useEffect, useCallback } from 'react';
 import { flushSync } from 'react-dom';
 import '@mode-7/mod/dist/index.css';
 import {
@@ -44,55 +44,22 @@ import {
 } from '@mode-7/mod';
 import { ModuleWrapper } from './components/ModuleWrapper';
 import { ModuleRenderer } from './components/ModuleRenderer';
+import { Sidebar } from './components/Sidebar';
+import { CanvasArea } from './components/CanvasArea';
 import { MODULE_DEFINITIONS } from './moduleDefinitions';
 import './App.css';
-import { SidebarIcon } from 'lucide-react';
-
-interface Position {
-  x: number;
-  y: number;
-}
-
-interface Port {
-  id: string;
-  type: 'input' | 'output';
-  label: string;
-}
-
-interface ModuleData {
-  id: string;
-  type: string;
-  position: Position;
-  ports: Port[];
-  color: string;
-  enabled?: boolean;
-}
-
-interface Connection {
-  id: string;
-  from: { moduleId: string; portId: string };
-  to: { moduleId: string; portId: string };
-}
-
-interface SketchModule {
-  id: string;
-  type: string;
-  position: Position;
-  enabled?: boolean;
-  params?: Record<string, any>;
-}
-
-interface SketchConnection {
-  id: string;
-  from: { moduleId: string; portId: string };
-  to: { moduleId: string; portId: string };
-}
-
-interface SketchData {
-  version: 1;
-  modules: SketchModule[];
-  connections: SketchConnection[];
-}
+import {
+  HoveredPort,
+  Position,
+  Port,
+  ModuleData,
+  Connection,
+  SketchModule,
+  SketchConnection,
+  SketchData,
+  DraggingConnectionState,
+  SidebarDragModuleState,
+} from './types';
 
 function ModularSynth() {
   const audioContext = useAudioContext();
@@ -102,19 +69,13 @@ function ModularSynth() {
   const [layoutVersion, setLayoutVersion] = useState(0);
   const [contentSize, setContentSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
   const [requiresUserGesture, setRequiresUserGesture] = useState(false);
-  const [draggingConnection, setDraggingConnection] = useState<{
-    from: { moduleId: string; portId: string };
-    mousePos: Position;
-    startPortType: 'input' | 'output';
-  } | null>(null);
-  const [hoveredPort, setHoveredPort] = useState<{ moduleId: string; portId: string } | null>(null);
-  const [sidebarDragModule, setSidebarDragModule] = useState<{
-    moduleType: string;
-  } | null>(null);
+  const [draggingConnection, setDraggingConnection] = useState<DraggingConnectionState | null>(null);
+  const [hoveredPort, setHoveredPort] = useState<HoveredPort | null>(null);
+  const [sidebarDragModule, setSidebarDragModule] = useState<SidebarDragModuleState | null>(null);
   const [sidebarDragPoint, setSidebarDragPoint] = useState<Position | null>(null);
   const pendingSidebarDragRef = useRef<{ moduleType: string; startX: number; startY: number } | null>(null);
   const [isSidebarDragActive, setSidebarDragActive] = useState(false);
-  const sidebarDragModuleRef = useRef(sidebarDragModule);
+  const sidebarDragModuleRef = useRef<SidebarDragModuleState | null>(sidebarDragModule);
   const getIsMobileView = () => (typeof window !== 'undefined' ? window.innerWidth < 900 : false);
   const lastIsMobileRef = useRef(getIsMobileView());
   const [isMobileView, setIsMobileView] = useState(getIsMobileView);
@@ -530,7 +491,6 @@ function ModularSynth() {
   };
 
   const handleCanvasPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    handleUnlockAudio();
     if (!canvasRef.current) return;
     if (sidebarDragModule) {
       event.preventDefault();
@@ -675,25 +635,6 @@ function ModularSynth() {
     setSidebarDragActive(true);
   };
 
-  const renderModuleButton = (type: string) => (
-    <button
-      key={type}
-      onClick={() => {
-        // console.log('Add module:', type);
-        if (!isMobileView) {
-          handleAddModule(type);
-        }
-      }}
-      draggable
-      onDragStart={(e) => e.dataTransfer.setData('moduleType', type)}
-      onPointerDown={startSidebarDrag(type)}
-      onTouchStart={startSidebarTouchDrag(type)}
-      style={{ borderLeft: `4px solid ${MODULE_DEFINITIONS[type].color}`, cursor: 'grab' }}
-    >
-      {MODULE_DEFINITIONS[type].label}
-    </button>
-  );
-
   const updateModuleParam = (moduleId: string, key: string, value: any) => {
     setModuleParams(prev => ({
       ...prev,
@@ -821,321 +762,120 @@ function ModularSynth() {
     event.target.value = '';
   };
 
-  const handleSidebarTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
-    // if (event.touches.length > 1) {
-    //   event.preventDefault();
-    // }
-  };
-
-  const handleSidebarTouchMove = (event: React.TouchEvent<HTMLDivElement>) => {
-    // scroll the sidebar
-    // if (event.touches.length === 1) {
-    //   event.preventDefault();
-    // } 
-    // if (event.touches.length === 1 && isSidebarOpen) {
-    //   const touch = event.touches[0];
-    //   const deltaY = touch.clientY - panStartRef.current.y;
-    //   const sidebarEl = event.currentTarget;
-    //   sidebarEl.scrollTop = panStartRef.current.scrollTop - deltaY;
-    //   panStartRef.current = {
-    //     x: touch.clientX,
-    //     y: touch.clientY,
-    //     scrollLeft: sidebarEl.scrollLeft,
-    //     scrollTop: sidebarEl.scrollTop,
-    //     pointerId: 0,
-    //   };
-    // }
-    // if (event.touches.length > 1) {
-      // event.preventDefault();
-    // }
-  };
+  const isSaveDisabled = modules.length === 0 && connections.length === 0;
   const zoomPercent = Math.round(zoom * 100);
   const appClassName = ['app', isMobileView ? 'mobile-view' : '', isSidebarOpen ? 'sidebar-open' : ''].filter(Boolean).join(' ');
-  const sidebarClassName = `sidebar${isSidebarOpen ? ' open' : ''}`;
 
   return (
     <div className={appClassName}>
-      {/* Sidebar */}
-      <div
-        className={sidebarClassName}
-        // onTouchStart={handleSidebarTouchStart}
-        // onTouchMove={handleSidebarTouchMove}
+      <Sidebar
+        isSidebarOpen={isSidebarOpen}
+        isMobileView={isMobileView}
+        handleSaveSketch={handleSaveSketch}
+        handleSketchFileChange={handleSketchFileChange}
+        startSidebarDrag={startSidebarDrag}
+        startSidebarTouchDrag={startSidebarTouchDrag}
+        handleAddModule={handleAddModule}
+        isSaveDisabled={isSaveDisabled}
+      />
+      <CanvasArea
+        canvasRef={canvasRef}
+        contentRef={contentRef}
+        canvasScaleRef={canvasScaleRef}
+        contentSize={contentSize}
+        layoutVersion={layoutVersion}
+        zoom={zoom}
+        zoomPercent={zoomPercent}
+        minZoom={minZoom}
+        maxZoom={maxZoom}
+        zoomIn={zoomIn}
+        zoomOut={zoomOut}
+        handleCanvasMouseMove={handleCanvasMouseMove}
+        handleCanvasMouseUp={handleCanvasMouseUp}
+        handleCanvasDragOver={handleCanvasDragOver}
+        handleCanvasDrop={handleCanvasDrop}
+        handleCanvasPointerDown={handleCanvasPointerDown}
+        handleCanvasPointerMove={handleCanvasPointerMove}
+        handleCanvasPointerUp={handleCanvasPointerUp}
+        handleCanvasTouchStart={handleCanvasTouchStart}
+        handleCanvasTouchMove={handleCanvasTouchMove}
+        handleCanvasTouchEnd={handleCanvasTouchEnd}
+        draggingConnection={draggingConnection}
+        connections={connections}
+        sidebarDragModule={sidebarDragModule}
+        sidebarDragPoint={sidebarDragPoint}
+        getPortPosition={getPortPosition}
+        handleWireClick={handleWireClick}
+        isMobileView={isMobileView}
+        toggleSidebar={toggleSidebar}
+        handleUnlockAudio={handleUnlockAudio}
       >
-        <a href="/mod/" className="sidebar-header">
-          <h1 className="sidebar-title">MOD</h1>
-        </a>
+        {modules.map((module) => {
+          const inputPorts = module.ports.filter(p =>
+            p.type === 'input'
+            && !p.label.startsWith('CV')
+            && p.label !== 'Gate'
+            && p.label !== 'Clock'
+            && p.label !== 'Reset'
+            && p.label !== 'Trigger'
+            && p.label !== 'Pitch'
+            && p.label !== 'Stop'
+          );
+          const outputPorts = module.ports.filter(p => p.type === 'output');
+          const cvPorts = module.ports.filter(p =>
+            p.type === 'input'
+            && (p.label === 'CV' || p.label === 'Gate' || p.label === 'Clock' || p.label === 'Reset' || p.label === 'Trigger' || p.label === 'Start' || p.label === 'Pitch' || p.label === 'Stop')
+          );
 
-        <div className="module-category sketch-controls">
-          <h3>Sketches</h3>
-          <button onClick={handleSaveSketch} disabled={modules.length === 0 && connections.length === 0}>
-            Save Sketch
-          </button>
-          <label className="file-button">
-            Load Sketch
-            <input type="file" accept="application/json" onChange={handleSketchFileChange} />
-          </label>
-        </div>
+          const inputStreams = inputPorts.map(port => {
+            const connection = connections.find(c => c.to.portId === port.id);
+            if (requiresUserGesture) return null;
+            return connection ? getStreamRef(connection.from.portId) : null;
+          });
 
-        <div className="module-category">
-          <h3>Sources</h3>
-          {renderModuleButton('ToneGenerator')}
-          {renderModuleButton('NoiseGenerator')}
-          {renderModuleButton('Microphone')}
-          {renderModuleButton('MP3Deck')}
-          {renderModuleButton('Fluidsynth')}
-          {renderModuleButton('MidiPlayer')}
-          {renderModuleButton('StreamingAudioDeck')}
-        </div>
+          const cvInputStreams: { [key: string]: React.RefObject<any> | null } = {};
+          cvPorts.forEach(port => {
+            const connection = connections.find(c => c.to.portId === port.id);
+            const key = port.id.split('-').slice(-2).join('-');
+            cvInputStreams[key] = requiresUserGesture ? null : (connection ? getStreamRef(connection.from.portId) : null);
+          });
 
-        <div className="module-category">
-          <h3>CV</h3>
-          {renderModuleButton('LFO')}
-          {renderModuleButton('ADSR')}
-          {renderModuleButton('Sequencer')}
-          {renderModuleButton('Clock')}
-        </div>
+          const outputStreams = outputPorts.map(port => getStreamRef(port.id));
 
-        <div className="module-category">
-          <h3>Processors</h3>
-          {renderModuleButton('Filter')}
-          {renderModuleButton('Delay')}
-          {renderModuleButton('Reverb')}
-          {renderModuleButton('Compressor')}
-          {renderModuleButton('Distortion')}
-          {renderModuleButton('DiodeFilter')}
-          {renderModuleButton('Panner')}
-          {renderModuleButton('EQ')}
-          {renderModuleButton('Chorus')}
-          {renderModuleButton('Phaser')}
-          {renderModuleButton('Flanger')}
-          {renderModuleButton('Tremolo')}
-          {renderModuleButton('BitCrusher')}
-          {renderModuleButton('Limiter')}
-          {renderModuleButton('Gate')}
-          {renderModuleButton('AutoWah')}
-          {renderModuleButton('RingModulator')}
-          {renderModuleButton('VCA')}
-        </div>
-
-        <div className="module-category">
-          <h3>Mixers</h3>
-          {renderModuleButton('CrossFade')}
-          {renderModuleButton('Mixer')}
-        </div>
-
-        <div className="module-category">
-          <h3>Output</h3>
-          {renderModuleButton('Monitor')}
-        </div>
-
-        <div className="module-category">
-          <h3>Visualizations</h3>
-          {renderModuleButton('Oscilloscope')}
-          {renderModuleButton('SpectrumAnalyzer')}
-          {renderModuleButton('LevelMeter')}
-        </div>
-      </div>
-     
-      {/* Canvas */}
-      <div
-        ref={canvasRef}
-        className="canvas"
-        onMouseMove={handleCanvasMouseMove}
-        onMouseUp={handleCanvasMouseUp}
-        onDragOver={handleCanvasDragOver}
-        onDrop={handleCanvasDrop as any}
-        onPointerDown={handleCanvasPointerDown}
-        onPointerMove={handleCanvasPointerMove}
-        onPointerUp={handleCanvasPointerUp}
-        onPointerCancel={handleCanvasPointerUp}
-        onTouchStart={handleCanvasTouchStart}
-        onTouchMove={handleCanvasTouchMove}
-        onTouchEnd={handleCanvasTouchEnd}
-        onTouchCancel={handleCanvasTouchEnd}
-      >
-        <div className="canvas-controls">
-          <div className="zoom-controls">
-            <button type="button" onClick={zoomOut} disabled={zoom <= minZoom} aria-label="Zoom out">
-              −
-            </button>
-            <span className="zoom-label">{zoomPercent}%</span>
-            <button type="button" onClick={zoomIn} disabled={zoom >= maxZoom} aria-label="Zoom in">
-              +
-            </button>
-          </div>
-        {isMobileView && (
-          <button
-            type="button"
-            className="sidebar-toggle"
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={toggleSidebar}
-            aria-label="Toggle module list"
-          >
-            <SidebarIcon />
-            </button>
-          )}
-        </div>
-        <div
-          ref={contentRef}
-          className="canvas-content"
-          style={{ width: contentSize.width || '100%', height: contentSize.height || '100%' }}
-        >
-          <div
-            ref={canvasScaleRef}
-            className="canvas-scale"
-            style={{ transform: `scale(${zoom})`, transformOrigin: '0 0' }}
-          >
-            {/* SVG for wires */}
-            <svg
-              className="wires-svg"
-              width={'400%'}
-              height={'400%'}
+          return (
+            <ModuleWrapper
+              key={module.id}
+              id={module.id}
+              type={module.type}
+              position={module.position}
+              ports={module.ports}
+              color={module.color}
+              onMove={moveModule}
+              onDelete={deleteModule}
+              onPortMouseDown={handlePortMouseDown}
+              onPortMouseEnter={(moduleId, portId) => setHoveredPort({ moduleId, portId })}
+              onPortMouseLeave={() => setHoveredPort(null)}
+              isPortConnected={isPortConnected}
+              hoveredPortId={hoveredPort?.moduleId === module.id ? hoveredPort.portId : undefined}
+              enabled={module.enabled}
+              onEnabledToggle={toggleModuleEnabled}
+              supportsEnabled={supportsEnabled(module.type)}
             >
-            {/* Render existing connections - memoized */}
-            {useMemo(() => connections.map((conn) => {
-              const fromPos = getPortPosition(conn.from.moduleId, conn.from.portId);
-              const toPos = getPortPosition(conn.to.moduleId, conn.to.portId);
-
-              if (!fromPos || !toPos) return null;
-
-              // Create a smooth curve
-              const midX = (fromPos.x + toPos.x) / 2;
-              const path = `M ${fromPos.x} ${fromPos.y} C ${midX} ${fromPos.y}, ${midX} ${toPos.y}, ${toPos.x} ${toPos.y}`;
-
-              return (
-                <g key={conn.id}>
-                  {/* Invisible thick path for easier clicking */}
-                <path
-                  d={path}
-                  stroke="transparent"
-                  strokeWidth="12"
-                  fill="none"
-                  strokeLinecap="round"
-                  style={{ cursor: 'pointer' }}
-                  onPointerDown={(event) => event.stopPropagation()}
-                  onClick={(e) => handleWireClick(conn.id, e)}
-                />
-                  {/* Visible wire */}
-                  <path
-                    d={path}
-                    stroke="#4CAF50"
-                    strokeWidth="3"
-                    fill="none"
-                    strokeLinecap="round"
-                    style={{
-                      filter: 'drop-shadow(0 0 4px rgba(76, 175, 80, 0.5))',
-                      pointerEvents: 'none'
-                    }}
-                  />
-                </g>
-              );
-            }), [connections, modules, layoutVersion])}
-
-            {/* Render dragging connection */}
-            {draggingConnection && (() => {
-              const fromPos = getPortPosition(draggingConnection.from.moduleId, draggingConnection.from.portId);
-              if (!fromPos) return null;
-
-              const midX = (fromPos.x + draggingConnection.mousePos.x) / 2;
-              const path = `M ${fromPos.x} ${fromPos.y} C ${midX} ${fromPos.y}, ${midX} ${draggingConnection.mousePos.y}, ${draggingConnection.mousePos.x} ${draggingConnection.mousePos.y}`;
-
-              return (
-                <path
-                  d={path}
-                  stroke="#4CAF50"
-                  strokeWidth="3"
-                  fill="none"
-                  strokeLinecap="round"
-                  opacity="0.6"
-                  strokeDasharray="5,5"
-                  style={{ pointerEvents: 'none' }}
-                />
-              );
-            })()}
-            {sidebarDragPoint && sidebarDragModule && (
-              <div
-                className="sidebar-drag-preview"
-                style={{
-                  left: sidebarDragPoint.x - 16,
-                  top: sidebarDragPoint.y - 16,
-                }}
-              >
-                {MODULE_DEFINITIONS[sidebarDragModule.moduleType]?.label || 'Module'}
-              </div>
-            )}
-          </svg>
-
-          {modules.map((module) => {
-            const inputPorts = module.ports.filter(p =>
-              p.type === 'input'
-              && !p.label.startsWith('CV')
-              && p.label !== 'Gate'
-              && p.label !== 'Clock'
-              && p.label !== 'Reset'
-              && p.label !== 'Trigger'
-              && p.label !== 'Pitch'
-              && p.label !== 'Stop'
-            );
-            const outputPorts = module.ports.filter(p => p.type === 'output');
-            const cvPorts = module.ports.filter(p =>
-              p.type === 'input'
-              && (p.label === 'CV' || p.label === 'Gate' || p.label === 'Clock' || p.label === 'Reset' || p.label === 'Trigger' || p.label === 'Start' || p.label === 'Pitch' || p.label === 'Stop')
-            );
-
-            // Get connected input streams for each input port (excluding CV)
-            const inputStreams = inputPorts.map(port => {
-              const connection = connections.find(c => c.to.portId === port.id);
-              if (requiresUserGesture) return null;
-              return connection ? getStreamRef(connection.from.portId) : null;
-            });
-
-            // Get CV input streams
-            const cvInputStreams: { [key: string]: React.RefObject<any> | null } = {};
-            cvPorts.forEach(port => {
-              const connection = connections.find(c => c.to.portId === port.id);
-              const key = port.id.split('-').slice(-2).join('-'); // Extract 'cv-freq', 'cv-gain', etc.
-              cvInputStreams[key] = requiresUserGesture ? null : (connection ? getStreamRef(connection.from.portId) : null);
-            });
-
-            // Get output stream refs for each output port
-            const outputStreams = outputPorts.map(port => getStreamRef(port.id));
-
-            return (
-              <ModuleWrapper
-                key={module.id}
-                id={module.id}
-                type={module.type}
-                position={module.position}
-                ports={module.ports}
-                color={module.color}
-                onMove={moveModule}
-                onDelete={deleteModule}
-                onPortMouseDown={handlePortMouseDown}
-                onPortMouseEnter={(moduleId, portId) => setHoveredPort({ moduleId, portId })}
-                onPortMouseLeave={() => setHoveredPort(null)}
-                isPortConnected={isPortConnected}
-                hoveredPortId={hoveredPort?.moduleId === module.id ? hoveredPort.portId : undefined}
+              <ModuleRenderer
+                moduleId={module.id}
+                moduleType={module.type}
+                inputStreams={inputStreams}
+                outputStreams={outputStreams}
+                cvInputStreams={cvInputStreams}
                 enabled={module.enabled}
-                onEnabledToggle={toggleModuleEnabled}
-                supportsEnabled={supportsEnabled(module.type)}
-              >
-                <ModuleRenderer
-                  moduleId={module.id}
-                  moduleType={module.type}
-                  inputStreams={inputStreams}
-                  outputStreams={outputStreams}
-                  cvInputStreams={cvInputStreams}
-                  enabled={module.enabled}
-                  params={moduleParams[module.id] || getDefaultParams(module.type)}
-                  onParamChange={updateModuleParam}
-                />
-              </ModuleWrapper>
-            );
-          })}
-        </div>
-      </div>
+                params={moduleParams[module.id] || getDefaultParams(module.type)}
+                onParamChange={updateModuleParam}
+              />
+            </ModuleWrapper>
+          );
+        })}
+      </CanvasArea>
     </div>
-  </div>
   );
 }
 
