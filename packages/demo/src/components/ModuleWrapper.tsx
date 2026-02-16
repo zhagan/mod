@@ -75,19 +75,6 @@ export const ModuleWrapper = React.memo<ModuleWrapperProps>(({
   const textColor = isLightColor(color) ? '#2a2a2a' : '#ffffff';
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-<<<<<<< Updated upstream
-    // Don't start dragging if clicking on a port or control
-    if ((e.target as HTMLElement).closest('.port') ||
-        (e.target as HTMLElement).closest('input') ||
-        (e.target as HTMLElement).closest('button') ||
-        (e.target as HTMLElement).closest('select') ||
-        (e.target as HTMLElement).closest('.select-trigger') ||
-        (e.target as HTMLElement).closest('.select-content') ||
-        (e.target as HTMLElement).closest('.select-item')) {
-=======
-  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-=======
->>>>>>> Stashed changes
     const target = e.target as HTMLElement;
     const controlSelectors = [
       '.port',
@@ -124,10 +111,6 @@ export const ModuleWrapper = React.memo<ModuleWrapperProps>(({
     ];
 
     if (controlSelectors.some(selector => Boolean(target.closest(selector)))) {
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
       return;
     }
 
