@@ -20,6 +20,7 @@ interface ModuleWrapperProps {
   color?: string;
   onMove: (id: string, position: Position) => void;
   onDelete: (id: string) => void;
+  onDuplicate?: (id: string) => void;
   onPortMouseDown?: (moduleId: string, portId: string, portType: 'input' | 'output', event: React.PointerEvent<HTMLDivElement>) => void;
   onPortMouseEnter?: (moduleId: string, portId: string) => void;
   onPortMouseLeave?: () => void;
@@ -55,6 +56,7 @@ export const ModuleWrapper = React.memo<ModuleWrapperProps>(({
   color,
   onMove,
   onDelete,
+  onDuplicate,
   onPortMouseDown,
   onPortMouseEnter,
   onPortMouseLeave,
@@ -175,6 +177,20 @@ export const ModuleWrapper = React.memo<ModuleWrapperProps>(({
                   boxShadow: enabled ? '0 0 6px rgba(0, 255, 136, 0.6)' : '0 0 6px rgba(255, 68, 68, 0.6)',
                 }}
               />
+            </button>
+          )}
+          {onDuplicate && (
+            <button
+              className="module-wrapper-duplicate"
+              style={{ color: textColor }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDuplicate(id);
+              }}
+              title="Duplicate"
+              aria-label="Duplicate module"
+            >
+              ⧉
             </button>
           )}
           <button

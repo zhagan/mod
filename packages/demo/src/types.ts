@@ -3,10 +3,34 @@ export interface Position {
   y: number;
 }
 
+export interface ModuleDefinition {
+  type: string;
+  label: string;
+  category: string;
+  color: string;
+  inputs: number;
+  outputs: number;
+  inputLabels?: string[];
+  outputLabels?: string[];
+  inputIds?: string[];
+  defaultParams?: Record<string, any>;
+}
+
 export interface Port {
   id: string;
   type: 'input' | 'output';
   label: string;
+}
+
+export interface SubSketchInterfacePort {
+  id: string;
+  label: string;
+  signalType?: 'cv' | 'audio';
+}
+
+export interface SubSketchInterface {
+  inputs: SubSketchInterfacePort[];
+  outputs: SubSketchInterfacePort[];
 }
 
 export interface ModuleData {
@@ -42,6 +66,7 @@ export interface SketchData {
   version: number;
   modules: SketchModule[];
   connections: SketchConnection[];
+  interface?: SubSketchInterface;
 }
 
 export interface HoveredPort {
