@@ -12,6 +12,7 @@ type Props = {
   getParentStreamRef: (portId: string) => any;
   requiresUserGesture: boolean;
   suspended?: boolean;
+  onRuntimeAnimChange?: (key: string, patch: { sequencerCurrentStep?: number }) => void;
 };
 
 const SKETCH_IN_MODULE_ID = '__sketch_in__';
@@ -102,6 +103,7 @@ export const SubSketchRuntime: React.FC<Props> = ({
   getParentStreamRef,
   requiresUserGesture,
   suspended = false,
+  onRuntimeAnimChange,
 }) => {
   const storageMode = params.storageMode === 'embed' ? 'embed' : 'reference';
   const referenceUrl = typeof params.referenceUrl === 'string' ? params.referenceUrl : '';
@@ -346,6 +348,8 @@ export const SubSketchRuntime: React.FC<Props> = ({
             enabled={module.enabled}
             params={moduleRuntimeParams}
             onParamChange={() => {}}
+            renderUI={false}
+            onRuntimeAnimChange={(childId, patch) => onRuntimeAnimChange?.(`${moduleId}::${childId}`, patch)}
           />
         );
       })}

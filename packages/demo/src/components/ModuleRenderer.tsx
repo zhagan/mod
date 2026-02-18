@@ -83,6 +83,11 @@ interface ModuleRendererProps {
   onParamChange: (moduleId: string, key: string, value: any) => void;
   onRequestOpenSubSketch?: (moduleId: string) => void;
   onUpdateSubSketchInterface?: (moduleId: string, value: any) => void;
+  renderUI?: boolean;
+  runtimeAnimKey?: string;
+  getRuntimeAnimState?: (key: string) => { sequencerCurrentStep?: number } | undefined;
+  subscribeRuntimeAnimState?: (key: string, listener: () => void) => () => void;
+  onRuntimeAnimChange?: (moduleId: string, patch: { sequencerCurrentStep?: number }) => void;
 }
 
 export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
@@ -96,6 +101,11 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                                                                 onParamChange,
                                                                 onRequestOpenSubSketch,
                                                                 onUpdateSubSketchInterface,
+                                                                renderUI = true,
+                                                                runtimeAnimKey = '',
+                                                                getRuntimeAnimState,
+                                                                subscribeRuntimeAnimState,
+                                                                onRuntimeAnimChange,
                                                               }) => {
   const [selectedStepIndex, setSelectedStepIndex] = React.useState(0);
   const clockHandleRef = React.useRef<any>(null);
@@ -145,6 +155,21 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
     if (desired && !actual) handle.start?.();
     if (!desired && actual) handle.stop?.();
   }, [moduleType, params?.isRunning]);
+
+  const sequencerRuntimeStep = React.useSyncExternalStore(
+    React.useCallback((listener) => {
+      if (!runtimeAnimKey || !subscribeRuntimeAnimState) return () => {};
+      return subscribeRuntimeAnimState(runtimeAnimKey, listener);
+    }, [runtimeAnimKey, subscribeRuntimeAnimState]),
+    React.useCallback(() => {
+      if (!runtimeAnimKey || !getRuntimeAnimState) return undefined;
+      return getRuntimeAnimState(runtimeAnimKey)?.sequencerCurrentStep;
+    }, [runtimeAnimKey, getRuntimeAnimState]),
+    React.useCallback(() => {
+      if (!runtimeAnimKey || !getRuntimeAnimState) return undefined;
+      return getRuntimeAnimState(runtimeAnimKey)?.sequencerCurrentStep;
+    }, [runtimeAnimKey, getRuntimeAnimState]),
+  );
 
   switch (moduleType) {
     case 'SubSketch': {
@@ -1591,9 +1616,14 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
           onLengthChange={(value) => setParam('length', value)}
           swing={params.swing}
           onSwingChange={(value) => setParam('swing', value)}
+          onCurrentStepChange={(value) => onRuntimeAnimChange?.(moduleId, { sequencerCurrentStep: value })}
         >
-          {(controls) => (
-            <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
+          {renderUI ? ((controls) => {
+            const displayCurrentStep = Number.isFinite(sequencerRuntimeStep as any)
+              ? (sequencerRuntimeStep as number)
+              : controls.currentStep;
+            return (
+              <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
               <ModUISlider
                 label="Length"
                 value={controls.length}
@@ -1721,7 +1751,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                       borderRadius: '6px',
                       padding: '2px',
                       border: selectedStepIndex === i ? '1px solid rgba(0,0,0,0.35)' : '1px solid transparent',
-                      background: i === controls.currentStep ? 'rgba(255,0,0,0.08)' : 'transparent',
+                      background: i === displayCurrentStep ? 'rgba(255,0,0,0.08)' : 'transparent',
                     }}
                     role="button"
                     tabIndex={0}
@@ -1739,7 +1769,7 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                   >
                     <ModUIButton
                       active={step.active}
-                      variant={i === controls.currentStep ? 'success' : 'default'}
+                      variant={i === displayCurrentStep ? 'success' : 'default'}
                       onClick={() => {
                         const next = [...controls.steps];
                         next[i] = { ...step, active: !step.active };
@@ -1762,7 +1792,8 @@ export const ModuleRenderer: React.FC<ModuleRendererProps> = ({
                 />
               </div>
             </div>
-          )}
+            );
+          }) : undefined}
         </Sequencer>
       ) : null;
 
