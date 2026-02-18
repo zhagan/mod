@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState } from 'react';
 import './XYPad.css';
 
 export interface XYPadProps {
@@ -46,6 +46,7 @@ export const XYPad: React.FC<XYPadProps> = ({
 }) => {
   const padRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const pointerIdRef = useRef<number | null>(null);
 
   const displayValueX = formatValueX ? formatValueX(valueX) : valueX.toString();
   const displayValueY = formatValueY ? formatValueY(valueY) : valueY.toString();
@@ -81,33 +82,42 @@ export const XYPad: React.FC<XYPadProps> = ({
     if (newValueY !== valueY) onChangeY(newValueY);
   };
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handlePointerDown = (e: React.PointerEvent) => {
     if (disabled) return;
+    if (padRef.current) {
+      try {
+        padRef.current.setPointerCapture(e.pointerId);
+      } catch {
+        // Ignore (some environments may throw)
+      }
+    }
+    pointerIdRef.current = e.pointerId;
     setIsDragging(true);
     updateValues(e.clientX, e.clientY);
     e.preventDefault();
     e.stopPropagation();
   };
 
-  const handleMouseMove = (e: MouseEvent) => {
+  const handlePointerMove = (e: React.PointerEvent) => {
     if (!isDragging) return;
+    if (pointerIdRef.current !== null && e.pointerId !== pointerIdRef.current) return;
     updateValues(e.clientX, e.clientY);
+    e.preventDefault();
+    e.stopPropagation();
   };
 
-  const handleMouseUp = () => {
+  const endDrag = (e: React.PointerEvent) => {
+    if (pointerIdRef.current !== null && e.pointerId !== pointerIdRef.current) return;
+    pointerIdRef.current = null;
     setIsDragging(false);
-  };
-
-  useEffect(() => {
-    if (isDragging) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
-      return () => {
-        window.removeEventListener('mousemove', handleMouseMove);
-        window.removeEventListener('mouseup', handleMouseUp);
-      };
+    try {
+      padRef.current?.releasePointerCapture(e.pointerId);
+    } catch {
+      // Ignore
     }
-  }, [isDragging, valueX, valueY]);
+    e.preventDefault();
+    e.stopPropagation();
+  };
 
   const defaultStyles = {
     container: `modui-xypad ${className}`,
@@ -124,7 +134,10 @@ export const XYPad: React.FC<XYPadProps> = ({
       <div
         ref={padRef}
         className={defaultStyles.pad}
-        onMouseDown={handleMouseDown}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
         style={{
           width: size,
           height: size,

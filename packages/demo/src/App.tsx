@@ -73,6 +73,53 @@ type LiveSubSketchSession = {
   snapshot: EditorSnapshot;
 };
 
+type RuntimeAnimState = {
+  sequencerCurrentStep?: number;
+};
+
+type RuntimeAnimStore = {
+  get: (key: string) => RuntimeAnimState | undefined;
+  set: (key: string, patch: RuntimeAnimState) => void;
+  subscribe: (key: string, listener: () => void) => () => void;
+};
+
+const createRuntimeAnimStore = (): RuntimeAnimStore => {
+  type Entry = { state: RuntimeAnimState; listeners: Set<() => void> };
+  const entries = new Map<string, Entry>();
+
+  const getEntry = (key: string) => {
+    const existing = entries.get(key);
+    if (existing) return existing;
+    const created: Entry = { state: {}, listeners: new Set() };
+    entries.set(key, created);
+    return created;
+  };
+
+  return {
+    get: (key) => {
+      if (!key) return undefined;
+      return entries.get(key)?.state;
+    },
+    set: (key, patch) => {
+      if (!key) return;
+      const entry = getEntry(key);
+      const next: RuntimeAnimState = { ...entry.state, ...patch };
+      const changed = Object.keys(patch).some((k) => (entry.state as any)[k] !== (next as any)[k]);
+      if (!changed) return;
+      entry.state = next;
+      entry.listeners.forEach((l) => l());
+    },
+    subscribe: (key, listener) => {
+      if (!key) return () => {};
+      const entry = getEntry(key);
+      entry.listeners.add(listener);
+      return () => {
+        entry.listeners.delete(listener);
+      };
+    },
+  };
+};
+
 function ModularSynth() {
   const audioContext = useAudioContext();
   const [modules, setModules] = useState<ModuleData[]>([]);
@@ -138,6 +185,19 @@ function ModularSynth() {
   const isSubCanvasPanningRef = useRef(false);
   const subRafIdRef = useRef<number | null>(null);
   const subPortPositionCacheRef = useRef<Map<string, Position>>(new Map());
+
+  const runtimeAnimStoreRef = useRef<RuntimeAnimStore | null>(null);
+  if (!runtimeAnimStoreRef.current) {
+    runtimeAnimStoreRef.current = createRuntimeAnimStore();
+  }
+
+  const getRuntimeAnimState = useCallback((key: string) => runtimeAnimStoreRef.current?.get(key), []);
+  const subscribeRuntimeAnimState = useCallback((key: string, listener: () => void) => {
+    return runtimeAnimStoreRef.current?.subscribe(key, listener) ?? (() => {});
+  }, []);
+  const setRuntimeAnimState = useCallback((key: string, patch: RuntimeAnimState) => {
+    runtimeAnimStoreRef.current?.set(key, patch);
+  }, []);
 
   // Create stream refs map
   const [, bumpStreamVersion] = useState(0);
@@ -1807,6 +1867,7 @@ function ModularSynth() {
                     parentConnections={connections}
                     getParentStreamRef={getStreamRef}
                     requiresUserGesture={requiresUserGesture}
+                    onRuntimeAnimChange={(key, patch) => setRuntimeAnimState(key, patch)}
                   />
                 </>
               )}
@@ -1924,6 +1985,9 @@ function ModularSynth() {
                     enabled={module.enabled}
                     params={subModuleParams[module.id] || getDefaultParams(module.type)}
                     onParamChange={updateSubModuleParam}
+                    runtimeAnimKey={liveSubSketch ? `${liveSubSketch.moduleId}::${module.id}` : ''}
+                    getRuntimeAnimState={getRuntimeAnimState}
+                    subscribeRuntimeAnimState={subscribeRuntimeAnimState}
                   />
                 </ModuleWrapper>
               );
